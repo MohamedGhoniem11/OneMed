@@ -1,5 +1,5 @@
 ﻿{
-  "name": "firebase-express-api",
+  "name": "OneMed",
   "version": "1.0.0",
   "type": "module",
   "main": "src/server.js",
