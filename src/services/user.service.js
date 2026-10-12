@@ -1,70 +1,61 @@
-﻿import { db, admin } from "../config/firebase.js";
+﻿import { admin, db } from "../config/firebase.js";
 
 const col = db.collection("users");
 
-const normalizeEmail = (email) => email.trim().toLowerCase();
-
-const conflict = () => {
-  const err = new Error("Email already exists");
-  err.status = 409;
-  return err;
-};
-
-export const create = async (data) => {
-  const email = normalizeEmail(data.email);
-  const ref = col.doc(); // ID عشوائي
-
-  await db.runTransaction(async (t) => {
-    const dup = await t.get(col.where("email", "==", email).limit(1));
-    if (!dup.empty) throw conflict();
-    t.set(ref, {
-      ...data,
-      email,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-  });
-
-  return { id: ref.id, ...data, email };
-};
-
-export const getAll = async () => {
-  const snap = await col.get();
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-};
+const httpError = (status, message) => Object.assign(new Error(message), { status });
 
 export const getById = async (id) => {
   const doc = await col.doc(id).get();
   return doc.exists ? { id: doc.id, ...doc.data() } : null;
 };
 
-export const update = async (id, data) => {
+export const getAll = async ({ limit = 20, startAfter } = {}) => {
+  let q = col.orderBy("createdAt", "desc").limit(limit);
+  if (startAfter) {
+    const cursor = await col.doc(startAfter).get();
+    if (cursor.exists) q = q.startAfter(cursor);
+  }
+  const snap = await q.get();
+  const users = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  const nextCursor = snap.docs.length === limit ? snap.docs.at(-1).id : null;
+  return { users, nextCursor };
+};
+
+export const updateProfile = async (id, data) => {
   const ref = col.doc(id);
+  if (!(await ref.get()).exists) return null;
 
-  const found = await db.runTransaction(async (t) => {
-    const doc = await t.get(ref);
-    if (!doc.exists) return false;
-
-    const changes = { ...data };
-    if (data.email !== undefined) {
-      const email = normalizeEmail(data.email);
-      const dup = await t.get(col.where("email", "==", email).limit(2));
-      if (dup.docs.some((d) => d.id !== id)) throw conflict();
-      changes.email = email;
-    }
-
-    t.update(ref, {
-      ...changes,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
-    return true;
+  if (data.name) await admin.auth().updateUser(id, { displayName: data.name });
+  await ref.update({
+    ...data,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
+  return getById(id);
+};
 
-  return found ? getById(id) : null;
+export const setRole = async (id, role) => {
+  const ref = col.doc(id);
+  if (!(await ref.get()).exists) return null;
+
+  await admin.auth().setCustomUserClaims(id, { role });
+  await ref.update({
+    role,
+    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+  return getById(id);
 };
 
 export const remove = async (id) => {
   const ref = col.doc(id);
   if (!(await ref.get()).exists) return false;
+
+  try {
+    await admin.auth().deleteUser(id);
+  } catch (e) {
+    if (e.code !== "auth/user-not-found") throw e;
+  }
   await ref.delete();
   return true;
 };
+
+export { httpError };
