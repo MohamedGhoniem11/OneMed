@@ -1,0 +1,13 @@
+
+services:
+  backend:
+    build: .
+    container_name: onemed-backend
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+    volumes:
+      - ./serviceAccountKey.json:/app/serviceAccountKey.json:ro
+    restart: unless-stopped
