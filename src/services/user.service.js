@@ -1,4 +1,4 @@
-﻿import { admin, db } from "../config/firebase.js";
+import { admin, db } from "../config/firebase.js";
 
 const col = db.collection("users");
 

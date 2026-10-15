@@ -1,4 +1,4 @@
-﻿import * as service from "../services/user.service.js";
+import * as service from "../services/user.service.js";
 import { isValidPhone, normalizePhone } from "../utils/validators.js";
 const ROLES = ["patient", "doctor", "admin"];
 

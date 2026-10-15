@@ -1,4 +1,4 @@
-﻿import * as service from "../services/auth.service.js";
+import * as service from "../services/auth.service.js";
 import { isValidPhone, normalizePhone } from "../utils/validators.js";
 
 export async function register(req, res, next) {

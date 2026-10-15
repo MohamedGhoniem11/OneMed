@@ -1,4 +1,4 @@
-﻿import { Router } from "express";
+import { Router } from "express";
 import * as c from "../controllers/user.controller.js";
 import { authenticate, requireRole } from "../middleware/auth.js";
 
