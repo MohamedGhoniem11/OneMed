@@ -1,25 +1,29 @@
 ﻿import * as service from "../services/user.service.js";
-
+import { isValidPhone, normalizePhone } from "../utils/validators.js";
 const ROLES = ["patient", "doctor", "admin"];
 
 // بيرجع الحقول المسموحة فقط، أو error لو فيها غلط
-const parseProfile = (body) => {
+function parseProfile(body) {
+  const { name, phone } = body;   // ← السطر الناقص
   const data = {};
-  if (body.name !== undefined) {
-    if (typeof body.name !== "string" || !body.name.trim())
-      throw service.httpError(400, "name must be a non-empty string");
-    data.name = body.name.trim();
+
+  if (name !== undefined) {
+    if (typeof name !== "string" || !name.trim())
+      throw service.httpError(400, "name غير صالح");
+    data.name = name.trim();
   }
-  if (body.phone !== undefined) {
-    if (typeof body.phone !== "string" || !/^[0-9+\-\s]{7,20}$/.test(body.phone))
-      throw service.httpError(400, "phone is invalid");
-    data.phone = body.phone.trim();
+
+  if (phone !== undefined) {
+    if (!isValidPhone(phone))
+      throw service.httpError(400, "رقم الموبايل غير صالح");   // ← service.httpError
+    data.phone = normalizePhone(phone);
   }
+
   if (Object.keys(data).length === 0)
     throw service.httpError(400, "nothing to update (allowed: name, phone)");
-  return data;
-};
 
+  return data;
+}
 const notFound = (res) => res.status(404).json({ message: "User not found" });
 
 export const me = async (req, res, next) => {

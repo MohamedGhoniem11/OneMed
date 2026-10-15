@@ -2,7 +2,7 @@
 
 const httpError = (status, message) => Object.assign(new Error(message), { status });
 
-export const register = async ({ name, email, password, phone, role }) => {
+export async function register({ name, email, password, role, phone }) {
   let userRecord;
   try {
     userRecord = await admin.auth().createUser({ email, password, displayName: name });
@@ -16,16 +16,29 @@ export const register = async ({ name, email, password, phone, role }) => {
   try {
     await admin.auth().setCustomUserClaims(userRecord.uid, { role });
     await db.collection("users").doc(userRecord.uid).set({
-      name,
-      email: userRecord.email,
-      phone: phone ?? null,
-      role,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      name, email, phone, role, createdAt: new Date(),
     });
   } catch (e) {
-    await admin.auth().deleteUser(userRecord.uid); // تراجع لو فشل الحفظ
+    await admin.auth().deleteUser(userRecord.uid); // rollback
     throw e;
   }
 
-  return { id: userRecord.uid, name, email: userRecord.email, role };
-};
+  // دخول تلقائي
+  const customToken = await admin.auth().createCustomToken(userRecord.uid);
+  const r = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${process.env.FIREBASE_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: customToken, returnSecureToken: true }),
+    }
+  );
+  const auth = await r.json();
+
+  return {
+    id: userRecord.uid,
+    name, email, phone, role,
+    idToken: r.ok ? auth.idToken : null,
+    refreshToken: r.ok ? auth.refreshToken : null,
+  };
+}
