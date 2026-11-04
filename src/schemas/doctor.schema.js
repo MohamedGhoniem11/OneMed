@@ -16,6 +16,7 @@ export const doctorSchema = {
       },
     },
     bio: { type: "string", max: 1000 },
+    licenseNumber: { type: "string", required: true, min: 3, max: 40 },
     consultationFee: { type: "number", min: 0 },
     verified: { type: "boolean", readOnly: true },  // الأدمن بس هو اللي يوثّق الدكتور
     createdAt: { type: "timestamp", readOnly: true },
