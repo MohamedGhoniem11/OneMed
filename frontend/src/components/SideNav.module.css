@@ -1,0 +1,186 @@
+.nav {
+  width: 198px;
+  min-width: 198px;
+  height: 100%;
+  background: #002657;
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* Top section */
+.top {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: 24px;
+}
+
+/* Logo */
+.logoArea {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.logoText {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.5px;
+  line-height: 28px;
+}
+.logoSub {
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.5);
+  font-family: var(--font-mono);
+  letter-spacing: 0.6px;
+  line-height: 16.5px;
+}
+
+/* Nav list */
+.list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+}
+
+/* Nav item button */
+.navItem {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 4px;
+  background: transparent;
+  border: none !important;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.navItem:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+.navIcon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+.navLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.70);
+  letter-spacing: 0.6px;
+  line-height: 12px;
+  white-space: nowrap;
+}
+
+/* Active state */
+.navItemActive {
+  background: #006a61;
+  border-left: 4px solid #6bd8cb !important;
+  padding-left: 20px;
+}
+.navItemActive .navLabel {
+  color: #fff;
+}
+.navItemActive .navIcon {
+  opacity: 1;
+}
+.navItemActive:hover {
+  background: #006a61;
+}
+
+/* ── User section (node 46-1532) ── */
+.userSection {
+  border-top: 1px solid rgba(195,198,210,0.30);
+  padding: 25px 24px 24px;
+  flex-shrink: 0;
+}
+
+.userCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Avatar ring exactly from Figma: 2px solid #0b3b7c */
+.avatarWrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  border: 2px solid #0b3b7c;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.userAvatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 9999px;
+}
+
+.userInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+  flex: 1;
+}
+
+/* Editable name — click to edit */
+.userName {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.6px;
+  line-height: 21px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+  transition: border-color 0.15s;
+  margin-bottom: -1px;
+}
+.userName:hover {
+  border-bottom-color: rgba(255,255,255,0.4);
+}
+
+/* Inline name input */
+.nameInput {
+  width: 100%;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0.6px;
+  line-height: 21px;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.35) !important;
+  border-radius: 3px;
+  padding: 1px 4px;
+  font-family: var(--font-main);
+  outline: none;
+}
+
+.userRole {
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.70);
+  font-family: var(--font-mono);
+  letter-spacing: 0.6px;
+  line-height: 14.4px;
+  white-space: nowrap;
+}
