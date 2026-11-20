@@ -17,6 +17,12 @@ export default function PageSwitcher() {
       >
         ⚙️ Administration
       </NavLink>
+      <NavLink
+        to="/pharmacy-order"
+        className={({ isActive }) => `${styles.btn} ${isActive ? styles.active : ''}`}
+      >
+        💊 Pharmacy Order
+      </NavLink>
     </div>
   )
 }

@@ -1,8 +1,9 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import App      from './App.jsx'
-import AppAdmin from './AppAdmin.jsx'
+import App               from './App.jsx'
+import AppAdmin          from './AppAdmin.jsx'
+import PharmacyOrderPage from './components/PharmacyOrderPage.jsx'
 import './index.css'
 
 ReactDOM.createRoot(document.getElementById('root')).render(
@@ -12,6 +13,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <Route path="/"            element={<Navigate to="/prescription" replace />} />
         <Route path="/prescription" element={<App />} />
         <Route path="/admin"        element={<AppAdmin />} />
+        <Route path="/pharmacy-order" element={<PharmacyOrderPage />} />
       </Routes>
     </BrowserRouter>
   </React.StrictMode>,
