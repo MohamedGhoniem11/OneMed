@@ -1,40 +1,72 @@
-.switcher {
+/* ── fixed bottom tab bar ── */
+.bar {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
-  display: flex;
-  gap: 8px;
+  bottom: 0;
+  left: 0;
+  right: 0;
   z-index: 9999;
+  background: #ffffff;
+  border-top: 1px solid #e5e7eb;
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.08);
+  padding: 0 16px;
 }
 
-.btn {
+.track {
   display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 4px;
+  max-width: 600px;
+  margin: 0 auto;
+  height: 60px;
+}
+
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 10px 18px;
-  border-radius: 9999px;
-  background: #002657;
-  color: rgba(255,255,255,0.75);
-  font-size: 12px;
-  font-weight: 600;
-  font-family: 'Inter', sans-serif;
-  letter-spacing: 0.3px;
+  justify-content: center;
+  gap: 4px;
   text-decoration: none;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.25);
+  border-radius: 12px;
+  margin: 6px 2px;
+  padding: 6px 8px;
+  color: #9ca3af;
   transition: background 0.15s, color 0.15s, transform 0.1s;
 }
 
-.btn:hover {
-  background: #0b3b7c;
-  color: #fff;
+.tab:hover {
+  background: #f3f4f6;
+  color: #374151;
   transform: translateY(-1px);
 }
 
+.emoji {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.label {
+  font-size: 10px;
+  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+/* active tab */
 .active {
-  background: #0d9488;
-  color: #fff;
+  color: #0d9488;
+  background: #f0fdfa;
 }
 
 .active:hover {
-  background: #0b7c72;
+  background: #ccfbf1;
+  transform: none;
+}
+
+.active .emoji {
+  transform: translateY(-2px);
+  transition: transform 0.15s;
 }

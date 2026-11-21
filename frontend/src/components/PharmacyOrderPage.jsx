@@ -1,0 +1,259 @@
+import React, { useState } from 'react'
+
+// ── Pharmacy / OneMed icons ──────────────────────────────────────────────────
+import iconPharmacyGrey  from '../assets/icons/pharmacy/pharmacy-icon-grey.svg'
+import iconPharmacyTeal  from '../assets/icons/pharmacy/pharmacy-icon-teal.svg'
+import iconCheckTeal     from '../assets/icons/pharmacy/checkmark-teal.svg'
+import iconRx            from '../assets/icons/pharmacy/rx-icon.svg'
+import iconBackArrow     from '../assets/icons/pharmacy/back-arrow.svg'
+import iconWaLink        from '../assets/icons/pharmacy/wa-link-icon.svg'
+
+// ── WhatsApp icons ───────────────────────────────────────────────────────────
+import iconWaBg          from '../assets/icons/pharmacy/wa-bg-pattern.svg'
+import iconWaAvatar      from '../assets/icons/pharmacy/wa-pharmacy-avatar.svg'
+import iconWaDoubleCheck from '../assets/icons/pharmacy/wa-double-check.svg'
+import iconWaVideo       from '../assets/icons/pharmacy/wa-video-icon.svg'
+import iconWaPhone       from '../assets/icons/pharmacy/wa-phone-icon.svg'
+import iconWaDots        from '../assets/icons/pharmacy/wa-dots-icon.svg'
+import iconWaEmoji       from '../assets/icons/pharmacy/wa-emoji-icon.svg'
+import iconWaAttach      from '../assets/icons/pharmacy/wa-attach-icon.svg'
+import iconWaSend        from '../assets/icons/pharmacy/wa-send-icon.svg'
+
+import PageSwitcher from './PageSwitcher.jsx'
+import styles from './PharmacyOrderPage.module.css'
+
+// ── Static data ──────────────────────────────────────────────────────────────
+const PHARMACIES = [
+  {
+    id: 1,
+    name: 'City Central Care',
+    info: '2.4 km • Closes 10 PM',
+    icon: iconPharmacyGrey,
+    iconActive: iconPharmacyGrey,
+    tealBg: false,
+  },
+  {
+    id: 2,
+    name: 'MediCare Plus Pharmacy',
+    info: '0.8 km • Open 24/7',
+    icon: iconPharmacyTeal,
+    iconActive: iconPharmacyTeal,
+    tealBg: true,
+  },
+]
+
+const PRESCRIPTION = {
+  id: '#RX-9284',
+  items: ['Amoxicillin 500mg (20 caps)', 'Ibuprofen 400mg (30 tabs)'],
+}
+
+const CHAT_MESSAGES = [
+  {
+    id: 1,
+    type: 'outgoing',
+    time: '10:42 AM',
+    paragraphs: [
+      'Hello MediCare Plus,',
+      'I would like to order the following\nprescription from OneMed Clinic:\n*Doctor:* Dr. Ahmed Mansour\n*Patient ID:* #P-4829',
+      '*Medicines:*\n1. Amoxicillin 500mg (20 caps)\n2. Ibuprofen 400mg (30 tabs)',
+    ],
+    showDoubleCheck: true,
+  },
+]
+
+// Renders WhatsApp-style bold text (*word*)
+function WaText({ text }) {
+  const parts = text.split(/(\*[^*]+\*)/g)
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.startsWith('*') && p.endsWith('*')
+          ? <strong key={i}>{p.slice(1, -1)}</strong>
+          : p.split('\n').map((line, j, arr) => (
+              <React.Fragment key={`${i}-${j}`}>
+                {line}
+                {j < arr.length - 1 && <br />}
+              </React.Fragment>
+            ))
+      )}
+    </>
+  )
+}
+
+export default function PharmacyOrderPage() {
+  const [selected, setSelected] = useState(2)
+
+  return (
+    <div className={styles.page}>
+
+      {/* ════════════════════════════════════════
+          TOP HALF — OneMed Interface
+      ════════════════════════════════════════ */}
+      <div className={styles.topHalf}>
+
+        {/* OneMed App-like Header */}
+        <header className={styles.oneMedHeader}>
+          <button className={styles.backBtn} aria-label="Go back">
+            <img src={iconBackArrow} alt="" className={styles.backIcon} />
+          </button>
+          <span className={styles.oneMedLogo}>OneMed</span>
+        </header>
+
+        {/* Content Area */}
+        <div className={styles.contentArea}>
+          <p className={styles.subtitle}>
+            Prescription ready for order. Choose a partner pharmacy to send via WhatsApp.
+          </p>
+
+          {/* Pharmacy Cards */}
+          <div className={styles.pharmacyList}>
+            {PHARMACIES.map(ph => {
+              const isActive = selected === ph.id
+              return (
+                <button
+                  key={ph.id}
+                  className={`${styles.pharmacyCard} ${isActive ? styles.pharmacyCardActive : styles.pharmacyCardInactive}`}
+                  onClick={() => setSelected(ph.id)}
+                >
+                  {/* Avatar */}
+                  <div className={`${styles.pharmacyAvatar} ${isActive ? styles.pharmacyAvatarActive : ''}`}>
+                    <img
+                      src={isActive ? ph.iconActive : ph.icon}
+                      alt=""
+                      className={styles.pharmacyAvatarIcon}
+                    />
+                  </div>
+
+                  {/* Text */}
+                  <div className={styles.pharmacyInfo}>
+                    <span className={styles.pharmacyName}>{ph.name}</span>
+                    <span className={styles.pharmacyMeta}>{ph.info}</span>
+                  </div>
+
+                  {/* Active badge */}
+                  {isActive && (
+                    <div className={styles.pharmacyBadge}>
+                      <img src={iconCheckTeal} alt="" className={styles.checkIcon} />
+                      <span className={styles.badgeLabel}>Order</span>
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Prescription Summary Mini Card */}
+          <div className={styles.rxCard}>
+            <div className={styles.rxCardHeader}>
+              <img src={iconRx} alt="" className={styles.rxIcon} />
+              <span className={styles.rxId}>PRESCRIPTION {PRESCRIPTION.id}</span>
+            </div>
+            <ul className={styles.rxList}>
+              {PRESCRIPTION.items.map((item, i) => (
+                <li key={i} className={styles.rxItem}>• {item}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        {/* Transition Bubble */}
+        <div className={styles.transitionBubble}>
+          <img src={iconWaLink} alt="WhatsApp" className={styles.transitionIcon} />
+        </div>
+      </div>
+
+      {/* ════════════════════════════════════════
+          BOTTOM HALF — WhatsApp Interface
+      ════════════════════════════════════════ */}
+      <div className={styles.bottomHalf}>
+
+        {/* WhatsApp background tiled pattern */}
+        <div
+          className={styles.waBgPattern}
+          style={{ backgroundImage: `url(${iconWaBg})` }}
+        />
+
+        {/* WhatsApp Header */}
+        <header className={styles.waHeader}>
+          {/* Avatar circle — pharmacy store icon */}
+          <div className={styles.waAvatarWrap}>
+            <img src={iconWaAvatar} alt="" className={styles.waAvatarImg} />
+          </div>
+          <div className={styles.waContactInfo}>
+            <span className={styles.waContactName}>MediCare Plus Pharmacy</span>
+            <span className={styles.waContactSub}>Business Account</span>
+          </div>
+          <div className={styles.waHeaderIcons}>
+            <button className={styles.waIconBtn} aria-label="Video call">
+              <img src={iconWaVideo} alt="" className={styles.waHeaderIcon} />
+            </button>
+            <button className={styles.waIconBtn} aria-label="Voice call">
+              <img src={iconWaPhone} alt="" className={styles.waHeaderIconPhone} />
+            </button>
+            <button className={styles.waIconBtn} aria-label="More options">
+              <img src={iconWaDots} alt="" className={styles.waHeaderIconDots} />
+            </button>
+          </div>
+        </header>
+
+        {/* Chat Area */}
+        <div className={styles.chatArea}>
+          {/* Date pill */}
+          <div className={styles.datePill}>Today</div>
+
+          {CHAT_MESSAGES.map(msg => (
+            <div
+              key={msg.id}
+              className={`${styles.msgRow} ${msg.type === 'outgoing' ? styles.msgRowOut : styles.msgRowIn}`}
+            >
+              <div className={`${styles.msgBubble} ${msg.type === 'outgoing' ? styles.msgBubbleOut : styles.msgBubbleIn}`}>
+                <div className={styles.msgBody}>
+                  {msg.paragraphs.map((para, i) => (
+                    <p key={i} className={styles.msgPara}>
+                      <WaText text={para} />
+                    </p>
+                  ))}
+                </div>
+                <div className={styles.msgMeta}>
+                  <span className={styles.msgTime}>{msg.time}</span>
+                  {msg.type === 'outgoing' && (
+                    <img src={iconWaDoubleCheck} alt="" className={styles.msgCheck} />
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* WhatsApp Input Area */}
+        <div className={styles.waInput}>
+          {/* + button on the left */}
+          <button className={styles.waInputBtnPlus} aria-label="Attach">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 5V19M5 12H19" stroke="#8696a0" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+          </button>
+
+          {/* Text field with emoji icon inside right */}
+          <div className={styles.waInputField}>
+            <span className={styles.waInputPlaceholder}>Type a message</span>
+            <button className={styles.waInputEmojiBtn} aria-label="Emoji">
+              <img src={iconWaEmoji} alt="" />
+            </button>
+          </div>
+
+          {/* Mic / Send button on the right */}
+          <button className={styles.waSendBtn} aria-label="Voice message">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+              <rect x="9" y="2" width="6" height="12" rx="3" fill="white"/>
+              <path d="M5 10C5 14.418 8.134 18 12 18C15.866 18 19 14.418 19 10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+              <line x1="12" y1="18" x2="12" y2="22" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+              <line x1="8" y1="22" x2="16" y2="22" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  )
+}
