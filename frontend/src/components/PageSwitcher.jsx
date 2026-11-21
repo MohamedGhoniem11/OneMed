@@ -2,27 +2,30 @@ import React from 'react'
 import { NavLink } from 'react-router-dom'
 import styles from './PageSwitcher.module.css'
 
+const pages = [
+  { to: '/prescription',   emoji: '📄', label: 'Prescription' },
+  { to: '/admin',          emoji: '⚙️',  label: 'Admin'        },
+  { to: '/pharmacy-order', emoji: '💊', label: 'Pharmacy'     },
+  { to: '/emergency',      emoji: '🚨', label: 'Emergency'    },
+]
+
 export default function PageSwitcher() {
   return (
-    <div className={styles.switcher}>
-      <NavLink
-        to="/prescription"
-        className={({ isActive }) => `${styles.btn} ${isActive ? styles.active : ''}`}
-      >
-        📄 Prescription Review
-      </NavLink>
-      <NavLink
-        to="/admin"
-        className={({ isActive }) => `${styles.btn} ${isActive ? styles.active : ''}`}
-      >
-        ⚙️ Administration
-      </NavLink>
-      <NavLink
-        to="/pharmacy-order"
-        className={({ isActive }) => `${styles.btn} ${isActive ? styles.active : ''}`}
-      >
-        💊 Pharmacy Order
-      </NavLink>
-    </div>
+    <nav className={styles.bar}>
+      <div className={styles.track}>
+        {pages.map(({ to, emoji, label }) => (
+          <NavLink
+            key={to}
+            to={to}
+            className={({ isActive }) =>
+              `${styles.tab} ${isActive ? styles.active : ''}`
+            }
+          >
+            <span className={styles.emoji}>{emoji}</span>
+            <span className={styles.label}>{label}</span>
+          </NavLink>
+        ))}
+      </div>
+    </nav>
   )
 }

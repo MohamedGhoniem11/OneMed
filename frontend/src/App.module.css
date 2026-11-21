@@ -5,6 +5,8 @@
   width: 100%;
   background: linear-gradient(90deg, var(--color-bg-page) 0%, var(--color-bg-page) 100%);
   overflow: hidden;
+  padding-bottom: 72px;
+  box-sizing: border-box;
 }
 
 .splitPane {

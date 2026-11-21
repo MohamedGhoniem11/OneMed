@@ -56,19 +56,8 @@ const CHAT_MESSAGES = [
       'Hello MediCare Plus,',
       'I would like to order the following\nprescription from OneMed Clinic:\n*Doctor:* Dr. Ahmed Mansour\n*Patient ID:* #P-4829',
       '*Medicines:*\n1. Amoxicillin 500mg (20 caps)\n2. Ibuprofen 400mg (30 tabs)',
-      'Please confirm availability and total\nprice.',
     ],
     showDoubleCheck: true,
-  },
-  {
-    id: 2,
-    type: 'incoming',
-    time: '10:44 AM',
-    paragraphs: [
-      'Welcome to MediCare Plus! 🏥',
-      'Yes, we have both items in stock.\nTotal price is: *$24.50*',
-      'Would you like to pick it up or prefer\ndelivery?',
-    ],
   },
 ]
 
@@ -186,13 +175,9 @@ export default function PharmacyOrderPage() {
 
         {/* WhatsApp Header */}
         <header className={styles.waHeader}>
-          {/* Avatar circle — pharmacy building icon on semi-transparent white bg */}
+          {/* Avatar circle — pharmacy store icon */}
           <div className={styles.waAvatarWrap}>
-            {/* pharmacy/store icon, white, 20×18px — from Figma node 46:1172 */}
-            <svg width="20" height="18" viewBox="0 0 20 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M1 7V17H7V12H13V17H19V7L10 1L1 7Z" stroke="white" strokeWidth="1.5" strokeLinejoin="round"/>
-              <path d="M7 17V12H13V17" stroke="white" strokeWidth="1.5" strokeLinejoin="round"/>
-            </svg>
+            <img src={iconWaAvatar} alt="" className={styles.waAvatarImg} />
           </div>
           <div className={styles.waContactInfo}>
             <span className={styles.waContactName}>MediCare Plus Pharmacy</span>
@@ -203,7 +188,7 @@ export default function PharmacyOrderPage() {
               <img src={iconWaVideo} alt="" className={styles.waHeaderIcon} />
             </button>
             <button className={styles.waIconBtn} aria-label="Voice call">
-              <img src={iconWaPhone} alt="" className={styles.waHeaderIcon} />
+              <img src={iconWaPhone} alt="" className={styles.waHeaderIconPhone} />
             </button>
             <button className={styles.waIconBtn} aria-label="More options">
               <img src={iconWaDots} alt="" className={styles.waHeaderIconDots} />
@@ -242,22 +227,33 @@ export default function PharmacyOrderPage() {
 
         {/* WhatsApp Input Area */}
         <div className={styles.waInput}>
-          <button className={styles.waInputBtn} aria-label="Emoji">
-            <img src={iconWaEmoji} alt="" />
+          {/* + button on the left */}
+          <button className={styles.waInputBtnPlus} aria-label="Attach">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 5V19M5 12H19" stroke="#8696a0" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
           </button>
+
+          {/* Text field with emoji icon inside right */}
           <div className={styles.waInputField}>
             <span className={styles.waInputPlaceholder}>Type a message</span>
-            <button className={styles.waInputBtn} aria-label="Attach">
-              <img src={iconWaAttach} alt="" />
+            <button className={styles.waInputEmojiBtn} aria-label="Emoji">
+              <img src={iconWaEmoji} alt="" />
             </button>
           </div>
-          <button className={styles.waSendBtn} aria-label="Send">
-            <img src={iconWaSend} alt="" className={styles.waSendIcon} />
+
+          {/* Mic / Send button on the right */}
+          <button className={styles.waSendBtn} aria-label="Voice message">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+              <rect x="9" y="2" width="6" height="12" rx="3" fill="white"/>
+              <path d="M5 10C5 14.418 8.134 18 12 18C15.866 18 19 14.418 19 10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+              <line x1="12" y1="18" x2="12" y2="22" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+              <line x1="8" y1="22" x2="16" y2="22" stroke="white" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
           </button>
         </div>
       </div>
 
-      <PageSwitcher />
     </div>
   )
 }
