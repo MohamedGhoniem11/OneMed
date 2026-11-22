@@ -1,0 +1,898 @@
+/* ══════════════════════════════════════════════════════════════
+   SystemOverviewPage — Figma nodes 46:671 → 46:966
+   Stack: React + CSS Modules
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Page wrapper ── */
+.page {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  background: #f8f9fa;
+  overflow: hidden;
+  font-family: var(--font-main);
+  padding-bottom: 72px;
+  box-sizing: border-box;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SIDE NAV  (node 46:929) — 210px wide, dark blue
+   ══════════════════════════════════════════════════════════════ */
+.sideNav {
+  width: 210px;
+  flex-shrink: 0;
+  background: #002657;
+  border-right: 1px solid #c3c6d2;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Logo row */
+.navLogo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 20px 16px;
+  flex-shrink: 0;
+}
+
+/* logo image (node 47:1082) — 195×93px full width, no text beside it */
+.navLogoImgWrap {
+  width: 100%;
+  height: 93px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.navLogoImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+
+/* Nav links (nodes 46:941–46:961) */
+.navLinks {
+  flex: 1 0 0;
+  display: flex;
+  flex-direction: column;
+  padding: 25px 5px 0;
+  gap: 1px;
+  overflow-y: auto;
+}
+
+/* border-l-4 always present, transparent when inactive — exact Figma */
+.navLink {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px 12px 20px;
+  cursor: pointer;
+  border-left: 4px solid transparent;
+  transition: background 0.15s;
+  box-sizing: border-box;
+}
+
+.navLink:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+/* Active: bg #006a61, border-left #6bd8cb */
+.navLinkActive {
+  background: #006a61;
+  border-left-color: #6bd8cb;
+}
+
+.navLinkActive:hover {
+  background: #005a52;
+}
+
+.navLinkIcon {
+  flex-shrink: 0;
+  display: block;
+  filter: brightness(0) invert(1);
+  opacity: 0.7;
+}
+
+.navLinkActive .navLinkIcon {
+  opacity: 1;
+}
+
+/* inactive: rgba(255,255,255,0.7) — active: white */
+.navLinkLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.7);
+  letter-spacing: 0.6px;
+  line-height: 12px;
+  white-space: nowrap;
+  font-family: var(--font-main);
+}
+
+.navLinkActive .navLinkLabel {
+  color: white;
+}
+
+.navLinkActive .navLinkLabel {
+  color: white;
+}
+
+/* Settings at bottom */
+.navSettings {
+  border-top: 1px solid rgba(195,198,210,0.3);
+  padding: 18px 5px;
+  flex-shrink: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MAIN COLUMN
+   ══════════════════════════════════════════════════════════════ */
+.main {
+  flex: 1 0 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── Top App Bar (node 46:904) ── */
+.topBar {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  padding: 0 24px;
+  background: rgba(248,249,250,0.8);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid #c3c6d2;
+  box-shadow: 0px 1px 2px rgba(0,0,0,0.05);
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.topBarSearch {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.topBarSearchIcon {
+  position: absolute;
+  left: 12px;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.topBarSearchInput {
+  width: 256px;
+  padding: 11px 17px 11px 41px;
+  background: white;
+  border: 1px solid #c3c6d2;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: var(--font-main);
+  color: #191c1d;
+  outline: none;
+}
+
+.topBarSearchInput::placeholder { color: #6b7280; }
+.topBarSearchInput:focus { border-color: #0b3b7c; }
+
+.topBarRight {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.topBarIcons {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.topBarIconBtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.8;
+}
+
+.topBarIcon {
+  width: 20px;
+  height: 20px;
+}
+
+.topBarBadge {
+  position: absolute;
+  top: 0;
+  right: -1px;
+  width: 8px;
+  height: 8px;
+  background: #006a61;
+  border-radius: 9999px;
+}
+
+.topBarUser {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.topBarDivider {
+  width: 1px;
+  height: 32px;
+  background: #c3c6d2;
+  flex-shrink: 0;
+}
+
+.topBarUserInfo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.topBarUserName {
+  font-size: 12px;
+  font-weight: 600;
+  color: #191c1d;
+  letter-spacing: 0.6px;
+  line-height: 12px;
+}
+
+.topBarUserRole {
+  font-size: 14px;
+  font-weight: 400;
+  color: #434750;
+  line-height: 21px;
+}
+
+.topBarAvatar {
+  width: 40px;
+  height: 40px;
+  background: #0b3b7c;
+  border: 1px solid #c3c6d2;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 0px 1px 2px rgba(0,0,0,0.05);
+}
+
+/* node 46:926 — icon 16×20px inside circle, NOT a photo */
+.topBarAvatarIcon {
+  width: 16px;
+  height: 20px;
+  display: block;
+  filter: brightness(0) invert(1);
+  flex-shrink: 0;
+}
+
+/* ── Scrollable content area ── */
+.content {
+  flex: 1 0 0;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+  padding: 32px 24px 40px;
+}
+
+/* ── Page header ── */
+.pageHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pageTitle {
+  font-size: 32px;
+  font-weight: 600;
+  color: #191c1d;
+  line-height: 38.4px;
+  margin: 0;
+}
+
+.pageSubtitle {
+  font-size: 16px;
+  font-weight: 400;
+  color: #434750;
+  line-height: 24px;
+  margin: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   METRICS ROW  (node 46:678)
+   ══════════════════════════════════════════════════════════════ */
+.metricsRow {
+  display: flex;
+  gap: 24px;
+  width: 100%;
+}
+
+.metricCard {
+  position: relative;
+  flex: 1 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 24px;
+  background: white;
+  border: 1px solid #c3c6d2;
+  border-radius: 12px;
+  box-shadow: 0px 1px 2px rgba(0,0,0,0.05);
+  overflow: hidden;
+}
+
+.metricCorner {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 96px;
+  height: 96px;
+  border-bottom-left-radius: 100px;
+  pointer-events: none;
+}
+
+.metricTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  width: 100%;
+  position: relative;
+}
+
+.metricIcon {
+  width: 34px;
+  height: 42px;
+  display: block;
+  flex-shrink: 0;
+}
+
+.metricChange {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.metricArrow {
+  width: 13.333px;
+  height: 8px;
+}
+
+.metricChangeText {
+  font-size: 12px;
+  font-weight: 600;
+  color: #10b981;
+  letter-spacing: 0.6px;
+}
+
+.metricValue {
+  font-size: 48px;
+  font-weight: 700;
+  color: #191c1d;
+  letter-spacing: -0.96px;
+  line-height: 52.8px;
+  padding-top: 11px;
+  position: relative;
+}
+
+.metricLabel {
+  font-size: 14px;
+  font-weight: 400;
+  color: #434750;
+  line-height: 21px;
+  position: relative;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MAIN GRID  (node 46:721)
+   ══════════════════════════════════════════════════════════════ */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+/* ── Table Card (col 1-2) ── */
+.tableCard {
+  grid-column: 1 / span 2;
+  display: flex;
+  flex-direction: column;
+  height: 600px;
+  background: white;
+  border: 1px solid #c3c6d2;
+  border-radius: 12px;
+  box-shadow: 0px 1px 2px rgba(0,0,0,0.05);
+  overflow: hidden;
+}
+
+/* Table header */
+.tableHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 24px 25px;
+  border-bottom: 1px solid #c3c6d2;
+  background: white;
+  flex-shrink: 0;
+}
+
+.tableTitle {
+  font-size: 20px;
+  font-weight: 600;
+  color: #191c1d;
+  line-height: 28px;
+  margin: 0;
+}
+
+.tableSubtitle {
+  font-size: 14px;
+  font-weight: 400;
+  color: #434750;
+  line-height: 21px;
+  margin: 0;
+}
+
+.addBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #006a61;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  letter-spacing: 0.6px;
+  cursor: pointer;
+  box-shadow: 0px 1px 1px rgba(0,0,0,0.05);
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.addBtn:hover { background: #004f49; }
+
+.addBtnIcon {
+  width: 10.5px;
+  height: 10.5px;
+}
+
+/* Filters bar */
+.filtersBar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 24px 13px;
+  background: #f3f4f5;
+  border-bottom: 1px solid #c3c6d2;
+  flex-shrink: 0;
+}
+
+.searchWrap {
+  position: relative;
+  width: 384px;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 13.5px;
+  height: 13.5px;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 9px 17px 9px 37px;
+  background: white;
+  border: 1px solid #c3c6d2;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: var(--font-main);
+  color: #191c1d;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.searchInput::placeholder { color: #6b7280; }
+.searchInput:focus { border-color: #0b3b7c; }
+
+.filterBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  background: white;
+  border: 1px solid #c3c6d2;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: var(--font-main);
+  color: #191c1d;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.filterBtn:hover { background: #f3f4f5; }
+
+.filterIcon {
+  width: 12px;
+  height: 8px;
+}
+
+/* Table body */
+.tableBody {
+  flex: 1 0 0;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* Col header row */
+.tableColHeader {
+  display: flex;
+  align-items: center;
+  padding: 12px 0;
+  background: #f3f4f5;
+  border-bottom: 1px solid #c3c6d2;
+  box-shadow: 0px 1px 1px rgba(0,0,0,0.05);
+  font-size: 12px;
+  font-weight: 600;
+  color: #434750;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+/* Table data row */
+.tableRow {
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+  background: white;
+}
+
+.tableRowBorder {
+  border-top: 1px solid rgba(195,198,210,0.5);
+}
+
+/* Column widths */
+.colPharmacy {
+  width: 277px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+}
+
+.colContact {
+  width: 214px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 24px;
+}
+
+.colStatus {
+  flex: 1 0 0;
+  display: flex;
+  align-items: center;
+  padding: 12px 24px;
+}
+
+.colActions {
+  width: 118px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 12px 24px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #434750;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+/* Pharmacy cell */
+.pharmacyCellIcon {
+  width: 32px;
+  height: 32px;
+  background: rgba(0,106,97,0.1);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pharmacyCellIconImg {
+  width: 13.5px;
+  height: 15px;
+}
+
+.pharmacyCellInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.pharmacyCellName {
+  font-size: 14px;
+  font-weight: 700;
+  color: #191c1d;
+  line-height: 21px;
+}
+
+.pharmacyCellId {
+  font-size: 12px;
+  font-weight: 400;
+  color: #434750;
+  line-height: 16px;
+}
+
+/* Contact cell */
+.contactIcon {
+  width: 13.333px;
+  height: 13.333px;
+  flex-shrink: 0;
+}
+
+.contactText {
+  font-size: 14px;
+  font-weight: 400;
+  color: #191c1d;
+  line-height: 21px;
+}
+
+/* Status badge */
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 16px;
+  white-space: nowrap;
+}
+
+/* Action dots */
+.actionDots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+
+.actionDots:hover { opacity: 1; }
+
+.actionDotsIcon {
+  width: 4px;
+  height: 16px;
+}
+
+/* Table footer / pagination */
+.tableFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 17px 16px 16px;
+  border-top: 1px solid #c3c6d2;
+  background: white;
+  flex-shrink: 0;
+}
+
+.paginationText {
+  font-size: 14px;
+  font-weight: 400;
+  color: #434750;
+  line-height: 21px;
+}
+
+.paginationBtns {
+  display: flex;
+  gap: 8px;
+}
+
+.pageBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid #c3c6d2;
+  border-radius: 4px;
+  background: white;
+  font-size: 16px;
+  color: #191c1d;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.pageBtn:hover { background: #f3f4f5; }
+
+.pageBtnDisabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.pageBtnDisabled:hover { background: white; }
+
+/* ══════════════════════════════════════════════════════════════
+   SIDE PANEL — Audit Feed  (node 46:851)
+   ══════════════════════════════════════════════════════════════ */
+.sidePanel {
+  grid-column: 3;
+  display: flex;
+  flex-direction: column;
+  height: 600px;
+  background: white;
+  border: 1px solid #c3c6d2;
+  border-radius: 12px;
+  box-shadow: 0px 1px 2px rgba(0,0,0,0.05);
+  overflow: hidden;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 24px 25px;
+  border-bottom: 1px solid #c3c6d2;
+  background: white;
+  flex-shrink: 0;
+}
+
+.panelHeaderIcon {
+  width: 18px;
+  height: 18px;
+}
+
+.panelTitle {
+  font-size: 20px;
+  font-weight: 600;
+  color: #191c1d;
+  line-height: 28px;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.feedList {
+  flex: 1 0 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.feedItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  position: relative;
+}
+
+.feedIconWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.feedIconCircle {
+  width: 32px;
+  height: 32px;
+  border-radius: 9999px;
+  border: 2px solid white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(195,198,210,0.3);
+}
+
+.feedIcon {
+  width: 14px;
+  height: 14px;
+}
+
+.feedLine {
+  width: 1px;
+  flex: 1 0 0;
+  min-height: 16px;
+  background: #c3c6d2;
+  margin-top: 4px;
+}
+
+.feedCard {
+  flex: 1 0 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 13px;
+  background: #f3f4f5;
+  border: 1px solid rgba(195,198,210,0.5);
+  border-radius: 8px;
+}
+
+.feedCardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.feedCardTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: #191c1d;
+  letter-spacing: 0.6px;
+  white-space: nowrap;
+}
+
+.feedCardTime {
+  font-size: 12px;
+  font-weight: 400;
+  color: #434750;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.feedCardBody {
+  font-size: 14px;
+  font-weight: 400;
+  color: #434750;
+  line-height: 21px;
+  margin: 0;
+}
+
+.panelFooter {
+  border-top: 1px solid #c3c6d2;
+  padding: 20px 12px 16px;
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.viewLogBtn {
+  font-size: 12px;
+  font-weight: 600;
+  color: #006a61;
+  letter-spacing: 0.6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.viewLogBtn:hover { opacity: 0.7; }
