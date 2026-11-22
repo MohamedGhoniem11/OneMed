@@ -402,7 +402,8 @@
 }
 
 /* Phone icon: 18×18px (Figma 46:1183) */
-.waIconBtn:nth-child(2) img {
+.waHeaderIconPhone {
+  display: block;
   width: 18px;
   height: 18px;
 }
@@ -413,8 +414,6 @@
   width: 4px;
   height: 16px;
 }
-
-/* ── Chat Area ──────────────────────────────────────────────── */
 .chatArea {
   position: relative;
   z-index: 1;
@@ -537,18 +536,24 @@
   box-sizing: border-box;
 }
 
-/* + button on the left */
+/* + / attach button on the left (node 46:1194) */
 .waInputBtnPlus {
   width: 40px;
   height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
+  padding: 8px 8px 14px;
   background: none;
   border: none;
   cursor: pointer;
   flex-shrink: 0;
+}
+
+.waInputBtnIcon {
+  width: 14px;
+  height: 14px;
+  display: block;
 }
 
 /* Text field */
@@ -576,7 +581,7 @@
   overflow: hidden;
 }
 
-/* Emoji button inside the field */
+/* Emoji button inside the field (node 46:1196) */
 .waInputEmojiBtn {
   width: 24px;
   height: 24px;
@@ -590,9 +595,16 @@
   flex-shrink: 0;
 }
 
-.waInputEmojiBtn img {
+.waInputEmojiIcon {
   width: 20px;
   height: 20px;
+  display: block;
+}
+
+/* Send button icon */
+.waSendIcon {
+  width: 14px;
+  height: 19px;
   display: block;
 }
 
