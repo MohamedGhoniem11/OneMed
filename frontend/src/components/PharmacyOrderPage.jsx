@@ -175,14 +175,16 @@ export default function PharmacyOrderPage() {
 
         {/* WhatsApp Header */}
         <header className={styles.waHeader}>
-          {/* Avatar circle — pharmacy store icon */}
+          {/* Avatar (node 46:1171) — 40×40 circle, rgba white 20%, pharmacy icon 20×18 */}
           <div className={styles.waAvatarWrap}>
             <img src={iconWaAvatar} alt="" className={styles.waAvatarImg} />
           </div>
+          {/* Contact info (node 46:1174) */}
           <div className={styles.waContactInfo}>
             <span className={styles.waContactName}>MediCare Plus Pharmacy</span>
             <span className={styles.waContactSub}>Business Account</span>
           </div>
+          {/* Header icons */}
           <div className={styles.waHeaderIcons}>
             <button className={styles.waIconBtn} aria-label="Video call">
               <img src={iconWaVideo} alt="" className={styles.waHeaderIcon} />
@@ -225,31 +227,25 @@ export default function PharmacyOrderPage() {
           ))}
         </div>
 
-        {/* WhatsApp Input Area */}
+        {/* WhatsApp Input Area (node 46:1186) */}
         <div className={styles.waInput}>
-          {/* + button on the left */}
+          {/* + / attach button on the left (node 46:1194) */}
           <button className={styles.waInputBtnPlus} aria-label="Attach">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 5V19M5 12H19" stroke="#8696a0" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
+            <img src={iconWaAttach} alt="" className={styles.waInputBtnIcon} />
           </button>
 
-          {/* Text field with emoji icon inside right */}
+          {/* Text field */}
           <div className={styles.waInputField}>
             <span className={styles.waInputPlaceholder}>Type a message</span>
+            {/* Emoji icon inside field (node 46:1196) */}
             <button className={styles.waInputEmojiBtn} aria-label="Emoji">
-              <img src={iconWaEmoji} alt="" />
+              <img src={iconWaEmoji} alt="" className={styles.waInputEmojiIcon} />
             </button>
           </div>
 
-          {/* Mic / Send button on the right */}
-          <button className={styles.waSendBtn} aria-label="Voice message">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
-              <rect x="9" y="2" width="6" height="12" rx="3" fill="white"/>
-              <path d="M5 10C5 14.418 8.134 18 12 18C15.866 18 19 14.418 19 10" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-              <line x1="12" y1="18" x2="12" y2="22" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-              <line x1="8" y1="22" x2="16" y2="22" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
+          {/* Mic send button */}
+          <button className={styles.waSendBtn} aria-label="Send">
+            <img src={iconWaSend} alt="" className={styles.waSendIcon} />
           </button>
         </div>
       </div>

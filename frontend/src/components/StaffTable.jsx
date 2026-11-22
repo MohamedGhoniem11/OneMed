@@ -9,33 +9,41 @@ import drSarahImg      from '../assets/images/dr-sarah-jenkins.png'
 import elenaImg        from '../assets/images/elena-rodriguez.png'
 import styles from './StaffTable.module.css'
 
+// Figma nodes 46:1356, 46:1380 — exact names, IDs, departments, roles, statuses
 const STAFF = [
   {
     id: 1, photo: drSarahImg, initials: null,
     name: 'Dr. Sarah Jenkins', staffId: 'ONM-8429',
     department: 'Cardiology',
-    role: 'Attending Physician', roleBg: '#d8e2ff', roleColor: '#001a41',
+    role: 'Attending Physician',
+    roleBg: 'rgba(216,226,255,0.6)', roleColor: '#001a41',
+    // node 46:1345 — Active: green dot + green text
     status: 'Active', statusColor: '#10b981', dotColor: '#10b981',
   },
   {
     id: 2, photo: null, initials: 'MK',
     name: 'Michael Kim', staffId: 'ONM-7731',
     department: 'Laboratory',
-    role: 'Lab Technician', roleBg: '#d8e3fb', roleColor: '#111c2d',
+    role: 'Lab Technician',
+    roleBg: 'rgba(216,227,251,0.6)', roleColor: '#111c2d',
+    // On Leave: amber dot + amber text
     status: 'On Leave', statusColor: '#f59e0b', dotColor: '#f59e0b',
   },
   {
     id: 3, photo: elenaImg, initials: null,
     name: 'Elena Rodriguez', staffId: 'ONM-6612',
     department: 'Radiology',
-    role: 'Radiologist', roleBg: '#d8e2ff', roleColor: '#001a41',
+    role: 'Radiologist',
+    roleBg: 'rgba(216,226,255,0.6)', roleColor: '#001a41',
     status: 'Active', statusColor: '#10b981', dotColor: '#10b981',
   },
   {
     id: 4, photo: null, initials: 'AM',
     name: 'Ahmed Mansour', staffId: 'ONM-0001',
     department: 'Administration',
-    role: 'SysAdmin', roleBg: '#e7e8e9', roleColor: '#191c1d',
+    role: 'SysAdmin',
+    roleBg: '#e7e8e9', roleColor: '#191c1d',
+    // Inactive: grey dot + grey text
     status: 'Inactive', statusColor: '#747781', dotColor: '#747781',
   },
 ]

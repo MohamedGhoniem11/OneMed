@@ -1,5 +1,5 @@
 /* ══════════════════════════════════════════════════════════════
-   SideNav — Figma nodes 46:929 → 46:966 + 47:1082
+   SideNav — Figma nodes 46:929, 47:1080, 46:941–46:961, 46:1531
    Width: 210px, background: #002657
    ══════════════════════════════════════════════════════════════ */
 
@@ -15,60 +15,23 @@
   overflow: hidden;
 }
 
-/* ── Logo area (node 47:1082) ── */
-.logoArea {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 20px 20px 16px;
+/* ── Logo (node 47:1080) — full-width image, appears ONCE ── */
+.logoWrap {
+  width: 100%;
+  height: 93px;
   flex-shrink: 0;
-}
-
-/* node 47:1082 — 195×93px logo image, displayed proportionally */
-.logoImgWrap {
-  width: 93px;
-  height: 35px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   overflow: hidden;
 }
 
 .logoImg {
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   display: block;
-  /* invert to show white on dark bg if needed */
-  filter: brightness(0) invert(1);
-  opacity: 0.9;
+  pointer-events: none;
 }
 
-.logoTexts {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.logoText {
-  font-size: 16px;
-  font-weight: 700;
-  color: white;
-  letter-spacing: -0.3px;
-  line-height: 20px;
-}
-
-.logoSub {
-  font-size: 11px;
-  font-weight: 400;
-  color: rgba(255,255,255,0.5);
-  font-family: var(--font-mono);
-  letter-spacing: 0.6px;
-  line-height: 15px;
-}
-
-/* ── Nav links wrapper ── */
+/* ── Nav links (nodes 46:941–46:961, 46:1498) ── */
 .navLinksWrap {
   flex: 1 0 0;
   display: flex;
@@ -78,15 +41,13 @@
   overflow-y: auto;
 }
 
-/* ── Individual nav link (nodes 46:941–46:961) ── */
-/* Figma: border-l-4 always present, transparent when inactive */
+/* border-l-4 always present, transparent when inactive */
 .navItem {
   position: relative;
   display: flex;
   align-items: center;
   gap: 12px;
   width: 100%;
-  /* exact Figma padding: pl-[20px] pr-[16px] py-[12px] */
   padding: 12px 16px 12px 20px;
   background: transparent;
   border: none;
@@ -101,8 +62,7 @@
   background: rgba(255,255,255,0.08);
 }
 
-/* Active state (node 46:941 — Dashboard) */
-/* Figma: bg-[#006a61] border-[#6bd8cb] border-l-4 */
+/* node 46:1498 — active: bg #006a61, border-left #6bd8cb */
 .navItemActive {
   background: #006a61;
   border-left: 4px solid #6bd8cb;
@@ -115,18 +75,15 @@
 .navIcon {
   flex-shrink: 0;
   display: block;
-  /* default opacity for inactive */
-  opacity: 0.7;
-  /* invert to white since nav is dark */
   filter: brightness(0) invert(1);
+  opacity: 0.7;
 }
 
 .navItemActive .navIcon {
   opacity: 1;
 }
 
-/* Nav label text */
-/* Figma inactive: text-[rgba(255,255,255,0.7)] tracking-[0.6px] */
+/* node 46:1498 — inactive rgba(255,255,255,0.7), active white */
 .navLabel {
   font-size: 12px;
   font-weight: 600;
@@ -137,21 +94,13 @@
   font-family: var(--font-main);
 }
 
-/* Figma active: text-white */
 .navItemActive .navLabel {
-  color: white;
+  color: #ffffff;
 }
 
-/* ── Settings area (node 46:966) ── */
-.settingsArea {
-  border-top: 1px solid rgba(195,198,210,0.3);
-  padding: 18px 5px;
-  flex-shrink: 0;
-}
-
-/* ── User profile section ── */
+/* ── User profile (node 46:1531) ── */
 .userSection {
-  border-top: 1px solid rgba(195,198,210,0.3);
+  border-top: 1px solid rgba(195,198,210,0.30);
   padding: 16px 20px;
   flex-shrink: 0;
 }
