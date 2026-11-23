@@ -1,0 +1,51 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  /* ── Colors from Figma ── */
+  --color-primary:        #0b3b7c;
+  --color-primary-dark:   #002657;
+  --color-teal:           #0d9488;
+  --color-teal-light:     rgba(13, 148, 136, 0.10);
+  --color-teal-border:    rgba(13, 148, 136, 0.20);
+  --color-green:          #10b981;
+  --color-green-light:    rgba(16, 185, 129, 0.10);
+  --color-green-border:   rgba(16, 185, 129, 0.20);
+  --color-amber:          #f59e0b;
+  --color-text-dark:      #191c1d;
+  --color-text-mid:       #434750;
+  --color-border:         #c3c6d2;
+  --color-border-light:   rgba(195, 198, 210, 0.50);
+  --color-bg-page:        #f8f9fa;
+  --color-bg-row:         #f3f4f5;
+  --color-white:          #ffffff;
+
+  /* ── Typography ── */
+  --font-main:   'Inter', sans-serif;
+  --font-mono:   'Courier Prime', monospace;
+
+  /* ── Shadows ── */
+  --shadow-nav:   0px 1px 2px 0px rgba(0,0,0,0.05);
+  --shadow-card:  0px 4px 20px 0px rgba(11,59,124,0.08);
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  font-family: var(--font-main);
+  background: var(--color-bg-page);
+  color: var(--color-text-dark);
+  -webkit-font-smoothing: antialiased;
+}
+
+button {
+  cursor: pointer;
+  font-family: inherit;
+  border: none;
+  background: none;
+}
+
+img { display: block; }

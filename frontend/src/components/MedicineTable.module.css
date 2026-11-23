@@ -1,0 +1,260 @@
+.pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 0;
+  min-width: 0;
+  height: 100%;
+  padding: 24px;
+  background: var(--color-bg-page);
+  overflow: auto;
+}
+
+/* ── Top heading ── */
+.topSection {
+  flex-shrink: 0;
+  padding-bottom: 24px;
+}
+
+.headingGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sectionTitle {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-primary-dark);
+  line-height: 28px;
+}
+
+.subtitle {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--color-text-mid);
+  line-height: 21px;
+}
+
+/* ── Table wrapper ── */
+.tableWrapper {
+  flex: 1 0 0;
+  min-height: 0;
+  padding-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+}
+
+.tableCard {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+/* ── Table header row ── */
+.tableHead {
+  display: flex;
+  align-items: center;
+  background: var(--color-bg-row);
+  border-bottom: 1px solid var(--color-border);
+  padding-right: 42px;
+}
+
+.tableHead > div {
+  padding: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-mid);
+  letter-spacing: 0.6px;
+  line-height: 12px;
+  white-space: nowrap;
+}
+
+/* Column widths */
+.colMedicine  { width: 138px; flex-shrink: 0; }
+.colDosage    { width: 131px; flex-shrink: 0; }
+.colFrequency { width: 144px; flex-shrink: 0; }
+.colDuration  { width: 135px; flex-shrink: 0; }
+.colAction    { flex: 1; display: flex; justify-content: flex-end; }
+
+/* ── Table body ── */
+.tableBody {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Individual row ── */
+.tableRow {
+  display: flex;
+  align-items: center;
+  height: 56px;
+  border-bottom: 1px solid var(--color-border-light);
+  position: relative;
+}
+
+.tableRow:hover .deleteBtn { opacity: 1; }
+
+/* Cell input */
+.inputWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.cellInput {
+  width: 100%;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--color-text-dark);
+  font-family: var(--font-main);
+  line-height: 21px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 5px 9px;
+  background: transparent;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.cellInput:focus {
+  border-color: var(--color-primary);
+  background: var(--color-white);
+}
+
+.cellInputWarn {
+  border-color: var(--color-amber) !important;
+}
+
+.editHint {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14.667px;
+  height: 22px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+
+.tableRow:hover .editHint { opacity: 1; }
+
+.warnIcon {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 13.333px;
+  height: 21.333px;
+}
+
+/* Delete button */
+.deleteBtn {
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  transition: opacity 0.15s;
+  background: none;
+  border: none;
+}
+
+.deleteBtn img {
+  width: 12px;
+  height: 13.5px;
+}
+
+/* ── Add row ── */
+.addRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12.5px 12px 18px;
+  border-top: 1px solid var(--color-border);
+  background: rgba(243, 244, 245, 0.30);
+}
+
+.addBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.addBtn img {
+  width: 15px;
+  height: 15px;
+}
+
+.addBtn span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-teal);
+  letter-spacing: 0.6px;
+  line-height: 12px;
+}
+
+.addBtn:hover span { text-decoration: underline; }
+
+/* ── Footer ── */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  padding-top: 17px;
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.btnOutline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 25px;
+  border: 1px solid var(--color-border) !important;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-dark);
+  letter-spacing: 0.6px;
+  line-height: 12px;
+  transition: background 0.15s;
+}
+.btnOutline:hover { background: var(--color-bg-row); }
+
+.btnOutline img {
+  width: 13.5px;
+  height: 12px;
+}
+
+.btnPrimary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border-radius: 4px;
+  background: var(--color-teal);
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 0.6px;
+  line-height: 12px;
+  drop-shadow: 0px 1px 1px rgba(0,0,0,0.05);
+  transition: background 0.15s;
+}
+.btnPrimary:hover { background: #0b7c72; }
+
+.btnPrimary img {
+  width: 15px;
+  height: 7.5px;
+}

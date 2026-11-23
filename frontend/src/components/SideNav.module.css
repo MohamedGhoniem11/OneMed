@@ -1,0 +1,176 @@
+/* ══════════════════════════════════════════════════════════════
+   SideNav — Figma nodes 46:929, 47:1080, 46:941–46:961, 46:1531
+   Width: 210px, background: #002657
+   ══════════════════════════════════════════════════════════════ */
+
+.nav {
+  width: 210px;
+  min-width: 210px;
+  height: 100%;
+  background: #002657;
+  border-right: 1px solid #c3c6d2;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* ── Logo (node 47:1080) — full-width image, appears ONCE ── */
+.logoWrap {
+  width: 100%;
+  height: 93px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.logoImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  pointer-events: none;
+}
+
+/* ── Nav links (nodes 46:941–46:961, 46:1498) ── */
+.navLinksWrap {
+  flex: 1 0 0;
+  display: flex;
+  flex-direction: column;
+  padding: 25px 5px 0;
+  gap: 1px;
+  overflow-y: auto;
+}
+
+/* border-l-4 always present, transparent when inactive */
+.navItem {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 16px 12px 20px;
+  background: transparent;
+  border: none;
+  border-left: 4px solid transparent;
+  cursor: pointer;
+  transition: background 0.15s;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.navItem:hover {
+  background: rgba(255,255,255,0.08);
+}
+
+/* node 46:1498 — active: bg #006a61, border-left #6bd8cb */
+.navItemActive {
+  background: #006a61;
+  border-left: 4px solid #6bd8cb;
+}
+
+.navItemActive:hover {
+  background: #005a52;
+}
+
+.navIcon {
+  flex-shrink: 0;
+  display: block;
+  filter: brightness(0) invert(1);
+  opacity: 0.7;
+}
+
+.navItemActive .navIcon {
+  opacity: 1;
+}
+
+/* node 46:1498 — inactive rgba(255,255,255,0.7), active white */
+.navLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.70);
+  letter-spacing: 0.6px;
+  line-height: 12px;
+  white-space: nowrap;
+  font-family: var(--font-main);
+}
+
+.navItemActive .navLabel {
+  color: #ffffff;
+}
+
+/* ── User profile (node 46:1531) ── */
+.userSection {
+  border-top: 1px solid rgba(195,198,210,0.30);
+  padding: 16px 20px;
+  flex-shrink: 0;
+}
+
+.userCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.avatarWrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  border: 2px solid #0b3b7c;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.userAvatar {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.userInfo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.userName {
+  font-size: 13px;
+  font-weight: 700;
+  color: white;
+  letter-spacing: 0.3px;
+  line-height: 20px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+  transition: border-color 0.15s;
+}
+
+.userName:hover {
+  border-bottom-color: rgba(255,255,255,0.4);
+}
+
+.nameInput {
+  width: 100%;
+  font-size: 13px;
+  font-weight: 700;
+  color: white;
+  background: rgba(255,255,255,0.10);
+  border: 1px solid rgba(255,255,255,0.35);
+  border-radius: 3px;
+  padding: 2px 4px;
+  font-family: var(--font-main);
+  outline: none;
+}
+
+.userRole {
+  font-size: 11px;
+  font-weight: 400;
+  color: rgba(255,255,255,0.60);
+  font-family: var(--font-mono);
+  letter-spacing: 0.5px;
+  line-height: 15px;
+  white-space: nowrap;
+}

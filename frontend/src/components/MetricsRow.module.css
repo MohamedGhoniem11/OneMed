@@ -1,0 +1,84 @@
+.row {
+  display: flex;
+  gap: 24px;
+  padding: 0 32px;
+  flex-shrink: 0;
+}
+
+.card {
+  flex: 1 0 0;
+  min-width: 0;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  box-shadow: 0px 1px 2px 0px rgba(0,0,0,0.05);
+  padding: 21px 21px 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+  position: relative;
+}
+
+.cardTop {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.iconWrap {
+  width: 40px;
+  height: 40px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.icon {
+  width: 22px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.cardLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: #434750;
+  letter-spacing: 0.6px;
+  line-height: 12px;
+  white-space: nowrap;
+}
+
+.valueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.value {
+  font-size: 48px;
+  font-weight: 700;
+  color: #002657;
+  letter-spacing: -0.96px;
+  line-height: 52.8px;
+  white-space: nowrap;
+}
+
+.sub {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 21px;
+  white-space: nowrap;
+}
+
+.arrow {
+  width: 10.667px;
+  height: 10.667px;
+  object-fit: contain;
+}
