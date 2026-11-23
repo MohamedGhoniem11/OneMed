@@ -1,7 +1,8 @@
 import * as ocr from "../services/ocr.service.js";
 import * as parser from "../services/prescription.parser.js";
 import * as service from "../services/prescription.service.js";
-import { httpError } from "../services/user.service.js";
+import { httpError } from "../utils/http-error.js";
+import { parseLimit } from "../utils/query.js";
 
 export async function extract(req, res, next) {
   try {
@@ -26,7 +27,7 @@ export async function create(req, res, next) {
 
 export async function list(req, res, next) {
   try {
-    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
+    const limit = parseLimit(req.query.limit);
     const doctorId = req.user.role === "admin" ? req.query.doctorId : req.user.uid;
     res.json(
       await service.list({
@@ -34,7 +35,7 @@ export async function list(req, res, next) {
         patientId: req.query.patientId,
         limit,
         startAfter: req.query.startAfter,
-      })
+      }),
     );
   } catch (err) {
     next(err);

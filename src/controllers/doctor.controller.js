@@ -1,7 +1,9 @@
 import * as service from "../services/doctor.service.js";
-import { httpError } from "../services/user.service.js";
+import { httpError } from "../utils/http-error.js";
+import { parseLimit } from "../utils/query.js";
 import { validate } from "../utils/schema.js";
 import { doctorSchema } from "../schemas/doctor.schema.js";
+
 const withoutPrivate = ({ licenseNumber, ...rest }) => rest;
 
 export async function getMe(req, res, next) {
@@ -24,17 +26,17 @@ export async function saveMe(req, res, next) {
 export async function updateMe(req, res, next) {
   try {
     const data = validate(doctorSchema, req.body, { partial: true });
-    if (Object.keys(data).length === 0)
-      throw httpError(400, "nothing to update");
+    if (Object.keys(data).length === 0) throw httpError(400, "nothing to update");
     res.json(await service.updateProfile(req.user.uid, data));
   } catch (err) {
     next(err);
   }
 }
+
 export async function getAll(req, res, next) {
   try {
     const { specialty, city, startAfter } = req.query;
-    const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
+    const limit = parseLimit(req.query.limit);
     const isAdmin = req.user.role === "admin";
 
     let verified = true;
@@ -45,8 +47,8 @@ export async function getAll(req, res, next) {
     const result = await service.list({ specialty, city, verified, limit, startAfter });
 
     if (!isAdmin) {
-      result.doctors = result.doctors.map((d) =>
-        d.id === req.user.uid ? d : withoutPrivate(d)
+      result.doctors = result.doctors.map((doctor) =>
+        doctor.id === req.user.uid ? doctor : withoutPrivate(doctor),
       );
     }
     res.json(result);
@@ -61,8 +63,7 @@ export async function getOne(req, res, next) {
     const isOwner = req.user.uid === req.params.id;
     const isAdmin = req.user.role === "admin";
 
-    if (!doctor.verified && !isAdmin && !isOwner)
-      throw httpError(404, "Doctor not found");
+    if (!doctor.verified && !isAdmin && !isOwner) throw httpError(404, "Doctor not found");
 
     res.json(isAdmin || isOwner ? doctor : withoutPrivate(doctor));
   } catch (err) {
@@ -70,13 +71,10 @@ export async function getOne(req, res, next) {
   }
 }
 
-
-
 export async function setVerified(req, res, next) {
   try {
-    const { verified } = req.body;
-    if (typeof verified !== "boolean")
-      throw httpError(400, "verified must be true or false");
+    const { verified } = req.body || {};
+    if (typeof verified !== "boolean") throw httpError(400, "verified must be true or false");
     res.json(await service.setVerified(req.params.id, verified));
   } catch (err) {
     next(err);

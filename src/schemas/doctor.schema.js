@@ -1,9 +1,8 @@
-// بروفايل الدكتور: doctors/{uid}  (نفس uid بتاع المستخدم)
+// doctors/{uid} (same uid as users/{uid})
 export const doctorSchema = {
   collection: "doctors",
   fields: {
     specialty: { type: "string", required: true, max: 80 },
-    licenseNumber: { type: "string", max: 40 },
     yearsOfExperience: { type: "number", min: 0, max: 70 },
     clinicName: { type: "string", max: 100 },
     clinicAddress: { type: "string", max: 200 },
@@ -18,7 +17,7 @@ export const doctorSchema = {
     bio: { type: "string", max: 1000 },
     licenseNumber: { type: "string", required: true, min: 3, max: 40 },
     consultationFee: { type: "number", min: 0 },
-    verified: { type: "boolean", readOnly: true },  // الأدمن بس هو اللي يوثّق الدكتور
+    verified: { type: "boolean", readOnly: true }, // only an admin can verify
     createdAt: { type: "timestamp", readOnly: true },
     updatedAt: { type: "timestamp", readOnly: true },
   },

@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (lint, tests, audit, OCR)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      TESSERACT_CACHE_PATH: ${{ github.workspace }}/.tesseract
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit and integration tests
+        run: npm test
+
+      - name: Production dependency audit (no high/critical)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Cache Tesseract language data
+        uses: actions/cache@v4
+        with:
+          path: .tesseract
+          key: tesseract-ara-eng-v1
+
+      - name: OCR smoke test
+        run: npm run test:ocr
+
+      - name: OCR accuracy harness
+        run: npm run test:ocr:accuracy
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build

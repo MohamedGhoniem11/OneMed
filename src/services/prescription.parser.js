@@ -1,6 +1,6 @@
 const HEADER =
   /^(?:dr\.?|doctor|clinic|hospital|center|centre|date|patient|name|diagnosis|address|phone|tel|rx|prescription|age|sex|gender|signature|notes?)\b/i;
-const BULLET = /^\s*(?:\d{1,2}\s*[).:\-]|[-•*·])\s*/;
+const BULLET = /^\s*(?:\d{1,2}\s*[).:-]|[-•*·])\s*/;
 
 const DOSE = /\b\d+(?:[.,]\d+)?\s*(?:mg|mcg|µg|ug|g|ml|cc|iu|units?|%)\b/i;
 const FREQ_X = /\b\d+\s*[x×]\s*\d+\b/i;

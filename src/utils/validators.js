@@ -1,7 +1,9 @@
-const EG_PHONE = /^01[0125][0-9]{8}$/;
+export const EG_PHONE = /^01[0125][0-9]{8}$/;
 
-// يشيل المسافات والشرطات ويحوّل +20 لـ 0
-export const normalizePhone = (p) =>
-  String(p).replace(/[\s-]/g, "").replace(/^\+20/, "0");
+// Removes whitespace/hyphens and normalizes +20 to 0.
+export const normalizePhone = (phone) =>
+  String(phone)
+    .replace(/[\s-]/g, "")
+    .replace(/^\+20/, "0");
 
-export const isValidPhone = (p) => EG_PHONE.test(normalizePhone(p));
+export const isValidPhone = (phone) => EG_PHONE.test(normalizePhone(phone));

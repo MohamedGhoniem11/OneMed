@@ -1,5 +1,5 @@
 import multer from "multer";
-import { httpError } from "../services/user.service.js";
+import { httpError } from "../utils/http-error.js";
 
 const ALLOWED = /^image\/(png|jpe?g|webp|bmp|tiff?)$/i;
 

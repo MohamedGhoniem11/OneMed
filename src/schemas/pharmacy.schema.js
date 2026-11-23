@@ -1,4 +1,5 @@
 import { EG_PHONE, normalizePhone } from "../utils/validators.js";
+
 export const pharmacySchema = {
   collection: "pharmacies",
   fields: {
@@ -16,9 +17,9 @@ export const pharmacySchema = {
     whatsappNumber: {
       type: "string",
       required: true,
-      transform: (v) => v.replace(/[\s-]/g, "").replace(/^\+20/, "0"),
-      pattern: /^01[0125][0-9]{8}$/,
-      message: "whatsappNumber غير صالح",
+      transform: normalizePhone,
+      pattern: EG_PHONE,
+      message: "whatsappNumber is invalid",
     },
     openingHours: { type: "string", max: 100 },
     active: { type: "boolean" },

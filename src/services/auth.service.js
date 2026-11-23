@@ -1,44 +1,85 @@
-import { admin, db } from "../config/firebase.js";
+import { getIdp } from "../auth/index.js";
+import { getStore } from "../store/index.js";
+import { httpError } from "../utils/http-error.js";
 
-const httpError = (status, message) => Object.assign(new Error(message), { status });
+function httpStatusForAuthError(error) {
+  switch (error?.code) {
+    case "auth/email-already-exists":
+      return 409;
+    case "auth/invalid-email":
+    case "auth/invalid-password":
+    case "auth/weak-password":
+    case "auth/invalid-display-name":
+      return 400;
+    default:
+      return null;
+  }
+}
+
+function sessionPayload(user, session) {
+  const payload = {
+    id: user.id,
+    uid: user.id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone ?? "",
+    role: user.role,
+  };
+  if (session.idToken) {
+    payload.idToken = session.idToken;
+    payload.expiresIn = session.expiresIn ?? null;
+  }
+  if (session.refreshToken) payload.refreshToken = session.refreshToken;
+  if (session.customToken) {
+    payload.customToken = session.customToken;
+    payload.requiresClientExchange = true;
+  }
+  return payload;
+}
 
 export async function register({ name, email, password, role, phone }) {
-  let userRecord;
+  const idp = getIdp();
+  const store = getStore();
+  const normalizedEmail = email.trim().toLowerCase();
+
+  let uid;
   try {
-    userRecord = await admin.auth().createUser({ email, password, displayName: name });
-  } catch (e) {
-    if (e.code === "auth/email-already-exists") throw httpError(409, "Email already exists");
-    if (e.code === "auth/invalid-email" || e.code === "auth/invalid-password")
-      throw httpError(400, e.message);
-    throw e;
+    ({ uid } = await idp.createUser({ email: normalizedEmail, password, displayName: name }));
+  } catch (error) {
+    const status = httpStatusForAuthError(error);
+    if (status === 409) throw httpError(409, "Email already exists");
+    if (status) throw httpError(status, error.message);
+    throw error;
   }
 
   try {
-    await admin.auth().setCustomUserClaims(userRecord.uid, { role });
-    await db.collection("users").doc(userRecord.uid).set({
-      name, email, phone, role, createdAt: new Date(),
+    await idp.setCustomUserClaims(uid, { role });
+    await store.set("users", uid, {
+      name,
+      email: normalizedEmail,
+      phone: phone || "",
+      role,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
-  } catch (e) {
-    await admin.auth().deleteUser(userRecord.uid); // rollback
-    throw e;
+  } catch (error) {
+    await idp.deleteUser(uid).catch(() => {});
+    throw error;
   }
 
-  // دخول تلقائي
-  const customToken = await admin.auth().createCustomToken(userRecord.uid);
-  const r = await fetch(
-    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${process.env.FIREBASE_API_KEY}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: customToken, returnSecureToken: true }),
-    }
-  );
-  const auth = await r.json();
+  const user = await store.get("users", uid);
+  const session = await idp.createSession(uid);
+  return sessionPayload(user, session);
+}
 
-  return {
-    id: userRecord.uid,
-    name, email, phone, role,
-    idToken: r.ok ? auth.idToken : null,
-    refreshToken: r.ok ? auth.refreshToken : null,
-  };
+export async function login({ email, password }) {
+  const idp = getIdp();
+  const store = getStore();
+  const normalizedEmail = email.trim().toLowerCase();
+  const session = await idp.signInWithPassword(normalizedEmail, password);
+  const user = await store.get("users", session.uid);
+  if (!user) {
+    throw httpError(403, "No OneMed profile is linked to this account; contact an administrator.");
+  }
+  return sessionPayload(user, session);
 }

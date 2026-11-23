@@ -1,61 +1,46 @@
-import { admin, db } from "../config/firebase.js";
+import { getIdp } from "../auth/index.js";
+import { getStore } from "../store/index.js";
 
-const col = db.collection("users");
+const COLLECTION = "users";
 
-const httpError = (status, message) => Object.assign(new Error(message), { status });
-
-export const getById = async (id) => {
-  const doc = await col.doc(id).get();
-  return doc.exists ? { id: doc.id, ...doc.data() } : null;
-};
+export const getById = (id) => getStore().get(COLLECTION, id);
 
 export const getAll = async ({ limit = 20, startAfter } = {}) => {
-  let q = col.orderBy("createdAt", "desc").limit(limit);
-  if (startAfter) {
-    const cursor = await col.doc(startAfter).get();
-    if (cursor.exists) q = q.startAfter(cursor);
-  }
-  const snap = await q.get();
-  const users = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  const nextCursor = snap.docs.length === limit ? snap.docs.at(-1).id : null;
-  return { users, nextCursor };
+  const { items, nextCursor } = await getStore().query(COLLECTION, {
+    orderBy: [{ field: "createdAt", direction: "desc" }],
+    limit,
+    startAfter,
+  });
+  return { users: items, nextCursor };
 };
 
 export const updateProfile = async (id, data) => {
-  const ref = col.doc(id);
-  if (!(await ref.get()).exists) return null;
+  const existing = await getStore().get(COLLECTION, id);
+  if (!existing) return null;
 
-  if (data.name) await admin.auth().updateUser(id, { displayName: data.name });
-  await ref.update({
-    ...data,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+  if (data.name) await getIdp().updateUser(id, { displayName: data.name });
+  await getStore().update(COLLECTION, id, { ...data, updatedAt: new Date() });
   return getById(id);
 };
 
 export const setRole = async (id, role) => {
-  const ref = col.doc(id);
-  if (!(await ref.get()).exists) return null;
+  const existing = await getStore().get(COLLECTION, id);
+  if (!existing) return null;
 
-  await admin.auth().setCustomUserClaims(id, { role });
-  await ref.update({
-    role,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-  });
+  await getIdp().setCustomUserClaims(id, { role });
+  await getStore().update(COLLECTION, id, { role, updatedAt: new Date() });
   return getById(id);
 };
 
 export const remove = async (id) => {
-  const ref = col.doc(id);
-  if (!(await ref.get()).exists) return false;
+  const existing = await getStore().get(COLLECTION, id);
+  if (!existing) return false;
 
   try {
-    await admin.auth().deleteUser(id);
-  } catch (e) {
-    if (e.code !== "auth/user-not-found") throw e;
+    await getIdp().deleteUser(id);
+  } catch (error) {
+    if (error.code !== "auth/user-not-found") throw error;
   }
-  await ref.delete();
+  await getStore().delete(COLLECTION, id);
   return true;
 };
-
-export { httpError };

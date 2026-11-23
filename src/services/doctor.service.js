@@ -1,81 +1,72 @@
-import { db, admin } from "../config/firebase.js";
-import { httpError } from "./user.service.js";
-const toIso = (v) => (v?.toDate ? v.toDate().toISOString() : v);
-const format = (id, data) => ({
-  id,
-  ...data,
-  createdAt: toIso(data.createdAt),
-  updatedAt: toIso(data.updatedAt),
-});
-const col = () => db.collection("doctors");
+import { getStore } from "../store/index.js";
+import { httpError } from "../utils/http-error.js";
+
+const COLLECTION = "doctors";
 
 export async function getProfile(uid) {
-  const snap = await col().doc(uid).get();
-  if (!snap.exists) throw httpError(404, "Doctor profile not found");
-  return { id: snap.id, ...snap.data() };
+  const doctor = await getStore().get(COLLECTION, uid);
+  if (!doctor) throw httpError(404, "Doctor profile not found");
+  return doctor;
 }
 
-// PUT: إنشاء أو تحديث البروفايل
+// PUT: create or update the profile (keeps existing verified flag on update)
 export async function saveProfile(uid, data) {
-  const ref = col().doc(uid);
-  const snap = await ref.get();
+  const existing = await getStore().get(COLLECTION, uid);
   const now = new Date();
-  if (snap.exists) {
-    await ref.set({ ...data, updatedAt: now }, { merge: true });
-  } else {
-    await ref.set({ ...data, verified: false, createdAt: now, updatedAt: now });
+  if (existing) {
+    return getStore().set(COLLECTION, uid, { ...data, updatedAt: now }, { merge: true });
   }
-  return getProfile(uid);
+  return getStore().set(COLLECTION, uid, {
+    ...data,
+    verified: false,
+    createdAt: now,
+    updatedAt: now,
+  });
 }
 
-// PATCH: تعديل جزئي (لازم البروفايل يكون موجود)
+// PATCH: partial update; the profile must already exist
 export async function updateProfile(uid, data) {
-  const ref = col().doc(uid);
-  const snap = await ref.get();
-  if (!snap.exists)
+  const existing = await getStore().get(COLLECTION, uid);
+  if (!existing) {
     throw httpError(404, "Doctor profile not found, create it first with PUT /api/doctors/me");
-  await ref.update({ ...data, updatedAt: new Date() });
-  return getProfile(uid);
+  }
+  return getStore().update(COLLECTION, uid, { ...data, updatedAt: new Date() });
 }
 
 export async function getOne(id) {
-  const [doc, user] = await Promise.all([
-    col().doc(id).get(),
-    db.collection("users").doc(id).get(),
-  ]);
-  if (!doc.exists) throw httpError(404, "Doctor not found");
-  return { id, name: user.data()?.name ?? null, ...doc.data() };
+  const store = getStore();
+  const [doctor, user] = await Promise.all([store.get(COLLECTION, id), store.get("users", id)]);
+  if (!doctor) throw httpError(404, "Doctor not found");
+  return { name: user?.name ?? null, ...doctor, id };
 }
 
-export async function list({ specialty, city, verified, limit, startAfter }) {
-  let q = col();
-  if (specialty) q = q.where("specialty", "==", specialty);
-  if (city) q = q.where("city", "==", city);
-  if (verified !== undefined) q = q.where("verified", "==", verified);
-  q = q.orderBy(admin.firestore.FieldPath.documentId()).limit(limit);
-  if (startAfter) q = q.startAfter(startAfter);
+export async function list({ specialty, city, verified, limit = 20, startAfter }) {
+  const where = [];
+  if (specialty) where.push({ field: "specialty", op: "==", value: specialty });
+  if (city) where.push({ field: "city", op: "==", value: city });
+  if (verified !== undefined) where.push({ field: "verified", op: "==", value: verified });
 
-  const snap = await q.get();
-  const docs = snap.docs;
+  const store = getStore();
+  const { items: doctors, nextCursor } = await store.query(COLLECTION, {
+    where,
+    orderBy: [{ field: "__id__", direction: "asc" }],
+    limit,
+    startAfter,
+  });
 
-  // الاسم موجود في users، فنجيبه مرة واحدة لكل الدكاترة
-  const users = docs.length
-    ? await db.getAll(...docs.map((d) => db.collection("users").doc(d.id)))
-    : [];
+  const users = await store.getMany(
+    "users",
+    doctors.map((doctor) => doctor.id),
+  );
 
-  const doctors = docs.map((d, i) => ({
-    id: d.id,
-    name: users[i].data()?.name ?? null,
-    ...d.data(),
-  }));
-  const nextCursor = docs.length === limit ? docs[docs.length - 1].id : null;
-  return { doctors, nextCursor };
+  return {
+    doctors: doctors.map((doctor, index) => ({ name: users[index]?.name ?? null, ...doctor })),
+    nextCursor,
+  };
 }
 
 export async function setVerified(id, verified) {
-  const ref = col().doc(id);
-  const snap = await ref.get();
-  if (!snap.exists) throw httpError(404, "Doctor not found");
-  await ref.update({ verified, updatedAt: new Date() });
-  return getOne(id);
+  const existing = await getStore().get(COLLECTION, id);
+  if (!existing) throw httpError(404, "Doctor not found");
+  return getStore().update(COLLECTION, id, { verified, updatedAt: new Date() });
 }
