@@ -106,6 +106,7 @@ describe("M2 medical ingestion API", () => {
       .expect(201);
     expect(ingest.body.record.status).toBe("needs_review");
     expect(ingest.body.record.lifecycle).toBe("manual_review");
+    expect(ingest.body.record.lifecycleHistory.map((s) => s.step)).toContain("manual_review");
 
     const patientView = await api.get(`/api/records?patientId=${PATIENT}`).set(bearer(patientToken)).expect(200);
     expect(patientView.body.items.some((r) => r.id === ingest.body.record.id)).toBe(false);

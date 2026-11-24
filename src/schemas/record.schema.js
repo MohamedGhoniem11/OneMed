@@ -24,6 +24,17 @@ export const recordSchema = {
     data: { type: "object", additional: true, fields: {} },
     status: { type: "string", enum: [...recordStatuses] },
     lifecycle: { type: "string", enum: [...recordLifecycle] },
+    lifecycleHistory: {
+      type: "array",
+      max: 20,
+      of: {
+        type: "object",
+        fields: {
+          step: { type: "string", required: true, enum: [...recordLifecycle] },
+          at: { type: "timestamp", required: true },
+        },
+      },
+    },
     observedAt: { type: "timestamp", required: true },
     uploadedBy: { type: "string", readOnly: true },
     source: { type: "string", max: 80 },

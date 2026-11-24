@@ -43,8 +43,21 @@ function normalizeManualValues(values = []) {
   });
 }
 
+function lifecycleSteps(normalized, hasUpload) {
+  const steps = ["validating"];
+  if (hasUpload && ["ocr", "pdf", "pdf_scan", "image"].includes(normalized.sourceFormat)) steps.push("ocr_processing");
+  steps.push("normalizing");
+  if (hasUpload) steps.push("encrypted");
+  steps.push("stored");
+  steps.push(normalized.needsReview ? "manual_review" : "accessible");
+  const at = new Date();
+  return steps.map((step) => ({ step, at }));
+}
+
 async function persistNormalized({ req, patientId, normalized, meta = {} }) {
+  const history = lifecycleSteps(normalized, Boolean(meta.uploadId));
   const body = {
+    lifecycleHistory: history,
     patientId,
     institutionId: req.user?.institutionId || req.affiliation?.institutionId || meta.institutionId || null,
     type: normalized.type,
@@ -136,7 +149,13 @@ async function parseFile(file) {
   if (format === "dicom") return normalizeDicom(file.buffer);
   const text = file.buffer.toString("utf8");
   if (format === "csv") return normalizeCsv(text);
-  if (format === "json") return normalizeJson(text);
+  if (format === "json") {
+    try { return normalizeJson(text); }
+    catch (error) {
+      if (error?.status) throw error;
+      throw httpError(400, `Invalid JSON/FHIR document: ${error.message}`);
+    }
+  }
   return normalizeOcrText(text, { confidence: 100, sourceFormat: "text" });
 }
 
@@ -185,6 +204,7 @@ export async function reviewRecord(req) {
     summary: values.map((v) => `${v.name}: ${v.value}${v.unit ? ` ${v.unit}` : ""}`).slice(0, 8).join("; "),
     status: withStatus(values),
     lifecycle: "accessible",
+    lifecycleHistory: [...(record.lifecycleHistory || []), { step: "accessible", at: new Date() }],
     confidence: 100,
     reviewed: true,
     reviewedBy: req.user?.uid || null,
