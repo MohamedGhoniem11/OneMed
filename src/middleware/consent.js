@@ -39,7 +39,9 @@ export async function canReadPatient(req, patientId, { scope = "records", resour
   throw httpError(403, "Patient record is not available to you");
 }
 
-export async function requirePatientAccess(scope, { resourceType, resourceId } = {}) {
+export function requirePatientAccess(scope, { resourceType, resourceId } = {}) {
+  // Must be synchronous: Express route registration needs the middleware
+  // function itself, not a Promise that resolves to one (B: Route.get() error).
   return async (req, res, next) => {
     try {
       const patientId = req.params.patientId || req.params.id || req.query.patientId || req.body?.patientId;

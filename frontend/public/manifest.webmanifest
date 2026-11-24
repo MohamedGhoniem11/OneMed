@@ -1,0 +1,12 @@
+{
+  "name": "OneMed — Unified Medical Data Platform",
+  "short_name": "OneMed",
+  "description": "Your complete medical history, one platform.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f8fc",
+  "theme_color": "#002657",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

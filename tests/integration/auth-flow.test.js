@@ -17,7 +17,7 @@ async function registerPatient(email, overrides = {}) {
     phone: "01012345678",
     emergencyContact: { name: "Family", phone: "01000000001", relationship: "family" },
     patient: {
-      nationalId: `2900101${String(Math.floor(Math.random() * 900000) + 100000)}`,
+      nationalId: `290010101${String(Math.floor(Math.random() * 90000) + 10000)}`,
       dateOfBirth: "1990-01-10",
       gender: "male",
       bloodGroup: "O+",

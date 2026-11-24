@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
-import { generate, verify } from "otplib";
+import { generate, generateSecret, verify } from "otplib";
 import { auditInternals, appendAudit, verifyChain } from "../../src/services/audit.service.js";
 import { getStore, setStoreForTests, resetStoreForTests } from "../../src/store/index.js";
 import { createLocalStore } from "../../src/store/local.store.js";
@@ -77,7 +77,8 @@ describe("session rotation", () => {
 
 describe("TOTP MFA + OTP", () => {
   it("verifies a valid TOTP code and rejects a wrong one", async () => {
-    const secret = crypto.randomBytes(20).toString("base64");
+    // otplib requires RFC 4648 Base32, not Base64.
+    const secret = generateSecret();
     const code = await generate({ secret });
     const result = await verify({ token: code, secret, window: 1 });
     expect(result.valid).toBe(true);
