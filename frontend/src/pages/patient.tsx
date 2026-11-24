@@ -23,7 +23,7 @@ export function PatientDashboard() {
   const [patient,setPatient] = useState<Patient|null>(null); const [records,setRecords] = useState<MedicalRecord[]>([]); const [rx,setRx] = useState<Prescription[]>([]); const [loading,setLoading]=useState(true);
   useEffect(()=>{ Promise.all([
     api.getPatient(session!.user.uid).then(setPatient),
-    api.list<MedicalRecord>('records',r=>r.patientId===session!.user.uid).then(a=>setRecords(a.sort((x,y)=>y.date.localeCompare(x.date)))),
+    api.listRecords(session!.user.uid).then(a=>setRecords(a.sort((x,y)=>String(y.date).localeCompare(String(x.date))))),
     api.list<Prescription>('prescriptions',r=>r.patientId===session!.user.uid).then(setRx),
   ]).finally(()=>setLoading(false)); },[]);
   const abnormal = records.flatMap(r=>r.values||[]).filter(v=>v.flag && v.flag!=='normal');
@@ -53,7 +53,7 @@ export function PatientDashboard() {
 
 export function PatientRecords() {
   const { session } = useAuth(); const { t } = useTranslation(); const [records,setRecords] = useState<MedicalRecord[]>([]); const [type,setType] = useState('all'); const [q,setQ] = useState('');
-  useEffect(()=>{ api.list<MedicalRecord>('records',r=>r.patientId===session!.user.uid).then(a=>setRecords(a.sort((x,y)=>y.date.localeCompare(x.date)))); },[]);
+  useEffect(()=>{ api.listRecords(session!.user.uid).then(a=>setRecords(a.sort((x,y)=>String(y.date).localeCompare(String(x.date))))); },[]);
   const filtered = records.filter(r=>(type==='all'||r.type===type) && (!q||`${r.title} ${r.institution}`.toLowerCase().includes(q.toLowerCase())));
   return <><PageHead title={t('records')} subtitle={t('clinicalTimeline')} actions={<button className="btn outline" onClick={()=>window.print()}><Download size={16}/> {t('printRecord')}</button>}/>
     <Card pad><div style={{padding:18,display:'flex',gap:10,flexWrap:'wrap'}}><input className="input" style={{maxWidth:260}} placeholder={t('search')} value={q} onChange={e=>setQ(e.target.value)}/><div className="tabs" style={{border:0,margin:0}}>{['all','lab','imaging','prescription','note','visit','vitals'].map(x=><button key={x} className={`tab ${type===x?'active':''}`} onClick={()=>setType(x)}>{t(x)}</button>)}</div></div>
@@ -66,7 +66,7 @@ export function PatientRecords() {
 
 export function PatientAnalytics() {
   const { session } = useAuth(); const { t } = useTranslation(); const [records,setRecords] = useState<MedicalRecord[]>([]);
-  useEffect(()=>{ api.list<MedicalRecord>('records',r=>r.patientId===session!.user.uid).then(setRecords); },[]);
+  useEffect(()=>{ api.listRecords(session!.user.uid).then(setRecords); },[]);
   const series = useMemo(()=>{
     const a1c = records.filter(r=>r.values?.some(v=>v.name==='HbA1c')).map(r=>({date:new Date(r.date).toLocaleDateString('en',{month:'short'}),value:r.values!.find(v=>v.name==='HbA1c')!.value,low:4,high:5.6}));
     const bp = records.filter(r=>r.values?.some(v=>v.name==='Systolic')).map(r=>({date:new Date(r.date).toLocaleDateString('en',{month:'short'}),systolic:r.values!.find(v=>v.name==='Systolic')!.value,diastolic:r.values!.find(v=>v.name==='Diastolic')!.value}));
@@ -118,7 +118,11 @@ export function PatientPrescriptions() {
 export function PatientConsents() {
   const { session } = useAuth(); const { t } = useTranslation(); const [list,setList] = useState<Consent[]>([]); const {toast}=useToast();
   const load = ()=>api.list<Consent>('consents',c=>c.patientId===session!.user.uid).then(setList); useEffect(()=>{void load();},[]);
-  const toggle = async (c:Consent)=>{ await api.mutate(db=>{const x=db.consents.find(y=>y.id===c.id); if(x) x.active=!x.active;}); toast(c.active?t('revoke'):t('grant')); void load(); };
+  const toggle = async (c:Consent)=>{
+    if(c.active) await api.revokeConsentApi(c.id, 'Patient request');
+    else await api.grantConsent({granteeType:c.granteeType, granteeId:c.granteeId, scope:c.scope.split(','), purpose:c.purpose});
+    toast(c.active?t('revoke'):t('grant')); void load();
+  };
   return <><PageHead title={t('dataPrivacy')} subtitle="Control who can access your medical record. Changes are audit logged."/>
     <Card pad><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('name')}</th><th>{t('role')}</th><th>Scope</th><th>Purpose</th><th>{t('status')}</th><th>{t('action')}</th></tr></thead><tbody>
       {list.map(c=><tr key={c.id}><td>{c.granteeName}</td><td>{t(c.granteeType)}</td><td>{c.scope}</td><td>{c.purpose}</td><td><StatusBadge status={c.active?'active':'revoked'}/></td><td><button className="btn sm outline" onClick={()=>void toggle(c)}>{c.active?t('revoke'):t('grant')}</button></td></tr>)}
@@ -130,14 +134,22 @@ export function PatientConsents() {
 export function PatientEmergencyConfig() {
   const { session } = useAuth(); const { t } = useTranslation(); const {toast}=useToast();
   const [profile,setProfile] = useState<EmergencyProfile|null>(null); const [qr,setQr] = useState(''); const [tab,setTab]=useState('settings');
-  useEffect(()=>{ api.list<EmergencyProfile>('emergencyProfiles',p=>p.patientId===session!.user.uid).then(a=>{ const p=a[0]; setProfile(p||null); if(p) QRCode.toDataURL(`${location.origin}/emergency/${p.token}`).then(setQr); }); },[]);
+  useEffect(()=>{ void (async()=>{
+    const a=await api.list<EmergencyProfile>('emergencyProfiles',p=>p.patientId===session!.user.uid);
+    let p=a[0]||null; const n=await api.myNfc();
+    if(n.issued) p={ ...(p as any), token:p?.token||'', patientId:session!.user.uid, nfcIssued:true,
+      nfcUid:n.nfcUid, scanCount:n.scanCount||0, activatedAt:p?.activatedAt||new Date().toISOString(),
+      settings:p?.settings||{showBloodType:true,showAllergies:true,showConditions:true,showMedications:false,showContacts:true,aiChatbotEnabled:true} };
+    setProfile(p); if(p?.token) QRCode.toDataURL(`${location.origin}/emergency/${p.token}`).then(setQr);
+  })(); },[]);
   const toggle = (k:keyof EmergencyProfile['settings'])=>{ if(!profile) return; const next={...profile,settings:{...profile.settings,[k]:!profile.settings[k]}}; setProfile(next); api.mutate(db=>{const p=db.emergencyProfiles.find(x=>x.token===profile.token); if(p) p.settings[k]=next.settings[k];}); };
   const fields:[keyof EmergencyProfile['settings'],string][] = [['showBloodType',t('bloodGroup')],['showAllergies',t('allergies')],['showConditions',t('chronicConditions')],['showMedications',t('currentMedications')],['showContacts',t('emergencyContact')],['aiChatbotEnabled',t('askAi')]];
   return <><PageHead title={t('emergencyQr')} subtitle="Choose what bystanders see when they scan your QR wearable."/>
     <Tabs tabs={[{id:'settings',label:t('settings')},{id:'qr',label:'QR / NFC'}]} active={tab} onChange={setTab}/>
     {tab==='settings'?<Card title={t('dataPrivacy')}>{fields.map(([k,label])=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'12px 0',borderBottom:'1px solid var(--line)'}}><strong>{label}</strong><button className={`btn sm ${profile?.settings[k]?'primary':'outline'}`} onClick={()=>toggle(k)}>{profile?.settings[k]?t('yes'):t('no')}</button></div>)}<p className="disclaimer" style={{marginTop:14}}>Full medical records stay behind authentication. Network and scan logs are kept for security.</p></Card>
     :<div className="grid cols-2"><Card title="Emergency QR"><div style={{textAlign:'center'}}>{qr?<img src={qr} alt="Emergency QR" style={{width:200,height:200}}/>:<div className="empty">Generating…</div>}<div className="disclaimer" style={{marginTop:12}}>{location.origin}/emergency/{profile?.token} {profile && <CopyButton value={`${location.origin}/emergency/${profile.token}`} compact/>}</div><a className="btn primary" style={{marginTop:12}} href={qr} download="onemed-emergency-qr.png"><Download size={16}/> {t('downloadQr')}</a></div></Card>
-      <Card title="NFC Wristband"><p style={{color:'var(--muted)'}}>NTAG 424 DNA wristband linked to this profile.</p><dl style={{lineHeight:2}}><dt style={{color:'var(--muted)'}}>Status</dt><dd>{profile?.nfcIssued?t('active'):'Not issued'}</dd><dt style={{color:'var(--muted)'}}>UID</dt><dd>{profile?.nfcUid||'-'}</dd><dt style={{color:'var(--muted)'}}>{t('scanQr')}</dt><dd>{profile?.scanCount||0}</dd></dl><Link className="btn outline" to={`/nfc/${profile?.token}`}>{t('view')} NFC page</Link></Card></div>}
+      <Card title="NFC Wristband"><p style={{color:'var(--muted)'}}>NTAG 424 DNA wristband linked to this profile.</p>
+        {api.API_MODE==='api' && <button className="btn sm outline" style={{marginBottom:10}} onClick={async()=>{await api.issueNfc(session!.user.uid);toast(t('saved'));}}>Issue NFC token</button>}<dl style={{lineHeight:2}}><dt style={{color:'var(--muted)'}}>Status</dt><dd>{profile?.nfcIssued?t('active'):'Not issued'}</dd><dt style={{color:'var(--muted)'}}>UID</dt><dd>{profile?.nfcUid||'-'}</dd><dt style={{color:'var(--muted)'}}>{t('scanQr')}</dt><dd>{profile?.scanCount||0}</dd></dl><Link className="btn outline" to={`/nfc/${profile?.token}`}>{t('view')} NFC page</Link></Card></div>}
   </>;
 }
 

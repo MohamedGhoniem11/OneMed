@@ -207,10 +207,13 @@ function DropletIcon(){ return <span style={{fontSize:14}}>🩸</span>; }
 
 export function NfcLanding() {
   const { token='' } = useParams(); const { t } = useTranslation(); const nav = useNavigate();
+  const [resolved,setResolved] = useState<{patientId:string}|null>(null); const [error,setError]=useState('');
+  useEffect(()=>{ void api.resolveNfc(token).then(setResolved).catch(e=>setError(e.message||'Invalid NFC token')); },[token]);
   return <div className="public-shell"><div className="public-top"><span className="logo">OneMed</span><span style={{fontSize:12}}>NFC / QR</span><div style={{flex:1}}/><BackButton fallback="/"/></div>
     <div className="public-wrap" style={{paddingTop:50}}><Card title="OneMed Patient ID" pad><p style={{color:'var(--muted)'}}>This wristband links to a verified OneMed patient profile.</p>
+      {error ? <div className="alert red">{error}</div> : <div className="alert green">{resolved?`Patient ${resolved.patientId} verified`:'Verifying wristband...'}</div>}
       <button className="btn navy" style={{width:'100%',marginBottom:10}} onClick={()=>nav('/login')}><Stethoscope size={16}/> {t('patientDashboard')} ({t('login')})</button>
-      <button className="btn outline" style={{width:'100%'}} onClick={()=>nav(`/emergency/${token}`)}><HeartPulseIcon size={16}/> {t('emergencyInfo')}</button>
+      <button className="btn outline" style={{width:'100%'}} onClick={()=>nav(`/emergency/${resolved?.patientId||token}`)}><HeartPulseIcon size={16}/> {t('emergencyInfo')}</button>
       <div className="disclaimer" style={{marginTop:14}}>Web NFC is available in Chrome on Android; QR scanning works on any phone.</div>
     </Card></div></div>;
 }

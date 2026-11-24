@@ -42,8 +42,8 @@ export function createFirebaseIdp() {
   return {
     kind: "firebase",
 
-    async createUser({ email, password, displayName }) {
-      const user = await getAuth().createUser({ email, password, displayName });
+    async createUser({ uid, email, password, displayName }) {
+      const user = await getAuth().createUser({ uid, email, password, displayName });
       return { uid: user.uid };
     },
 

@@ -118,6 +118,13 @@ if (nodeEnv === "production" && corsOrigins.includes("*") && firebaseConfigured)
   console.warn("[config] CORS_ORIGINS=* is not recommended in production; set an explicit allowlist.");
 }
 
+// Public links embeds in QR codes/NFC handoffs. Must be the origin the patient browser can reach.
+const publicBaseUrl = readString("PUBLIC_BASE_URL", "http://localhost:5173").replace(/\/+$/, "");
+if (!/^https?:\/\//.test(publicBaseUrl)) {
+  throw new ConfigError("PUBLIC_BASE_URL must start with http:// or https://");
+}
+const connectionTtlSeconds = readInt("CONNECTION_TTL_SECONDS", 900, { min: 60, max: 3600 });
+
 const jsonBodyLimit = readString("JSON_BODY_LIMIT", "1mb");
 if (!/^\d+(kb|mb)$/i.test(jsonBodyLimit)) {
   throw new ConfigError(`JSON_BODY_LIMIT must look like "256kb" or "1mb" (got "${jsonBodyLimit}").`);
@@ -195,6 +202,8 @@ export const env = Object.freeze({
   firebaseAuthEmulatorHost: readString("FIREBASE_AUTH_EMULATOR_HOST"),
 
   corsOrigins,
+  publicBaseUrl,
+  connectionTtlSeconds,
   jsonBodyLimit,
   uploadEncryptionKey,
   uploadMaxMb,

@@ -1,7 +1,7 @@
 import * as service from "../services/patient.service.js";
 import { updateMe } from "../controllers/user.controller.js";
 import { validate } from "../utils/schema.js";
-import { patientUpdateSchema } from "../schemas/patient.schema.js";
+import { emergencyOverrideSchema, patientUpdateSchema } from "../schemas/patient.schema.js";
 
 export const me = updateMe;
 export const updateMePatch = updateMe;
@@ -18,6 +18,20 @@ export async function updatePatientMe(req, res, next) {
   } catch (err) {
     next(err);
   }
+}
+
+export async function search(req, res, next) {
+  try {
+    const patients = await service.searchPatients(req, req.query.q, req.query.limit);
+    res.json({ patients });
+  } catch (err) { next(err); }
+}
+
+export async function override(req, res, next) {
+  try {
+    const data = validate(emergencyOverrideSchema, req.body);
+    res.json(await service.emergencyOverride(req, req.params.id, data));
+  } catch (err) { next(err); }
 }
 
 export async function getById(req, res, next) {

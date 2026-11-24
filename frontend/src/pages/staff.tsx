@@ -15,29 +15,30 @@ export function LabPortal({ initialTab = 'upload' }: { initialTab?: string }) {
   const { t } = useTranslation(); const {toast}=useToast(); const {session}=useAuth();
   const [tab,setTab]=useState(initialTab); const [patientId,setPatientId]=useState(''); const [patients,setPatients]=useState<Patient[]>([]);
   const [rows,setRows] = useState([{test:'Hemoglobin (Hb)',value:'14.2',unit:'g/dL',ref:'13.8 - 17.2',confidence:98},{test:'White Blood Cell (WBC)',value:'6.8',unit:'x10^3/uL',ref:'4.5 - 11.0',confidence:98},{test:'Platelet Count',value:'150',unit:'x10^3/uL',ref:'150 - 450',confidence:64},{test:'Glucose, Fasting',value:'92',unit:'mg/dL',ref:'70 - 99',confidence:58}]);
-  const [history,setHistory]=useState<MedicalRecord[]>([]);
-  useEffect(()=>{ api.list<Patient>('patients').then(a=>{setPatients(a);setPatientId(a[0]?.id||'');}); api.list<MedicalRecord>('records',r=>r.type==='lab').then(setHistory); },[]);
+  const [history,setHistory]=useState<MedicalRecord[]>([]); const [file,setFile]=useState<File|null>(null);
+  useEffect(()=>{ api.searchPatients('').then(a=>{setPatients(a);setPatientId(a[0]?.id||'');}); api.listRecords(undefined,'lab').then(setHistory); },[]);
   const confirm=async()=>{
     if(!patientId) return toast(t('fieldRequired'),true);
     const unverified = rows.filter(r=>r.confidence<80).length;
-    if(unverified) return toast(`${unverified} field(s) below 80% confidence. Confirm each value before linking.`,true);
-    await api.mutate(db=>{
-      const institution = db.institutions.find(i=>i.id===session!.user.institutionId)?.name || 'Connected Laboratory';
-      const values = rows.map(r=>{
-        const [lo,hi] = r.ref.split(/[-–]/).map(s=>Number(s.trim()));
-        const value = Number(r.value);
-        return {name:r.test,value,unit:r.unit,referenceLow:Number.isFinite(lo)?lo:0,referenceHigh:Number.isFinite(hi)?hi:999,
-          flag:(value<lo?'low':value>hi?'high':'normal') as 'low'|'high'|'normal'};
-      });
-      db.records.push({id:`r_${Date.now()}`,patientId,type:'lab',title:'Uploaded Lab Panel',institution,
-        date:new Date().toISOString(),confidence:Math.round(rows.reduce((a,r)=>a+r.confidence,0)/rows.length),
-        status:'accessible',values});
-      db.notifications.push({id:`n_${Date.now()}`,userId:patientId,title:'New lab result available',
-        body:`Uploaded Lab Panel from ${institution}`,type:'lab',read:false,createdAt:new Date().toISOString()});
-      db.audit.push({id:`a_${Date.now()}`,actor:session!.user.uid,actorName:session!.user.name,action:'lab_upload',
-        resource:'record',patientId,timestamp:new Date().toISOString(),ip:'127.0.0.1',hash:'',previousHash:''});
-    });
-    toast(t('saved')); api.list<MedicalRecord>('records',r=>r.type==='lab').then(setHistory); setTab('history');
+    if(!file && unverified) return toast(`${unverified} field(s) below 80% confidence. Confirm each value before linking.`,true);
+    try {
+      if(file) {
+        const result = await api.ingestRecord(file, patientId, session!.user.institutionId);
+        if(result.record?.status==='needs_review') toast('Upload stored - low confidence, awaiting manual review');
+        else toast(t('saved'));
+      } else {
+        const values = rows.map(r=>{
+          const [lo,hi] = r.ref.split(/[-–]/).map(s=>Number(s.trim()));
+          const value = Number(r.value);
+          return {name:r.test,value,unit:r.unit,referenceLow:Number.isFinite(lo)?lo:0,referenceHigh:Number.isFinite(hi)?hi:999,
+            flag:(value<lo?'low':value>hi?'high':'normal') as 'low'|'high'|'normal'};
+        });
+        await api.createManualRecord({patientId, institutionId:session!.user.institutionId, type:'lab',
+          title:'Uploaded Lab Panel', observedAt:new Date().toISOString(), data:{values}});
+        toast(t('saved'));
+      }
+      setFile(null); api.listRecords(undefined,'lab').then(setHistory); setTab('history');
+    } catch(e:any) { toast(e.message,true); }
   };
   return <><PageHead title="Lab Data Ingestion" subtitle="Upload physical lab reports or import batch datasets. Low-confidence fields require confirmation."/>
     <Tabs tabs={[{id:'upload',label:t('upload')},{id:'batch',label:t('batchImport')},{id:'manual',label:t('manualEntry')},{id:'history',label:t('records')}]} active={tab} onChange={setTab}/>
@@ -45,7 +46,7 @@ export function LabPortal({ initialTab = 'upload' }: { initialTab?: string }) {
       <div className="grid" style={{gap:16,alignContent:'start'}}>
         <Card title="Target Patient Context"><Field label="Search Patient ID, Name, or DOB"><select className="input" value={patientId} onChange={e=>setPatientId(e.target.value)}>{patients.map(p=><option key={p.id} value={p.id}>{p.name} - {p.nationalId}</option>)}</select></Field><p style={{fontSize:12,color:'var(--muted)'}}>{patientId?'Patient linked. Data will be appended to their unified record.':'No patient selected.'}</p></Card>
         <Card title={tab==='batch'?t('batchImport'):tab==='manual'?t('manualEntry'):'File Upload'}>
-          {tab==='upload' && <><div style={{border:'2px dashed var(--line)',borderRadius:10,padding:24,textAlign:'center'}}><Upload size={28}/><p><strong>{t('dragDrop')}</strong></p><p style={{fontSize:12,color:'var(--muted)'}}>{t('uploadHint')}</p><label className="btn navy"><Browse/> Browse Files<input type="file" hidden accept=".pdf,.png,.jpg,.csv,.json" onChange={e=>{if(e.target.files?.[0])toast(`Selected ${e.target.files[0].name} - Processing Complete (demo)`);}}/></label></div><div className="alert green" style={{marginTop:10,padding:8,fontSize:12}}>✓ Smith_BloodPanel_Q3.pdf · 2.4 MB · {t('processingComplete')}</div></>}
+          {tab==='upload' && <><div style={{border:'2px dashed var(--line)',borderRadius:10,padding:24,textAlign:'center'}}><Upload size={28}/><p><strong>{t('dragDrop')}</strong></p><p style={{fontSize:12,color:'var(--muted)'}}>{t('uploadHint')}</p><label className="btn navy"><Browse/> Browse Files<input type="file" hidden accept=".pdf,.png,.jpg,.jpeg,.csv,.json" onChange={e=>{const f=e.target.files?.[0]; if(f){setFile(f);toast(`Selected ${f.name} - ready to link`);}}}/></label></div>{file && <div className="alert green" style={{marginTop:10,padding:8,fontSize:12}}>✓ {file.name} · {(file.size/1024).toFixed(1)} KB · {t('processingComplete')}</div>}</>}
           {tab==='batch' && <><Field label="Paste CSV / JSON batch"><textarea className="input" rows={7} placeholder={'patientId,test,value,unit\nuser_patient_1,Hemoglobin,14.2,g/dL'} defaultValue={'patientId,test,value,unit\nuser_patient_1,Hemoglobin,14.2,g/dL\nuser_patient_1,WBC,6.8,x10^3/uL'}/></Field><button className="btn navy" style={{width:'100%'}} onClick={()=>toast('2 rows imported · linked to selected patient (demo)')}>{t('importBatch')}</button></>}
           {tab==='manual' && <><Field label="Test name"><input className="input" defaultValue="Glucose, Fasting"/></Field><Field label={t('value')}><input className="input" defaultValue="92"/></Field><Field label={t('unit')}><input className="input" defaultValue="mg/dL"/></Field><Field label={t('referenceRange')}><input className="input" defaultValue="70 - 99"/></Field><button className="btn navy" style={{width:'100%'}} onClick={()=>toast('Manual entry saved (demo)')}>{t('saveEntry')}</button></>}
         </Card>

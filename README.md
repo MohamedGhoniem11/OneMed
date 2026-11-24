@@ -109,8 +109,8 @@ available).
 | Complete role-based frontend | Implemented | every documented portal/page; demo-data mode by default, REST-ready via `VITE_API_MODE=api` |
 | Automated tests + CI | Implemented | Vitest/Supertest, ESLint, GitHub Actions |
 | Medical ingestion API (M2) | Implemented | PDF/image/CSV/JSON/FHIR/DICOM + manual entry, AES-256-GCM originals, <80% review gate |
-| Patient/lab/pharmacy portals | Partial | UI complete; lab records now have a real API, pharmacy still demo-only |
-| Consent, audit hash chain, QR/NFC | Partial | consent + audit implemented; QR/NFC services planned (M3/M4) |
+| Patient/lab/pharmacy portals | Partial | UI complete; patient/lab wired to real APIs, pharmacy still demo-only |
+| Consent, audit hash chain, QR/NFC | Implemented | scoped consent, hash chain, signed 15-min QR and NFC tokens, emergency override |
 | Emergency RAG chatbot / Gemini | Planned | M4 |
 | Fulfillment link + GPS pharmacy match | Planned | M5 |
 | Analytics, reports, bilingual PWA | Planned | M6–M7 |
@@ -196,6 +196,16 @@ Base path: `/api`. Protected routes require `Authorization: Bearer <token>`.
 | POST | `/api/records/manual` | staff with `records:write` | Manual value entry |
 | POST | `/api/records/ingest` | staff with `records:write` | Multipart file → normalized record (`file`, `patientId`) |
 | PATCH | `/api/records/:id/review` | staff with `records:write` | Verify a low-confidence extraction |
+| GET | `/api/patients/search?q=` | staff with `patients:read` | Consent-filtered patient search |
+| POST | `/api/patients/:id/emergency-override` | doctor/hospital admin/admin | Logged, time-limited critical-info access |
+| POST | `/api/connect/qr` | doctor | Create a 15-minute signed connection QR |
+| GET | `/api/connect/:token` | public | Resolve a scanned QR (clinician/scope only) |
+| POST | `/api/connect/:token/accept` | patient | Grant scoped, expiring consent |
+| POST | `/api/nfc` | staff with `patients:read` | Issue a signed NFC patient token |
+| GET | `/api/nfc/:token` | public | Resolve a wristband tap (scan logged) |
+| GET | `/api/nfc/mine` | patient | Own wristband status (never returns the raw token) |
+
+**Connection/NFC tokens:** JWT-based capability tokens, SHA-256 hashes at rest, domain-separated from login tokens. QR connections expire after `CONNECTION_TTL_SECONDS` (default 900); NFC tokens are revocable. Raw tokens are returned once.
 
 **Ingestion formats:** PDF text layer, JPG/PNG (Tesseract.js `ara+eng`), CSV/TSV, JSON/FHIR R4, DICOM metadata, and manual entry. Originals are encrypted with AES-256-GCM; every file has a SHA-256 checksum. Values below 80% OCR confidence are stored as `needs_review` and hidden from patients until confirmed.
 

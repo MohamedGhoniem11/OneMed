@@ -322,7 +322,7 @@ async function seed() {
     const { password, ...profile } = user;
     if (!existingProfile) {
       try {
-        await idp.createUser({ email: user.email, password, displayName: user.name });
+        await idp.createUser({ uid: user.uid, email: user.email, password, displayName: user.name });
       } catch (error) {
         if (error?.code !== "auth/email-already-exists") throw error;
       }

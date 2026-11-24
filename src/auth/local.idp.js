@@ -52,13 +52,14 @@ export function createLocalIdp() {
   return {
     kind: "local",
 
-    async createUser({ email, password, displayName }) {
+    async createUser({ uid, email, password, displayName }) {
       const normalized = normalizeEmail(email);
       if (await findAuthUserByEmail(normalized)) {
         throw withCode(httpError(409, "Email already exists"), "auth/email-already-exists");
       }
       const { salt, hash } = await hashPassword(password);
-      const created = await getStore().add(AUTH_COLLECTION, {
+      const id = uid || crypto.randomUUID();
+      await getStore().set(AUTH_COLLECTION, id, {
         email: normalized,
         displayName: displayName || "",
         passwordSalt: salt,
@@ -68,7 +69,7 @@ export function createLocalIdp() {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-      return { uid: created.id };
+      return { uid: id };
     },
 
     async setCustomUserClaims(uid, claims) {

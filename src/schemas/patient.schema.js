@@ -56,6 +56,14 @@ export const patientSchema = {
   },
 };
 
+/** Time-limited emergency access with a written justification (R17/UC-11). */
+export const emergencyOverrideSchema = {
+  fields: {
+    reason: { type: "string", required: true, min: 10, max: 500 },
+    ttlMinutes: { type: "number", min: 1, max: 60 },
+  },
+};
+
 export const patientUpdateSchema = {
   fields: {
     dateOfBirth: patientSchema.fields.dateOfBirth,
