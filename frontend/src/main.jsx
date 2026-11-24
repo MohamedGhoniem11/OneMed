@@ -5,8 +5,9 @@ import App                from './App.jsx'
 import AppAdmin           from './AppAdmin.jsx'
 import PharmacyOrderPage  from './components/PharmacyOrderPage.jsx'
 import EmergencyPage      from './components/EmergencyPage.jsx'
-import SystemOverviewPage from './components/SystemOverviewPage.jsx'
-import PageSwitcher       from './components/PageSwitcher.jsx'
+import SystemOverviewPage    from './components/SystemOverviewPage.jsx'
+import PatientAnalyticsPage  from './components/PatientAnalyticsPage.jsx'
+import PageSwitcher           from './components/PageSwitcher.jsx'
 import './index.css'
 
 function Root() {
@@ -18,7 +19,8 @@ function Root() {
         <Route path="/admin"          element={<AppAdmin />} />
         <Route path="/pharmacy-order" element={<PharmacyOrderPage />} />
         <Route path="/emergency"      element={<EmergencyPage />} />
-        <Route path="/system"         element={<SystemOverviewPage />} />
+        <Route path="/system"             element={<SystemOverviewPage />} />
+        <Route path="/patient-analytics" element={<PatientAnalyticsPage />} />
       </Routes>
       <PageSwitcher />
     </>
