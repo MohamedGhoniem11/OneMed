@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import { beforeEach, describe, expect, it } from "vitest";
 import { generate, generateSecret, verify } from "otplib";
 import { auditInternals, appendAudit, verifyChain } from "../../src/services/audit.service.js";

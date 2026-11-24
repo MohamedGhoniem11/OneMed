@@ -123,6 +123,17 @@ if (!/^\d+(kb|mb)$/i.test(jsonBodyLimit)) {
   throw new ConfigError(`JSON_BODY_LIMIT must look like "256kb" or "1mb" (got "${jsonBodyLimit}").`);
 }
 
+// Medical uploads: AES-256-GCM key, 50MB cap, and 80% review threshold (OQ4).
+const uploadEncryptionKey = readString("UPLOAD_ENCRYPTION_KEY");
+if (uploadEncryptionKey && !/^[0-9a-fA-F]{64}$/.test(uploadEncryptionKey)) {
+  throw new ConfigError("UPLOAD_ENCRYPTION_KEY must be 64 hex characters (32 bytes) for AES-256-GCM.");
+}
+if (nodeEnv === "production" && !uploadEncryptionKey) {
+  throw new ConfigError("UPLOAD_ENCRYPTION_KEY is required in production (64 hex characters).");
+}
+const uploadMaxMb = readInt("UPLOAD_MAX_MB", 50, { min: 1, max: 100 });
+const ocrConfidenceThreshold = readInt("OCR_CONFIDENCE_THRESHOLD", 80, { min: 50, max: 99 });
+
 function readTrustProxy() {
   const value = readString("TRUST_PROXY");
   if (!value) return false;
@@ -185,6 +196,11 @@ export const env = Object.freeze({
 
   corsOrigins,
   jsonBodyLimit,
+  uploadEncryptionKey,
+  uploadMaxMb,
+  uploadMaxBytes: uploadMaxMb * 1024 * 1024,
+  uploadDir: resolveFromRoot(readString("UPLOAD_DIR", "data/uploads")),
+  ocrConfidenceThreshold,
   rateLimitWindowMs: readInt("RATE_LIMIT_WINDOW_MINUTES", 15, { min: 1, max: 1440 }) * 60 * 1000,
   rateLimitMax: readInt("RATE_LIMIT_MAX", 300),
   authRateLimitMax: readInt("AUTH_RATE_LIMIT_MAX", 20),

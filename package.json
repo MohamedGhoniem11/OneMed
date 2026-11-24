@@ -30,6 +30,7 @@
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.5.0",
     "otplib": "^13.6.0",
+    "pdfjs-dist": "^6.5.438",
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {

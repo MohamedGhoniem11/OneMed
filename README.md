@@ -106,10 +106,11 @@ available).
 | Prescription OCR + parsing (Tesseract.js) | Implemented | bilingual `ara+eng`; no LLM/key |
 | Prescription persistence | Implemented | create / list / get by id |
 | Role guards | Implemented | six canonical roles; admin management |
-| Frontend prototypes (5 pages) | Implemented | static mock data; not wired to API |
+| Complete role-based frontend | Implemented | every documented portal/page; demo-data mode by default, REST-ready via `VITE_API_MODE=api` |
 | Automated tests + CI | Implemented | Vitest/Supertest, ESLint, GitHub Actions |
-| Patient/lab/pharmacy portals | Planned | M1–M5 |
-| Consent, audit hash chain, QR/NFC | Planned | M1–M4 |
+| Medical ingestion API (M2) | Implemented | PDF/image/CSV/JSON/FHIR/DICOM + manual entry, AES-256-GCM originals, <80% review gate |
+| Patient/lab/pharmacy portals | Partial | UI complete; lab records now have a real API, pharmacy still demo-only |
+| Consent, audit hash chain, QR/NFC | Partial | consent + audit implemented; QR/NFC services planned (M3/M4) |
 | Emergency RAG chatbot / Gemini | Planned | M4 |
 | Fulfillment link + GPS pharmacy match | Planned | M5 |
 | Analytics, reports, bilingual PWA | Planned | M6–M7 |
@@ -119,13 +120,14 @@ available).
 ## Architecture
 
 ```
-Presentation   React 18 + Vite 8 (JavaScript/JSX, CSS Modules) — static prototypes
+Presentation   React 18 + TypeScript + Vite 8 — complete role-based PWA-ready UI
                       │  HTTPS / REST (Vite proxies /api in development)
 Application    Node.js + Express 4 (ESM)
                       │  routes → controllers → services → ports
 Ports          store:  local file store  |  Firestore
                auth:   local JWT + scrypt (demo/CI)  |  Firebase Auth
-               OCR:    Tesseract.js (WASM, local)
+               OCR:    Tesseract.js (WASM) + PDF.js text layer
+               files:  AES-256-GCM encrypted originals + SHA-256 checksums
 Data            local data/local-db.json  |  Firestore
 ```
 
@@ -187,6 +189,15 @@ Base path: `/api`. Protected routes require `Authorization: Bearer <token>`.
 | POST | `/api/prescriptions` | doctor | Persist a reviewed prescription |
 | GET | `/api/prescriptions` | doctor, admin | List with pagination |
 | GET | `/api/prescriptions/:id` | doctor (owner), admin | Get one |
+| GET | `/api/records` | signed-in, consent-scoped | List records (`?type=lab&patientId=…&limit=…`) |
+| GET | `/api/records/pending` | staff with `records:write` | Low-confidence review queue |
+| GET | `/api/records/:id` | consent-scoped | Get one record |
+| GET | `/api/records/:id/original` | consent-scoped | Decrypt and download the original document |
+| POST | `/api/records/manual` | staff with `records:write` | Manual value entry |
+| POST | `/api/records/ingest` | staff with `records:write` | Multipart file → normalized record (`file`, `patientId`) |
+| PATCH | `/api/records/:id/review` | staff with `records:write` | Verify a low-confidence extraction |
+
+**Ingestion formats:** PDF text layer, JPG/PNG (Tesseract.js `ara+eng`), CSV/TSV, JSON/FHIR R4, DICOM metadata, and manual entry. Originals are encrypted with AES-256-GCM; every file has a SHA-256 checksum. Values below 80% OCR confidence are stored as `needs_review` and hidden from patients until confirmed.
 
 Register body:
 
@@ -196,7 +207,10 @@ Register body:
   "email": "mona@example.com",
   "password": "secret123",
   "role": "patient",
-  "phone": "01012345678"
+  "phone": "01012345678",
+  "emergencyContact": { "name": "Ahmed Ali", "relationship": "Brother", "phone": "01099998888" },
+  "patient": { "nationalId": "29001010101234", "dateOfBirth": "1990-01-10",
+               "gender": "female", "bloodGroup": "O+", "city": "Alexandria" }
 }
 ```
 
