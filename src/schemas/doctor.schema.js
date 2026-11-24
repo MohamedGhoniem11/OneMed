@@ -2,6 +2,7 @@
 export const doctorSchema = {
   collection: "doctors",
   fields: {
+    institutionId: { type: "string", max: 80 },
     specialty: { type: "string", required: true, max: 80 },
     yearsOfExperience: { type: "number", min: 0, max: 70 },
     clinicName: { type: "string", max: 100 },

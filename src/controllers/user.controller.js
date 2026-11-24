@@ -3,6 +3,8 @@ import { isValidPhone, normalizePhone } from "../utils/validators.js";
 import { httpError } from "../utils/http-error.js";
 import { ROLES } from "../constants/roles.js";
 import { parseLimit } from "../utils/query.js";
+import { appendAudit } from "../services/audit.service.js";
+import { revokeUserSessions } from "../services/session.service.js";
 
 // Only these fields can be changed by the user/admin profile endpoints.
 function parseProfile(body) {
@@ -99,7 +101,17 @@ export const remove = async (req, res, next) => {
     if (req.params.id === req.user.uid) {
       return res.status(400).json({ message: "You cannot delete your own account here", requestId: req.id });
     }
-    (await service.remove(req.params.id)) ? res.status(204).send() : notFound(req, res);
+    const removed = await service.remove(req.params.id);
+    if (!removed) return notFound(req, res);
+    await revokeUserSessions(req.params.id, "user_deleted").catch(() => {});
+    await appendAudit({
+      actorId: req.user.uid,
+      actorRole: req.user.role,
+      action: "user_deleted",
+      resourceType: "user",
+      resourceId: req.params.id,
+    }).catch((error) => console.error("[audit] user delete failed", error));
+    res.status(204).send();
   } catch (e) {
     next(e);
   }

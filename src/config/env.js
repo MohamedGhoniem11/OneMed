@@ -101,8 +101,10 @@ const authJwtSecret = readString("AUTH_JWT_SECRET");
 if (authJwtSecret && authJwtSecret.length < 32) {
   throw new ConfigError("AUTH_JWT_SECRET must be at least 32 characters. Generate one with crypto.randomBytes(48).toString('hex').");
 }
-if (nodeEnv === "production" && authProvider === "local" && !authJwtSecret) {
-  throw new ConfigError("AUTH_JWT_SECRET is required when NODE_ENV=production and AUTH_PROVIDER=local.");
+if (nodeEnv === "production" && !authJwtSecret) {
+  throw new ConfigError(
+    "AUTH_JWT_SECRET is required in production. It signs OneMed 15-minute access tokens after the identity provider authenticates the user.",
+  );
 }
 
 const corsOrigins = (readString("CORS_ORIGINS", "http://localhost:5173,http://localhost:4173") || "")
@@ -130,6 +132,18 @@ function readTrustProxy() {
   return value;
 }
 
+const cookieSameSite = readEnum("AUTH_COOKIE_SAMESITE", ["lax", "strict", "none"], "lax");
+const cookieSecure = readBool("AUTH_COOKIE_SECURE", nodeEnv === "production");
+if (cookieSameSite === "none" && !cookieSecure) {
+  throw new ConfigError("AUTH_COOKIE_SAMESITE=none requires AUTH_COOKIE_SECURE=true.");
+}
+const otpDevDelivery = readBool("AUTH_OTP_DEV_DELIVERY", nodeEnv !== "production");
+if (nodeEnv === "production" && otpDevDelivery) {
+  console.warn(
+    "[config] AUTH_OTP_DEV_DELIVERY=true in production. OTP codes will be returned by the API and logged; use only for a controlled demo.",
+  );
+}
+
 export const env = Object.freeze({
   nodeEnv,
   isProduction: nodeEnv === "production",
@@ -146,7 +160,18 @@ export const env = Object.freeze({
   authJwtSecret,
   authJwtIssuer: readString("AUTH_JWT_ISSUER", "onemed-api"),
   authJwtAudience: readString("AUTH_JWT_AUDIENCE", "onemed-clients"),
-  authAccessTtlSeconds: readInt("AUTH_ACCESS_TTL_SECONDS", 900, { min: 60, max: 86400 }),
+  authAccessTtlSeconds: readInt("AUTH_ACCESS_TTL_SECONDS", 900, { min: 60, max: 3600 }),
+  authRefreshTtlDays: readInt("AUTH_REFRESH_TTL_DAYS", 7, { min: 1, max: 90 }),
+  authIdleMinutesPatient: readInt("AUTH_IDLE_MINUTES_PATIENT", 30, { min: 5, max: 240 }),
+  authIdleMinutesStaff: readInt("AUTH_IDLE_MINUTES_STAFF", 15, { min: 5, max: 120 }),
+  authMfaTokenTtlSeconds: readInt("AUTH_MFA_TOKEN_TTL_SECONDS", 300, { min: 60, max: 900 }),
+  authOtpTtlMinutes: readInt("AUTH_OTP_TTL_MINUTES", 10, { min: 1, max: 60 }),
+  authOtpMaxAttempts: readInt("AUTH_OTP_MAX_ATTEMPTS", 5, { min: 1, max: 20 }),
+  authOtpDevDelivery: otpDevDelivery,
+  authCookieName: readString("AUTH_COOKIE_NAME", "onemed_rt"),
+  authCookieSecure: cookieSecure,
+  authCookieSameSite: cookieSameSite,
+  authCookieDomain: readString("AUTH_COOKIE_DOMAIN"),
 
   firebaseConfigured,
   credentialPath,

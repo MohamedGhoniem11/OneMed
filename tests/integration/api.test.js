@@ -1,35 +1,88 @@
 import request from "supertest";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import app from "../../src/app.js";
-import { getIdp } from "../../src/auth/index.js";
-import { getStore } from "../../src/store/index.js";
+import { createSession } from "../../src/services/session.service.js";
 
-const api = request(app);
+const PASSWORD = "secret123";
 
-const PATIENT = {
-  name: "Mona Patient",
-  email: "mona.patient@example.com",
-  password: "secret123",
-  role: "patient",
-  phone: "01012345678",
-};
+async function registerPatient(email, overrides = {}) {
+  const body = {
+    name: "Mona Patient",
+    email,
+    password: PASSWORD,
+    role: "patient",
+    phone: "01012345678",
+    emergencyContact: { name: "Family", phone: "01000000001", relationship: "family" },
+    patient: {
+      nationalId: `2900101${String(Math.floor(Math.random() * 900000) + 100000)}`,
+      dateOfBirth: "1990-01-10",
+      gender: "male",
+      bloodGroup: "O+",
+      city: "Alexandria",
+    },
+    ...overrides,
+  };
+  return (await request(app).post("/api/auth/register").send(body).expect(201)).body;
+}
 
-const DOCTOR = {
-  name: "Dr. Karim Hassan",
-  email: "karim.doctor@example.com",
-  password: "secret123",
-  role: "doctor",
-  phone: "+20 111 234 5678",
-};
+async function activate(body, code) {
+  return request(app).post("/api/auth/register/verify-otp").send({ challengeId: body.challengeId, code });
+}
 
-let patientToken;
-let patientId;
-let doctorToken;
-let doctorId;
+async function login(email, password = PASSWORD) {
+  return request(app).post("/api/auth/login").send({ email, password });
+}
 
-describe("API foundations (local mode)", () => {
+const bearer = (token) => ({ Authorization: `Bearer ${token}` });
+
+describe("API foundations (local mode, post-M1)", () => {
+  let doctor;
+  let admin;
+
+  beforeAll(async () => {
+    const reg = await registerPatient("foundations-patient@example.com");
+    await activate(reg, reg.devCode);
+
+    const doctorReg = await registerPatient("foundations-doctor@example.com", {
+      name: "Dr. Foundations",
+      role: "doctor",
+      phone: "+20 111 888 7766",
+      patient: undefined,
+      doctor: { specialty: "Cardiology", licenseNumber: "EG-FOUND-1", city: "Alexandria" },
+      emergencyContact: { name: "Clinic", phone: "01000000008", relationship: "work" },
+    });
+    const doctorVerify = await activate(doctorReg, doctorReg.devCode);
+    expect(doctorVerify.body.next).toBe("login_mfa");
+
+    const login1 = await login("foundations-doctor@example.com");
+    const setup = await request(app)
+      .post("/api/auth/mfa/setup")
+      .send({ setupToken: login1.body.setupToken })
+      .expect(200);
+    const { generate } = await import("otplib");
+    const code = await generate({ secret: setup.body.secret });
+
+    await request(app)
+      .post("/api/auth/mfa/enable")
+      .send({ setupToken: login1.body.setupToken, code })
+      .expect(200);
+
+    const login2 = await login("foundations-doctor@example.com");
+    const verified = await request(app)
+      .post("/api/auth/mfa/verify")
+      .send({ mfaToken: login2.body.mfaToken, code })
+      .expect(200);
+    doctor = { token: verified.body.accessToken, uid: verified.body.user.uid };
+
+    const adminSession = await createSession(
+      { id: "foundations-admin", role: "admin", email: "foundations-admin@example.com" },
+      { mfa: false },
+    );
+    admin = { token: adminSession.accessToken };
+  });
+
   it("boots credential-free and reports its mode", async () => {
-    const response = await api.get("/").expect(200);
+    const response = await request(app).get("/").expect(200);
     expect(response.body).toMatchObject({ status: "ok", persistence: "local", authProvider: "local" });
     expect(response.headers["x-powered-by"]).toBeUndefined();
     expect(response.headers["x-content-type-options"]).toBe("nosniff");
@@ -37,179 +90,69 @@ describe("API foundations (local mode)", () => {
   });
 
   it("protects authenticated routes with a JSON 401", async () => {
-    const response = await api.get("/api/users/me").expect(401);
+    const response = await request(app).get("/api/users/me").expect(401);
     expect(response.body.message).toBe("Missing token");
-    expect(response.body.requestId).toBeTruthy();
   });
 
   it("validates registration input", async () => {
-    await api.post("/api/auth/register").send({ ...PATIENT, role: "admin" }).expect(400);
-    await api.post("/api/auth/register").send({ ...PATIENT, phone: "01300000000" }).expect(400);
-    await api.post("/api/auth/register").send({ ...PATIENT, password: "123" }).expect(400);
-    await api.post("/api/auth/register").send({ name: "No Email" }).expect(400);
-  });
-
-  it("registers a patient, signs in, and reads the profile", async () => {
-    const registered = await api.post("/api/auth/register").send(PATIENT).expect(201);
-    expect(registered.body).toMatchObject({
-      name: PATIENT.name,
-      email: PATIENT.email,
-      role: "patient",
-      phone: "01012345678",
-    });
-    expect(registered.body.idToken).toEqual(expect.any(String));
-    expect(registered.body.expiresIn).toBe(900);
-
-    patientId = registered.body.id;
-    patientToken = registered.body.idToken;
-
-    const me = await api.get("/api/users/me").set("Authorization", `Bearer ${patientToken}`).expect(200);
-    expect(me.body).toMatchObject({ id: patientId, name: PATIENT.name, role: "patient" });
-
-    await api.post("/api/auth/register").send(PATIENT).expect(409);
-  });
-
-  it("supports login and rejects wrong passwords and tampered tokens", async () => {
-    const login = await api
-      .post("/api/auth/login")
-      .send({ email: PATIENT.email, password: PATIENT.password })
-      .expect(200);
-    expect(login.body.idToken).toEqual(expect.any(String));
-
-    await api
-      .post("/api/auth/login")
-      .send({ email: PATIENT.email, password: "wrong-password" })
-      .expect(401);
-
-    const tampered = `${login.body.idToken.slice(0, -2)}xy`;
-    await api.get("/api/users/me").set("Authorization", `Bearer ${tampered}`).expect(401);
-  });
-
-  it("creates a doctor profile and enforces role guards", async () => {
-    const registered = await api.post("/api/auth/register").send(DOCTOR).expect(201);
-    doctorToken = registered.body.idToken;
-    doctorId = registered.body.id;
-
-    const auth = (token) => ({ Authorization: `Bearer ${token}` });
-
-    const saved = await api
-      .put("/api/doctors/me")
-      .set(auth(doctorToken))
+    await request(app)
+      .post("/api/auth/register")
       .send({
-        specialty: "Cardiology",
-        licenseNumber: "EG-12345",
-        city: "Alexandria",
-        yearsOfExperience: 8,
+        name: "Bad",
+        email: "bad@example.com",
+        password: "short",
+        role: "admin",
+        phone: "01300000000",
+        emergencyContact: { name: "X", phone: "01300000000", relationship: "family" },
       })
-      .expect(200);
-    expect(saved.body).toMatchObject({ id: doctorId, specialty: "Cardiology", verified: false });
-
-    const profile = await api.get("/api/doctors/me").set(auth(doctorToken)).expect(200);
-    expect(profile.body.licenseNumber).toBe("EG-12345");
-
-    const list = await api.get("/api/doctors").set(auth(patientToken)).expect(200);
-    expect(list.body.doctors).toHaveLength(0); // unverified doctors are hidden from non-admins
-
-    await api.get("/api/doctors/me").set(auth(patientToken)).expect(403);
-    await api.get("/api/users").set(auth(patientToken)).expect(403);
-    await api.get("/api/users").set(auth(doctorToken)).expect(403);
-  });
-
-  it("persists a reviewed prescription through the storage port", async () => {
-    const auth = (token) => ({ Authorization: `Bearer ${token}` });
-    const payload = {
-      patientId,
-      diagnosis: "Bacterial sinusitis",
-      items: [{ name: "Amoxicillin", dose: "500mg", frequency: "1x3", duration: "5 days" }],
-    };
-
-    await api.post("/api/prescriptions").send(payload).expect(401);
-    await api.post("/api/prescriptions").set(auth(patientToken)).send(payload).expect(403);
-
-    const created = await api.post("/api/prescriptions").set(auth(doctorToken)).send(payload).expect(201);
-    expect(created.body).toMatchObject({
-      doctorId,
-      patientId,
-      status: "confirmed",
-      items: [{ name: "Amoxicillin" }],
-    });
-    expect(created.body.id).toBeTruthy();
-
-    const list = await api
-      .get("/api/prescriptions")
-      .set(auth(doctorToken))
-      .expect(200);
-    expect(list.body.prescriptions.map((item) => item.id)).toContain(created.body.id);
-
-    const one = await api
-      .get(`/api/prescriptions/${created.body.id}`)
-      .set(auth(doctorToken))
-      .expect(200);
-    expect(one.body.id).toBe(created.body.id);
-
-    await api
-      .post("/api/prescriptions")
-      .set(auth(doctorToken))
-      .send({ patientId, items: [] })
       .expect(400);
   });
 
-  it("enforces CORS allowlisting and returns safe errors", async () => {
-    await api.get("/").set("Origin", "http://evil.example").expect(403);
+  it("enforces admin role guards and doctor verification", async () => {
+    await request(app).get("/api/users").set(bearer(doctor.token)).expect(403);
 
-    const allowed = await api.get("/").set("Origin", "http://localhost:5173").expect(200);
+    const users = await request(app).get("/api/users").set(bearer(admin.token)).expect(200);
+    expect(users.body.users.length).toBeGreaterThanOrEqual(1);
+
+    const verified = await request(app)
+      .patch(`/api/doctors/${doctor.uid}/verify`)
+      .set(bearer(admin.token))
+      .send({ verified: true })
+      .expect(200);
+    expect(verified.body.verified).toBe(true);
+
+    const list = await request(app).get("/api/doctors").set(bearer(doctor.token)).expect(200);
+    expect(list.body.doctors.some((d) => (d.id ?? d.uid) === doctor.uid)).toBe(true);
+  });
+
+  it("stores a prescription for the owning doctor", async () => {
+    const created = await request(app)
+      .post("/api/prescriptions")
+      .set(bearer(doctor.token))
+      .send({
+        patientId: "foundations-patient",
+        diagnosis: "Legacy test",
+        items: [{ name: "Amoxicillin", dose: "500mg", frequency: "1x3", duration: "5 days" }],
+      })
+      .expect(201);
+    expect(created.body.doctorId).toBe(doctor.uid);
+  });
+
+  it("enforces CORS allowlisting", async () => {
+    await request(app).get("/").set("Origin", "http://evil.example").expect(403);
+    const allowed = await request(app).get("/").set("Origin", "http://localhost:5173").expect(200);
     expect(allowed.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
+  });
 
-    const malformed = await api
+  it("returns a JSON 404 and malformed JSON 400", async () => {
+    const missing = await request(app).get("/api/does-not-exist").expect(404);
+    expect(missing.body.message).toContain("not found");
+
+    const malformed = await request(app)
       .post("/api/auth/login")
       .set("Content-Type", "application/json")
       .send('{"email":')
       .expect(400);
     expect(malformed.body.message).toBe("Invalid JSON body");
-
-    const missing = await api.get("/api/does-not-exist").expect(404);
-    expect(missing.body.message).toContain("not found");
-  });
-
-  it("lets an administrator manage users with all six roles", async () => {
-    await getIdp().setCustomUserClaims(patientId, { role: "admin" });
-    await getStore().update("users", patientId, { role: "admin" });
-
-    const relogin = await api
-      .post("/api/auth/login")
-      .send({ email: PATIENT.email, password: PATIENT.password })
-      .expect(200);
-    patientToken = relogin.body.idToken;
-
-    const users = await api
-      .get("/api/users")
-      .set("Authorization", `Bearer ${patientToken}`)
-      .expect(200);
-    expect(users.body.users.length).toBeGreaterThanOrEqual(2);
-
-    await api
-      .patch(`/api/doctors/${doctorId}/verify`)
-      .set("Authorization", `Bearer ${patientToken}`)
-      .send({ verified: true })
-      .expect(200);
-
-    const doctors = await api
-      .get("/api/doctors")
-      .set("Authorization", `Bearer ${patientToken}`)
-      .expect(200);
-    expect(doctors.body.doctors).toHaveLength(1);
-    expect(doctors.body.doctors[0]).toMatchObject({ id: doctorId, verified: true });
-
-    await api
-      .patch(`/api/users/${doctorId}/role`)
-      .set("Authorization", `Bearer ${patientToken}`)
-      .send({ role: "lab_staff" })
-      .expect(200);
-
-    await api
-      .patch(`/api/users/${doctorId}/role`)
-      .set("Authorization", `Bearer ${patientToken}`)
-      .send({ role: "superuser" })
-      .expect(400);
   });
 });

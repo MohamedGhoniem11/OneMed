@@ -1,10 +1,12 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import cookieParser from "cookie-parser";
 import routes from "./routes/index.js";
 import { env } from "./config/env.js";
 import { requestId } from "./middleware/request-id.js";
 import { globalLimiter } from "./middleware/rate-limit.js";
+import auditMiddleware from "./middleware/audit.js";
 import { notFound, errorHandler } from "./middleware/error.js";
 import { httpError } from "./utils/http-error.js";
 
@@ -33,12 +35,14 @@ app.use(
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Request-Id"],
     exposedHeaders: ["X-Request-Id"],
+    credentials: true,
     maxAge: 600,
   }),
 );
 
 app.use(globalLimiter);
 app.use(express.json({ limit: env.jsonBodyLimit }));
+app.use(cookieParser());
 
 app.set("json replacer", (key, value) =>
   value && typeof value === "object" && typeof value.toDate === "function"
@@ -55,7 +59,7 @@ app.get("/", (req, res) =>
   }),
 );
 
-app.use("/api", routes);
+app.use("/api", auditMiddleware, routes);
 
 app.use(notFound);
 app.use(errorHandler);

@@ -35,8 +35,17 @@ function clean(def, value, path) {
       if (def.max !== undefined && value.length > def.max) fail(`${path} allows at most ${def.max} item(s)`);
       return value.map((item, i) => clean(def.of, item, `${path}[${i}]`));
     }
-    case "object":
-      return shape(def.fields, value, path, false);
+    case "object": {
+      const result = shape(def.fields, value, path, false);
+      if (def.additional) {
+        for (const [key, item] of Object.entries(value)) {
+          if (!(key in def.fields) && item !== undefined) result[key] = item;
+        }
+      }
+      return result;
+    }
+    case "any":
+      return value;
     default:
       return value;
   }
@@ -46,7 +55,7 @@ function shape(fields, data, path, partial) {
   if (!isObj(data)) fail(`${path || "body"} must be an object`);
   const out = {};
   for (const [key, def] of Object.entries(fields)) {
-    if (def.readOnly) continue; // الحقول دي بيحطها السيرفر بس
+    if (def.readOnly) continue; // server-owned field
     const full = path ? `${path}.${key}` : key;
     const value = data[key];
     if (value === undefined || value === null) {

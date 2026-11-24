@@ -3,6 +3,8 @@ import { EG_PHONE, normalizePhone } from "../utils/validators.js";
 export const pharmacySchema = {
   collection: "pharmacies",
   fields: {
+    institutionId: { type: "string", max: 80 },
+    licenseNumber: { type: "string", min: 3, max: 40 },
     name: { type: "string", required: true, max: 100 },
     address: { type: "string", required: true, max: 200 },
     city: { type: "string", max: 60 },
@@ -23,6 +25,7 @@ export const pharmacySchema = {
     },
     openingHours: { type: "string", max: 100 },
     active: { type: "boolean" },
+    verified: { type: "boolean", readOnly: true },
     createdAt: { type: "timestamp", readOnly: true },
     updatedAt: { type: "timestamp", readOnly: true },
   },

@@ -11,10 +11,20 @@ describe("schema validation", () => {
       password: "secret123",
       role: "patient",
       phone: "+20 101 234 5678",
+      emergencyContact: { name: "Family", phone: "01000000001", relationship: "family" },
+      patient: {
+        nationalId: "29001011234567",
+        dateOfBirth: "1990-01-10",
+        gender: "male",
+        bloodGroup: "O+",
+        city: "Alexandria",
+      },
     });
     expect(data.name).toBe("Mona Ali");
     expect(data.email).toBe("mona@example.com");
     expect(data.phone).toBe("01012345678");
+    expect(data.emergencyContact.name).toBe("Family");
+    expect(data.patient.nationalId).toBe("29001011234567");
   });
 
   it("rejects staff roles on public self-registration", () => {
@@ -24,6 +34,8 @@ describe("schema validation", () => {
         email: "mona@example.com",
         password: "secret123",
         role: "admin",
+        phone: "01012345678",
+        emergencyContact: { name: "Family", phone: "01000000001", relationship: "family" },
       }),
     ).toThrow(/role must be one of/);
   });
@@ -34,9 +46,17 @@ describe("schema validation", () => {
       email: "mona@example.com",
       password: "secret123",
       role: "patient",
+      emergencyContact: { name: "Family", phone: "01000000001", relationship: "family" },
+      patient: {
+        nationalId: "29001011234567",
+        dateOfBirth: "1990-01-10",
+        gender: "male",
+        bloodGroup: "O+",
+        city: "Alexandria",
+      },
     };
     expect(() => validate(registerSchema, { ...base, phone: "01300000000" })).toThrow(/phone/);
-    expect(() => validate(registerSchema, { ...base, password: "123" })).toThrow(/at least 6/);
+    expect(() => validate(registerSchema, { ...base, password: "123" })).toThrow(/at least 8/);
   });
 
   it("requires all login fields", () => {

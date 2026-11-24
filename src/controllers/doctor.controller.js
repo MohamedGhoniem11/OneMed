@@ -3,6 +3,7 @@ import { httpError } from "../utils/http-error.js";
 import { parseLimit } from "../utils/query.js";
 import { validate } from "../utils/schema.js";
 import { doctorSchema } from "../schemas/doctor.schema.js";
+import { auditRequest } from "../services/audit.service.js";
 
 const withoutPrivate = ({ licenseNumber, ...rest }) => rest;
 
@@ -75,7 +76,13 @@ export async function setVerified(req, res, next) {
   try {
     const { verified } = req.body || {};
     if (typeof verified !== "boolean") throw httpError(400, "verified must be true or false");
-    res.json(await service.setVerified(req.params.id, verified));
+    const doctor = await service.setVerified(req.params.id, verified);
+    await auditRequest(req, {
+      action: verified ? "doctor_verified" : "doctor_unverified",
+      resourceType: "doctor",
+      resourceId: req.params.id,
+    });
+    res.json(doctor);
   } catch (err) {
     next(err);
   }
