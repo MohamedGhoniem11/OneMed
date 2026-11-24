@@ -28,11 +28,18 @@ export function Landing() {
       </div>
       <Card className="print-only" title="Patient Overview" pad><div className="grid cols-2"><div className="stat"><span className="value">120/80</span><span className="label">Blood Pressure</span></div><div className="stat"><span className="value">72 bpm</span><span className="label">Heart Rate</span></div></div><div style={{height:120,background:'linear-gradient(180deg,#eef5ff,#fff)',borderRadius:8,marginTop:12,display:'flex',alignItems:'flex-end',gap:6,padding:8}}>{[40,55,45,70,60,85,75].map((h,i)=><div key={i} style={{height:h,background:'#006a61',opacity:.6,flex:1,borderRadius:'4px 4px 0 0'}}/>)}</div></Card>
     </div></div>
-    <div className="landing-features"><h2 style={{textAlign:'center'}}>{t('features')}</h2>
+    <div className="landing-features"><h2 style={{textAlign:'center'}}>{t('features')}</h2><p style={{textAlign:'center',color:'var(--muted)'}}>{t('featuresSub')}</p>
       <div className="grid cols-3" style={{marginTop:24}}>
-        {[[<Smartphone size={26}/>,t('featureNfc'),'Tap a wristband to open a unified clinical record in seconds.'],[<QrCode size={26}/>,t('featureQr'),'Patients grant time-limited, audit-logged access by scanning a QR code.'],[<Pill size={26}/>,t('featurePharmacy'),'AI extracts medicines from a prescription and routes the order to nearby pharmacies.']].map(([icon,title,desc],i)=><Card key={i}><span style={{color:'var(--teal)'}}>{icon}</span><h3 style={{margin:'10px 0'}}>{title as string}</h3><p style={{color:'var(--muted)',margin:0}}>{desc as string}</p></Card>)}
+        {[[<Smartphone size={26}/>,t('featureNfc'),'Tap a wristband to open a unified clinical record in seconds.'],[<QrCode size={26}/>,t('featureQr'),'Patients grant time-limited, audit-logged access by scanning a QR code.'],[<Pill size={26}/>,t('featurePharmacy'),'AI extracts medicines from a prescription and routes the order to nearby pharmacies.']].map(([icon,title,desc],i)=><Card key={i}><span style={{color:'var(--teal)'}}>{icon}</span><h3 style={{margin:'10px 0'}}>{title as string}</h3><p style={{color:'var(--muted)',margin:0}}>{desc as string}</p><Link className="btn sm" style={{marginTop:12}} to="/register">{t('learnMore')} →</Link></Card>)}
+      </div>
+      <h2 style={{textAlign:'center',marginTop:46}}>{t('howItWorks')}</h2>
+      <div className="grid cols-3" style={{marginTop:24}}>
+        {[
+          [t('step1Title'),t('step1Desc')],[t('step2Title'),t('step2Desc')],[t('step3Title'),t('step3Desc')],
+        ].map(([title,desc],i)=><Card key={i}><div className="how-step"><span className="how-num">{i+1}</span><div><h3>{title}</h3><p style={{color:'var(--muted)',margin:'4px 0 0'}}>{desc}</p></div></div></Card>)}
       </div>
     </div>
+    <footer className="site-footer"><span>{t('footerRights')}</span><Link to="/register" style={{color:'#cfe0fb'}}>{t('privacyPolicy')}</Link><Link to="/register" style={{color:'#cfe0fb'}}>{t('termsOfService')}</Link><Link to="/emergency/em-demo-mona" style={{color:'#cfe0fb'}}>{t('clinicalSupport')}</Link></footer>
   </div>;
 }
 
@@ -132,6 +139,12 @@ export function EmergencyPage() {
     {openChat && <div className="modal-backdrop" onClick={()=>setOpenChat(false)}><div className="modal" onClick={e=>e.stopPropagation()} style={{display:'flex',flexDirection:'column',height:'80vh'}}>
       <div className="modal-head"><h3><Bot size={18}/> {t('askAi')}</h3><button className="btn sm" onClick={()=>setOpenChat(false)}>✕</button></div>
       <div className="modal-body" style={{flex:1,overflow:'auto'}}>
+        <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:10}}>
+          <span className="chip"><strong>{p?.name||'—'}</strong></span>
+          {p?.chronicDiseases.map(c=><span key={c} className="chip red">{c}</span>)}
+          {p?.bloodGroup && <span className="chip blue">{p.bloodGroup}</span>}
+          {p?.allergies.map(a=><span key={a} className="chip red">Allergy: {a}</span>)}
+        </div>
         <div className="alert blue" style={{fontSize:12}}>{t('firstAidDisclaimer')}</div>
         <div className="chat-log">{chat.map((c,i)=><div key={i} className={`msg ${c.role==='user'?'me':''}`}><div style={{whiteSpace:'pre-wrap'}}>{c.text}</div>{c.sources?.length?<div style={{fontSize:11,marginTop:8,opacity:.75}}>{c.sources.join(' · ')}</div>:null}{c.confidence && <Badge tone={c.confidence==='High'?'green':'amber'}>{c.confidence}</Badge>}</div>)}</div>
       </div>

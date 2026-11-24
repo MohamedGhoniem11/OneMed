@@ -14,7 +14,7 @@ import {
 import * as api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import type { Patient, MedicalRecord, Prescription, Consent, EmergencyProfile, Notification, Conversation, Message, AuditEntry } from '../types';
-import { Badge, Card, Empty, Field, Modal, PageHead, Stat, StatusBadge, Tabs, useToast } from '../components/ui';
+import { Badge, Card, Chip, Empty, Field, IdentityStrip, MetricCard, Modal, PageHead, SectionTabs, Stat, StatusBadge, Tabs, useToast } from '../components/ui';
 
 const RECORD_COLORS:Record<string,string> = { lab:'blue', imaging:'purple', prescription:'green', note:'gray', visit:'blue', vitals:'teal' };
 
@@ -70,17 +70,26 @@ export function PatientAnalytics() {
   },[records]);
   const latest = (name:string)=>records.flatMap(r=>r.values||[]).filter(v=>v.name===name).sort((a,b)=>0)[0];
   const status = (v:any)=>!v?'—':v.flag==='high'?'red':v.flag==='low'?'amber':'green';
+  const [view,setView] = useState('analytics');
   return <><PageHead title={t('patientAnalytics')} subtitle={t('comprehensiveHealth')} actions={<button className="btn outline" onClick={()=>window.print()}><Download size={16}/> {t('exportPdf')}</button>}/>
-    <div className="grid cols-4"><Card><div className="stat"><span className="value">27.4 <Badge tone="amber">↑ 0.5</Badge></span><span className="label">BMI</span></div></Card>
-      <Card><div className="stat"><span className="value">{(series.a1c[series.a1c.length-1])?.value||'—'}%</span><span className="label">HbA1c</span></div></Card>
-      <Card><div className="stat"><span className="value">92 <span style={{fontSize:12}}>mL/min</span></span><span className="label">eGFR</span></div></Card>
-      <Card><div className="stat"><span className="value" style={{color:'var(--red)'}}>12.4</span><span className="label">CRP — HIGH</span></div></Card></div>
+    <SectionTabs tabs={[{id:'overview',label:t('overview')},{id:'analytics',label:t('analytics')},{id:'reports',label:t('reports')}]} active={view} onChange={setView}/>
+    {view==='reports' ? <Card><p style={{color:'var(--muted)'}}>Generate patient medical history, lab results and clinical summary reports.</p><Link className="btn primary" to="/app/doctor/reports">Open reports</Link></Card> : <>
+    <div className="grid cols-4">
+      <MetricCard label="BMI" value="27.4" trend="↑ 0.5" tone="amber" bar={68} sub="Overweight range" icon={<Activity size={16}/>}/>
+      <MetricCard label="HbA1c" value={(series.a1c[series.a1c.length-1])?.value||'—'} unit="%" trend="↓ 0.2 vs last 3 months" tone="green" bar={62} icon={<HeartPulse size={16}/>}/>
+      <MetricCard label="eGFR" value="92" unit="mL/min" trend="Stable" tone="green" bar={78} sub="Normal kidney function" icon={<Activity size={16}/>}/>
+      <MetricCard label="CRP — HIGH" value="12.4" unit="mg/L" tone="red" bar={88} sub="Elevated inflammation markers (Oct 24)" icon={<AlertTriangle size={16}/>}/>
+    </div>
     <div className="grid cols-2" style={{marginTop:16}}>
       <Card title={t('bloodPressure')}><ResponsiveContainer width="100%" height={240}><LineChart data={series.bp}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="date"/><YAxis domain={[50,170]}/><Tooltip/><Legend/><ReferenceArea y1={90} y2={120} fill="#e7f6f3" fillOpacity={.5}/><Line type="monotone" dataKey="systolic" stroke="#002657" strokeWidth={2.5}/><Line type="monotone" dataKey="diastolic" stroke="#0f9d6e" strokeWidth={2.5}/></LineChart></ResponsiveContainer></Card>
       <Card title={t('labTrends') + ' — HbA1c'}><ResponsiveContainer width="100%" height={240}><LineChart data={series.a1c}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="date"/><YAxis domain={[4,9]}/><Tooltip/><Legend/><ReferenceArea y1={4} y2={5.6} fill="#e7f7ef" fillOpacity={.7}/><Line type="monotone" dataKey="value" stroke="#d99219" strokeWidth={2.5}/></LineChart></ResponsiveContainer></Card>
     </div>
+    <Card title="Lipid Panel" style={{marginTop:16}} action={<Chip tone="blue">{t('latestLabel')}: Oct 15</Chip>}>
+      {[[t('lipidTotal'),210,260,'amber'],[t('lipidLdl'),135,190,'red'],[t('lipidHdl'),55,100,'green'],[t('lipidTrig'),140,200,'amber']].map(([name,val,max,tone]:any)=><div className="lipid-row" key={name}><span className="lipid-name">{name}</span><span className="lipid-track"><i className="lipid-fill" style={{width:`${(val/max)*100}%`,background:tone==='red'?'var(--red)':tone==='green'?'var(--green)':'var(--amber)'}}/></span><span className="lipid-val">{val} mg/dL</span></div>)}
+    </Card>
     <Card title={t('medicationTimeline')} style={{marginTop:16}}><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('medicine')}</th><th>{t('dosage')}</th><th>{t('status')}</th></tr></thead><tbody><tr><td>Lisinopril 10mg</td><td>Once daily</td><td><Badge tone="green">Ongoing · 95%</Badge></td></tr><tr><td>Atorvastatin 20mg</td><td>At evening</td><td><Badge tone="green">Started Aug 15</Badge></td></tr><tr><td>Amoxicillin 500mg</td><td>BID</td><td><Badge tone="gray">Complete</Badge></td></tr></tbody></table></div></Card>
     <Card title={t('conditionSummary')} style={{marginTop:16}}><div className="grid cols-4">{[{label:'Type 2 Diabetes',tone:'red'},{label:'Hypertension',tone:'amber'},{label:`HbA1c ${latest('HbA1c')?.value||''}`,tone:status(latest('HbA1c'))},{label:`BP ${latest('Systolic')?.value||''}/${latest('Diastolic')?.value||''}`,tone:status(latest('Systolic'))}].map((c,i)=><div key={i} className="alert" style={{background:'#fff',padding:12}}><Badge tone={c.tone as any}>{c.label}</Badge></div>)}</div></Card>
+    </>}
   </>;
 }
 
@@ -144,5 +153,10 @@ export function PatientSettings() {
   return <><PageHead title={t('profile')} subtitle={t('clinicalIdentity')}/>
     <div className="grid cols-2"><Card title={t('personalInformation')}><Field label={t('name')}><input className="input" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></Field><Field label={t('phoneNumber')}><input className="input" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})}/></Field><Field label={t('email')}><input className="input" value={form.email} disabled/></Field><button className="btn navy" onClick={async()=>{await api.mutate(db=>{const u=db.users.find(x=>x.uid===form.uid); if(u){u.name=form.name;u.phone=form.phone;}});setUser(form);toast(t('saved'));}}>{t('save')}</button></Card>
       <Card title={t('emergencyContact')}><Field label={t('name')}><input className="input" dir="rtl" value={form.emergencyContact?.name||''} onChange={e=>setForm({...form,emergencyContact:{...form.emergencyContact,name:e.target.value}})}/></Field><Field label={t('phoneNumber')}><input className="input" value={form.emergencyContact?.phone||''} onChange={e=>setForm({...form,emergencyContact:{...form.emergencyContact,phone:e.target.value}})}/></Field><Field label={t('relationship')}><input className="input" value={form.emergencyContact?.relationship||''} onChange={e=>setForm({...form,emergencyContact:{...form.emergencyContact,relationship:e.target.value}})}/></Field><button className="btn navy" onClick={()=>toast(t('saved'))}>{t('save')}</button></Card></div>
+    <div className="grid cols-3" style={{marginTop:16}}>
+      <Card title={t('dataPrivacy')}><p style={{color:'var(--muted)',fontSize:13}}>{t('consentsDesc')}</p><Link className="btn sm outline" to="/app/patient/consents">{t('consents')} →</Link></Card>
+      <Card title={t('notificationPreferences')}><p style={{color:'var(--muted)',fontSize:13}}>{t('notificationsDesc')}</p><Link className="btn sm outline" to="/app/patient/notifications">{t('notifications')} →</Link></Card>
+      <Card title={t('emergencyQr')}><p style={{color:'var(--muted)',fontSize:13}}>{t('badgeDesc')}</p><Link className="btn sm outline" to="/app/patient/emergency">{t('configure')} →</Link></Card>
+    </div>
   </>;
 }

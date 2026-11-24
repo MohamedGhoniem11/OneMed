@@ -31,7 +31,52 @@ export function PageHead({title,subtitle,actions}:{title:string;subtitle?:string
   return <div className="page-head"><div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div><div className="no-print">{actions}</div></div>;
 }
 export function Stat({label,value,sub}:{label:string;value:React.ReactNode;sub?:string}) { return <div className="card stat"><span className="value">{value}</span><span className="label">{label}</span>{sub && <span className="hint">{sub}</span>}</div>; }
+/** One shared status vocabulary (G10) — tones and human labels. */
+const STATUS: Record<string,{tone:'green'|'amber'|'red'|'gray'|'blue';label?:string}> = {
+  active:{tone:'green',label:'Active'}, approved:{tone:'green',label:'Approved'}, verified:{tone:'green',label:'Verified'},
+  completed:{tone:'green',label:'Completed'}, ready:{tone:'green',label:'Ready'}, confirmed:{tone:'green',label:'Confirmed'},
+  accessible:{tone:'green',label:'Accessible'}, connected:{tone:'green',label:'Connected'}, normal:{tone:'green',label:'Normal'},
+  waiting:{tone:'amber',label:'Waiting'}, pending:{tone:'amber',label:'Pending'}, pending_verification:{tone:'amber',label:'Pending verification'},
+  needs_review:{tone:'amber',label:'Unverified'}, unverified:{tone:'amber',label:'Unverified'}, received:{tone:'amber',label:'Received'},
+  verifying:{tone:'amber',label:'Verifying'}, preparing:{tone:'amber',label:'Preparing'}, warning:{tone:'amber',label:'Warning'},
+  in_progress:{tone:'blue',label:'In progress'}, handed_over:{tone:'blue',label:'Handed over'}, discharged:{tone:'gray',label:'Discharged'},
+  critical:{tone:'red',label:'Critical'}, high:{tone:'red',label:'High'}, cancelled:{tone:'red',label:'Cancelled'},
+  suspended:{tone:'red',label:'Suspended'}, revoked:{tone:'red',label:'Revoked'}, inactive:{tone:'gray',label:'Inactive'},
+  archived:{tone:'gray',label:'Archived'}, stable:{tone:'green',label:'Stable'},
+};
 export function StatusBadge({status}:{status:string}) {
-  const map:Record<string,'green'|'amber'|'red'|'gray'|'blue'> = {active:'green',approved:'green',verified:'green',completed:'green',ready:'green',confirmed:'green',accessible:'green',pending:'amber',pending_verification:'amber',needs_review:'amber',received:'amber',verifying:'amber',preparing:'amber',handed_over:'blue',cancelled:'red',suspended:'red',inactive:'gray',archived:'gray',revoked:'red'};
-  return <Badge tone={map[status]||'blue'}>{status.replace(/_/g,' ')}</Badge>;
+  const s = STATUS[status] || {tone:'blue' as const};
+  return <Badge tone={s.tone}>{s.label || status.replace(/_/g,' ')}</Badge>;
+}
+export function Chip({children,tone='blue'}:{children:React.ReactNode;tone?:'blue'|'green'|'red'|'amber'|'gray'}) {
+  return <span className={`chip ${tone}`}>{children}</span>;
+}
+/** Identity strip shared by doctor patient viewer and patient header (G3). */
+export function IdentityStrip({name,initials,id,meta,blood,allergies,extra}:{name:string;initials?:string;id?:string;meta?:React.ReactNode;blood?:string;allergies?:string[];extra?:React.ReactNode}) {
+  return <div className="identity-strip">
+    <span className="avatar identity-avatar">{initials || name.slice(0,2).toUpperCase()}</span>
+    <div className="identity-main"><h2>{name}</h2><div className="identity-meta">{meta}{id && <span className="identity-id">ID: {id}</span>}</div></div>
+    <div className="identity-flags">{blood && <span className="identity-blood">🩸 {blood}</span>}{allergies?.length ? <span className="identity-allergy">⚠ {allergies.join(', ')}</span> : null}{extra}</div>
+  </div>;
+}
+/** Compact metric card with optional trend and a threshold micro-bar (G4). */
+export function MetricCard({label,value,unit,trend,tone='blue',bar,sub,icon}:{label:string;value:React.ReactNode;unit?:string;trend?:string;tone?:'green'|'amber'|'red'|'blue';bar?:number;sub?:string;icon?:React.ReactNode}) {
+  return <div className="card metric-card"><div className="metric-top"><span className="label">{label}</span>{icon}</div>
+    <div className="metric-value">{value}{unit && <small> {unit}</small>}{trend && <span className={`metric-trend ${tone}`}>{trend}</span>}</div>
+    {sub && <div className="metric-sub">{sub}</div>}
+    {bar!==undefined && <div className="metric-bar"><i style={{width:`${Math.min(100,Math.max(0,bar))}%`}} className={tone}/></div>}
+  </div>;
+}
+/** Lab/OCR verification row with confidence and explicit unverified state (G6). */
+export function VerificationRow({test,value,unit,reference,confidence,onChange,warn}:{test:string;value:string;unit?:string;reference?:string;confidence?:number;onChange?:(v:string)=>void;warn?:boolean}) {
+  const unverified = confidence !== undefined && confidence < 80;
+  return <tr className={unverified||warn?'verify-row warn':''}>
+    <td>{onChange?<input className="input" value={test} readOnly aria-label={test}/>:<strong>{test}</strong>}</td>
+    <td>{onChange?<input className="input verify-value" value={value} onChange={e=>onChange(e.target.value)} aria-label={`${test} value`}/>:value}</td>
+    <td>{unit||'—'}</td><td>{reference||'—'}</td>
+    <td>{confidence!==undefined?<Badge tone={unverified?'amber':'green'}>{confidence}% {unverified?'· Unverified':''}</Badge>:'—'}</td>
+  </tr>;
+}
+export function SectionTabs({tabs,active,onChange}:{tabs:{id:string;label:string}[];active:string;onChange:(id:string)=>void}) {
+  return <div className="tabs section-tabs" role="tablist">{tabs.map(x=><button key={x.id} role="tab" aria-selected={active===x.id} className={`tab ${active===x.id?'active':''}`} onClick={()=>onChange(x.id)}>{x.label}</button>)}</div>;
 }

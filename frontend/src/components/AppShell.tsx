@@ -69,7 +69,7 @@ export function AppShell({children}:{children:React.ReactNode}) {
   const roleLabel = t(session.user.role === 'lab_staff' ? 'labStaff' : session.user.role === 'hospital_admin' ? 'hospitalAdmin' : session.user.role);
   return <div className="app-shell">
     <aside className="sidebar" aria-label="Main navigation">
-      <div className="brand"><span className="brand-mark">✚</span><span className="brand-name">OneMed</span></div>
+      <div className="brand"><span className="brand-mark">✚</span><span className="brand-name">OneMed</span><span className="brand-sub">Healthcare Platform</span></div>
       <div className="nav-label">{roleLabel}</div>
       <nav>{items.map(i=><NavLink key={i.to} to={i.to} end className={({isActive})=>`nav-item ${isActive?'active':''}`} title={t(i.label)}>
         {i.icon}<span>{t(i.label)}</span></NavLink>)}</nav>
@@ -84,7 +84,7 @@ export function AppShell({children}:{children:React.ReactNode}) {
         <div className="spacer"/>
         {API_MODE==='demo' && <span className="demo-flag">{t('demoMode')}</span>}
         <button className="btn sm outline" onClick={()=>setLang(i18n.language==='en'?'ar':'en')} aria-label={t('language')}><Languages size={15}/> {i18n.language==='en'?'العربية':'English'}</button>
-        <NavLink to="/app/patient/notifications" className="btn sm outline" aria-label={t('notifications')}><Bell size={16}/></NavLink>
+        <NavLink to={session.user.role==='patient'?'/app/patient/notifications':'/app/doctor/messages'} className="btn sm outline" aria-label={t('notifications')} style={{position:'relative'}}><Bell size={16}/><span className="bell-dot" aria-hidden="true"/></NavLink>
         <div className="avatar" title={session.user.name}>{session.user.name.slice(0,2).toUpperCase()}</div>
         <div><strong>{session.user.name}</strong><div style={{fontSize:11,color:'var(--muted)'}}>{t(session.user.role==='lab_staff'?'labStaff':session.user.role)}</div></div>
       </header>

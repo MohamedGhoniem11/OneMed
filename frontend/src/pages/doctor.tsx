@@ -13,7 +13,7 @@ import {
 import * as api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import type { Patient, MedicalRecord, Prescription, Medicine, Consent, AuditEntry, ChatTurn } from '../types';
-import { Badge, Card, Empty, Field, Modal, PageHead, Stat, StatusBadge, Tabs, useToast } from '../components/ui';
+import { Badge, Card, Empty, Field, IdentityStrip, Modal, PageHead, SectionTabs, Stat, StatusBadge, Tabs, useToast } from '../components/ui';
 
 export function DoctorDashboard() {
   const { session } = useAuth(); const { t } = useTranslation(); const nav = useNavigate();
@@ -22,13 +22,14 @@ export function DoctorDashboard() {
   const filtered = patients.filter(p=>`${p.name} ${p.nationalId} ${p.phone}`.toLowerCase().includes(q.toLowerCase()));
   return <>
     <PageHead title={`Good Morning, ${session!.user.name.split(' ').slice(-1)[0]}`} subtitle={`${t('dashboard')} — ${new Date().toLocaleDateString()}`} actions={<span className="badge green">● {t('systemOnline')}</span>}/>
-    <div style={{display:'flex',gap:10,marginBottom:16,flexWrap:'wrap'}}><input className="input" style={{maxWidth:400}} placeholder={t('patients')+': '+t('nationalId')+', NFC, QR…'} value={q} onChange={e=>setQ(e.target.value)}/>
+    <div style={{display:'flex',gap:10,marginBottom:16,flexWrap:'wrap'}}><input className="input" style={{maxWidth:400}} placeholder={`Search Patient by ${t('nationalId')}, NFC, or QR…`} value={q} onChange={e=>setQ(e.target.value)}/>
+      <button className="btn danger" onClick={()=>window.open('/emergency/em-demo-mona','_blank')}>✚ {t('emergencyShortcut')}</button>
       <button className="btn outline" onClick={()=>nav('/app/doctor/qr')}><ScanLine size={16}/> {t('nfcScanner')}</button>
       <button className="btn outline" onClick={()=>nav('/app/doctor/qr')}><QrCode size={16}/> {t('qrGenerator')}</button>
-      <Link className="btn primary" to="/app/doctor/prescriptions"><Plus size={16}/> {t('newConsultation')}</Link></div>
+      <Link className="btn navy" to="/app/doctor/prescriptions"><Plus size={16}/> {t('newConsultation')}</Link></div>
     <div className="grid cols-2"><Card title={t('recentPatients')} action={<Link className="btn sm" to="/app/doctor/patients">{t('viewAll')}</Link>} pad={false}>
       <div className="table-wrap"><table className="tbl"><thead><tr><th>{t('patient')}</th><th>{t('nationalId')}</th><th>{t('status')}</th><th>{t('action')}</th></tr></thead><tbody>
-        {filtered.map(p=><tr key={p.id}><td><strong>{p.name}</strong><div style={{fontSize:12,color:'var(--muted)'}}>{p.gender==='male'?'M':'F'} · {p.city}</div></td><td style={{fontFamily:'monospace',fontSize:12}}>{p.nationalId}</td><td><Badge tone="blue">CONSENTED</Badge></td><td><Link className="btn sm primary" to={`/app/doctor/patients/${p.id}`}>{t('view')}</Link></td></tr>)}
+        {filtered.map(p=><tr key={p.id}><td><strong>{p.name}</strong><div style={{fontSize:12,color:'var(--muted)'}}>{p.gender==='male'?'M':'F'} · {p.city}</div></td><td style={{fontFamily:'monospace',fontSize:12}}>{p.nationalId}</td><td><StatusBadge status={p.chronicDiseases.length>1?'in_progress':'waiting'}/></td><td><Link className="btn sm primary" to={`/app/doctor/patients/${p.id}`}>{t('view')}</Link></td></tr>)}
       </tbody></table>{!filtered.length&&<Empty/>}</div></Card>
       <div className="grid" style={{gap:16}}><Card title={t('quickStats')}><div className="grid cols-2"><Stat label={t('patients')} value={patients.length}/><Stat label={t('pending')} value={rx.filter(r=>r.extractionStatus!=='confirmed').length}/></div></Card>
       <Card title={t('pending')} pad={false}><div className="card-body">{rx.filter(r=>r.extractionStatus!=='confirmed').map(r=><div key={r.id} style={{padding:'8px 0',borderBottom:'1px solid var(--line)'}}><strong>{r.medicines.map(m=>m.name).join(', ')}</strong><div style={{fontSize:12,color:'var(--muted)'}}>{r.patientName} · Review & sign</div><Link className="btn sm primary" to="/app/doctor/prescriptions">Review</Link></div>)}{rx.every(r=>r.extractionStatus==='confirmed')&&<Empty message="Nothing pending"/>}</div></Card>
@@ -59,8 +60,9 @@ export function PatientViewer() {
   const send = async () => { if(!msg.trim()) return; setChat(c=>[...c,{role:'user',text:msg}]); setMsg(''); const r=await api.chatbot(msg,patient||undefined); setChat(c=>[...c,r]); };
   const series = records.filter(r=>r.values?.some(v=>v.name==='HbA1c')).map(r=>({date:new Date(r.date).toLocaleDateString('en',{month:'short'}),value:r.values!.find(v=>v.name==='HbA1c')!.value}));
   return <>
-    <div className="page-head"><div><h1>{patient?.name||'…'}</h1><p>{patient?.dateOfBirth} · {patient?.gender} · <span style={{color:'var(--red)'}}>🩸 {patient?.bloodGroup}</span> · ID: {patient?.nationalId}</p></div>
+    <div className="page-head no-print"><div><IdentityStrip name={patient?.name||'…'} id={patient?.nationalId} blood={patient?.bloodGroup} allergies={patient?.allergies} meta={<>{patient?.dateOfBirth} · {patient?.gender==='male'?'Male':'Female'} · 45 yrs · 82 kg / 178 cm</>}/></div>
       <div className="no-print"><button className="btn outline" onClick={()=>window.print()}><Printer size={16}/> {t('printRecord')}</button><Link className="btn primary" to="/app/doctor/prescriptions"><Plus size={16}/> {t('newConsultation')}</Link></div></div>
+    <div className="print-only"><h1>{patient?.name}</h1><p>ID: {patient?.nationalId} · Blood: {patient?.bloodGroup}</p></div>
     {patient?.allergies.length ? <div className="alert red"><AlertTriangle size={18}/> <strong>{t('criticalAllergies')}:</strong> {patient.allergies.join(', ')} <Badge tone="red">CRITICAL</Badge></div> : null}
     {override && <div className="alert amber"><strong>Emergency override active.</strong> Reason: {reason}. Access is logged and time-limited.</div>}
     <div className="grid cols-2">
@@ -68,7 +70,8 @@ export function PatientViewer() {
         <div className="card-body"><div className="timeline">{filtered.map(r=><div className="timeline-item" key={r.id}><Badge tone={r.type==='lab'?'blue':r.type==='imaging'?'blue':r.type==='prescription'?'green':'gray'}>{t(r.type)}</Badge> <strong>{r.title}</strong>
           <div style={{fontSize:12,color:'var(--muted)'}}>{r.institution} · {new Date(r.date).toLocaleString()}</div>
           {r.values?.map(v=><div key={v.name} style={{fontSize:13,marginTop:4}}>{v.name}: <strong style={{color:v.flag==='high'?'var(--red)':'inherit'}}>{v.value} {v.unit}</strong> <span style={{color:'var(--muted)'}}>({v.referenceLow}–{v.referenceHigh})</span></div>)}
-          {r.summary && <p style={{fontSize:13,margin:'4px 0'}}>{r.summary}</p>}</div>)}</div>{!filtered.length&&<Empty/>}</div>
+          {r.summary && <p style={{fontSize:13,margin:'4px 0'}}>{r.summary}</p>}</div>)}</div>{!filtered.length&&<Empty/>}
+          {filtered.length>0 && <p style={{color:'var(--muted)',fontSize:12,textAlign:'center',paddingTop:8}}>— {t('historyFooter')} —</p>}</div>
       </Card>
       <div className="grid" style={{gap:16}}>
         <Card title={t('activeMedications')}><p>Metformin 500mg — PO BID with meals<br/>Lisinopril 10mg — PO QD<br/>Atorvastatin 20mg — PO QHS (refill needed)</p></Card>
@@ -90,6 +93,7 @@ export function DoctorPrescriptions() {
   const { session } = useAuth(); const { t } = useTranslation(); const {toast}=useToast();
   const [tab,setTab]=useState('list'); const [rx,setRx]=useState<Prescription[]>([]); const [patients,setPatients]=useState<Patient[]>([]);
   const [image,setImage]=useState<string|null>(null); const [items,setItems]=useState<Medicine[]>([]); const [confidence,setConfidence]=useState(0); const [patientId,setPatientId]=useState(''); const [busy,setBusy]=useState(false); const [link,setLink]=useState('');
+  const [zoom,setZoom]=useState(1); const [rotate,setRotate]=useState(0);
   useEffect(()=>{ api.list<Prescription>('prescriptions',x=>x.doctorId===session!.user.uid).then(setRx); api.list<Patient>('patients').then(a=>{setPatients(a);setPatientId(a[0]?.id||'');}); },[]);
   const file = (f:File|undefined)=>{ if(!f) return; const r=new FileReader(); r.onload=()=>setImage(String(r.result)); r.readAsDataURL(f);
     setTimeout(()=>{ setItems([{name:'Amoxicillin',dosage:'500mg',frequency:'1-0-1 (BID)',duration:'5 Days',confidence:97},{name:'Paracetamol',dosage:'650mg',frequency:'SOS',duration:'3 Days',confidence:88}]); setConfidence(94); },600);
@@ -104,8 +108,8 @@ export function DoctorPrescriptions() {
     <Tabs tabs={[{id:'list',label:t('prescriptions')},{id:'review',label:'Extraction Review'}]} active={tab} onChange={setTab}/>
     {tab==='list'?<Card pad><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('date')}</th><th>{t('patient')}</th><th>{t('extractedMedicines')}</th><th>{t('confidenceLabel')}</th><th>{t('status')}</th><th>{t('action')}</th></tr></thead><tbody>{rx.map(r=><tr key={r.id}><td>{new Date(r.date).toLocaleDateString()}</td><td>{r.patientName}</td><td>{r.medicines.map(m=>m.name).join(', ')}</td><td><Badge tone={r.confidence>=90?'green':'amber'}>{r.confidence}%</Badge></td><td><StatusBadge status={r.extractionStatus}/></td><td><div style={{display:'flex',gap:4}}>{r.fulfillmentLink&&<Link className="btn sm" to={r.fulfillmentLink}>{t('view')}</Link>}</div></td></tr>)}</tbody></table>{!rx.length&&<Empty/>}</div></Card>
     :<><div className="grid" style={{gridTemplateColumns:'1fr 1.3fr',gap:16}}>
-      <Card title={t('sourceDocument')}><label className="btn outline" style={{width:'100%'}}><ImageIcon size={16}/> Upload prescription image<input type="file" accept="image/*" hidden onChange={e=>file(e.target.files?.[0])}/></label>
-        <div style={{marginTop:14,minHeight:260,background:'#f7f9fc',border:'1px dashed var(--line)',borderRadius:8,display:'grid',placeItems:'center',overflow:'hidden'}}>{image?<img src={image} alt="Uploaded prescription" style={{maxWidth:'100%',maxHeight:340}}/>:<div className="empty"><Upload size={30}/><p>Upload a prescription image or PDF</p></div>}</div>
+      <Card title={t('sourceDocument')} action={<div style={{display:'flex',gap:4}}><button className="btn sm outline" onClick={()=>setZoom(z=>Math.min(2.5,z+0.25))} aria-label="Zoom in">＋</button><button className="btn sm outline" onClick={()=>setZoom(z=>Math.max(.5,z-0.25))} aria-label="Zoom out">−</button><button className="btn sm outline" onClick={()=>setRotate(r=>(r+90)%360)} aria-label="Rotate">⟳</button></div>}><label className="btn outline" style={{width:'100%'}}><ImageIcon size={16}/> Upload prescription image<input type="file" accept="image/*" hidden onChange={e=>file(e.target.files?.[0])}/></label>
+        <div style={{marginTop:14,minHeight:260,background:'#f7f9fc',border:'1px dashed var(--line)',borderRadius:8,display:'grid',placeItems:'center',overflow:'hidden'}}>{image?<img src={image} alt="Uploaded prescription" style={{maxWidth:'100%',maxHeight:340,transform:`scale(${zoom}) rotate(${rotate}deg)`,transition:'transform .2s'}}/>:<div className="empty"><Upload size={30}/><p>Upload a prescription image or PDF</p></div>}</div>
         <Field label={t('patient')}><select className="input" value={patientId} onChange={e=>setPatientId(e.target.value)}>{patients.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
       </Card>
       <Card title={t('extractedMedicines')} action={<Badge tone={confidence>=90?'green':'amber'}>{t('highConfidence')} ({confidence}%)</Badge>} pad={false}>
