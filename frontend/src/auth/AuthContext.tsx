@@ -13,8 +13,22 @@ interface AuthCtx {
 }
 const Ctx = createContext<AuthCtx | null>(null);
 export function AuthProvider({children}:{children:React.ReactNode}) {
-  const [session, setSession] = useState<Session|null>(() => api.getSession());
-  useEffect(() => { const t=setInterval(()=>{ const s=api.getSession(); if(!s && session) setSession(null); }, 30000); return ()=>clearInterval(t); }, [session]);
+  const [session, setSession] = useState<Session|null>(() => {
+    const s = api.getSession();
+    if (s && new Date(s.expiresAt).getTime() < Date.now()) { api.saveSession(null); return null; }
+    return s;
+  });
+  // Keep the UI in sync with the stored session and enforce the 15-minute expiry.
+  useEffect(() => {
+    const t = setInterval(() => {
+      const s = api.getSession();
+      if (!s || new Date(s.expiresAt).getTime() < Date.now()) {
+        if (s) api.saveSession(null);
+        setSession(null);
+      } else if (!session) setSession(s);
+    }, 30000);
+    return () => clearInterval(t);
+  }, [session]);
   const login = useCallback(async (e:string,p:string)=>{ setSession(await api.login(e,p)); }, []);
   const register = useCallback(async (d:any)=>api.register(d), []);
   const verifyOtp = useCallback(async (c:string,code:string)=>{ setSession(await api.verifyOtp(c,code)); }, []);

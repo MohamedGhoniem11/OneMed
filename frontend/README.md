@@ -59,6 +59,10 @@ Then start the backend with Firebase credentials (see root README). `src/api/cli
 | `/app/hospital/*` | Institution overview, staff, API connections, de-identified analytics |
 | `/app/admin/*` | Overview, staff, institutions, pharmacies, hash-chained audit, compliance reports, population health |
 
+## Landing imagery
+
+The hero and NFC feature tile use a branded CSS visual. Image generation was unavailable in this environment (`Invalid credential`), so no unrelated stock photography is shipped. To use your own licensed photos, add `public/images/landing-hero.png` and `public/images/nfc-wristband.png` and replace the two commented image slots in `src/pages/public.tsx` (`hero-visual` and `accent-cell`).
+
 ## Architecture
 
 ```

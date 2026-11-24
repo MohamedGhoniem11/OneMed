@@ -24,11 +24,11 @@ export function PatientDashboard() {
   useEffect(()=>{ api.getPatient(session!.user.uid).then(setPatient); api.list<MedicalRecord>('records',r=>r.patientId===session!.user.uid).then(a=>setRecords(a.sort((x,y)=>y.date.localeCompare(x.date)))); api.list<Prescription>('prescriptions',r=>r.patientId===session!.user.uid).then(setRx); },[]);
   const abnormal = records.flatMap(r=>r.values||[]).filter(v=>v.flag && v.flag!=='normal');
   return <>
-    <PageHead title={`${t('welcomeBack')}, ${patient?.name.split(' ')[0]||session?.user.name.split(' ')[0]}`} subtitle={`${t('dashboard')} — ${new Date().toLocaleDateString()}`} actions={<Link className="btn primary" to="/app/patient/analytics"><BarChart3 size={16}/> {t('analytics')}</Link>}/>
+    <PageHead title={`${t('welcomeBack')}, ${patient?.name.split(' ')[0]||session?.user.name.split(' ')[0]}`} subtitle={`${t('dashboard')} - ${new Date().toLocaleDateString()}`} actions={<Link className="btn primary" to="/app/patient/analytics"><BarChart3 size={16}/> {t('analytics')}</Link>}/>
     <div className="grid cols-4">
       <Stat label={t('records')} value={records.length} sub={`${records.filter(r=>r.type==='lab').length} ${t('lab')}`}/>
       <Stat label={t('activeMedications')} value={rx.reduce((a,r)=>a+r.medicines.length,0)}/>
-      <Stat label="Blood Group" value={patient?.bloodGroup||'—'}/>
+      <Stat label="Blood Group" value={patient?.bloodGroup||'-'}/>
       <Stat label={t('healthScore')} value={<span style={{color:'var(--green)'}}>{Math.max(60,100-abnormal.length*4)}%</span>} sub={t('comprehensiveHealth')}/>
     </div>
     <div className="grid cols-2" style={{marginTop:16}}>
@@ -38,8 +38,8 @@ export function PatientDashboard() {
         </div>)}</div>{!records.length && <Empty/>}</div>
       </Card>
       <div className="grid" style={{gap:16}}>
-        <Card title={t('criticalAllergies')}><div className="alert red"><AlertTriangle size={16}/> {patient?.allergies.join(', ')||'—'}</div>
-          <div style={{marginTop:10,fontSize:13}}><strong>{t('chronicConditions')}:</strong> {patient?.chronicDiseases.join(', ')||'—'}</div></Card>
+        <Card title={t('criticalAllergies')}><div className="alert red"><AlertTriangle size={16}/> {patient?.allergies.join(', ')||'-'}</div>
+          <div style={{marginTop:10,fontSize:13}}><strong>{t('chronicConditions')}:</strong> {patient?.chronicDiseases.join(', ')||'-'}</div></Card>
         <Card title={t('prescriptions')}>{rx.map(r=><div key={r.id} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--line)'}}><div><strong>{r.medicines.map(m=>m.name).join(', ')}</strong><div style={{fontSize:12,color:'var(--muted)'}}>{r.doctorName} · {new Date(r.date).toLocaleDateString()}</div></div><StatusBadge status={r.orderStatus||r.status}/></div>)}{!rx.length&&<Empty/>}</Card>
         <Card title={t('emergencyQr')}><p style={{color:'var(--muted)'}}>Your QR wearable gives bystanders instant access to approved critical information.</p><Link className="btn primary" to="/app/patient/emergency"><QrCode size={16}/> {t('configure')}</Link></Card>
       </div>
@@ -54,7 +54,7 @@ export function PatientRecords() {
   return <><PageHead title={t('records')} subtitle={t('clinicalTimeline')} actions={<button className="btn outline" onClick={()=>window.print()}><Download size={16}/> {t('printRecord')}</button>}/>
     <Card pad><div style={{padding:18,display:'flex',gap:10,flexWrap:'wrap'}}><input className="input" style={{maxWidth:260}} placeholder={t('search')} value={q} onChange={e=>setQ(e.target.value)}/><div className="tabs" style={{border:0,margin:0}}>{['all','lab','imaging','prescription','note','visit','vitals'].map(x=><button key={x} className={`tab ${type===x?'active':''}`} onClick={()=>setType(x)}>{t(x)}</button>)}</div></div>
       <div className="table-wrap"><table className="tbl"><thead><tr><th>{t('date')}</th><th>{t('type')}</th><th>{t('name')}</th><th>{t('institution')}</th><th>{t('confidenceLabel')}</th><th>{t('status')}</th></tr></thead><tbody>
-        {filtered.map(r=><tr key={r.id}><td>{new Date(r.date).toLocaleDateString()}</td><td><Badge tone={RECORD_COLORS[r.type] as any}>{t(r.type)}</Badge></td><td><strong>{r.title}</strong><div style={{fontSize:12,color:'var(--muted)'}}>{r.summary}</div>{r.values?.map(v=><div key={v.name} style={{fontSize:12}}>{v.name}: <strong style={{color:v.flag==='high'?'var(--red)':v.flag==='low'?'var(--amber)':'inherit'}}>{v.value} {v.unit}</strong> <span style={{color:'var(--muted)'}}>({v.referenceLow}–{v.referenceHigh})</span></div>)}</td><td>{r.institution}</td><td>{r.confidence?`${r.confidence}%`:'—'}</td><td><StatusBadge status={r.status||'accessible'}/></td></tr>)}
+        {filtered.map(r=><tr key={r.id}><td>{new Date(r.date).toLocaleDateString()}</td><td><Badge tone={RECORD_COLORS[r.type] as any}>{t(r.type)}</Badge></td><td><strong>{r.title}</strong><div style={{fontSize:12,color:'var(--muted)'}}>{r.summary}</div>{r.values?.map(v=><div key={v.name} style={{fontSize:12}}>{v.name}: <strong style={{color:v.flag==='high'?'var(--red)':v.flag==='low'?'var(--amber)':'inherit'}}>{v.value} {v.unit}</strong> <span style={{color:'var(--muted)'}}>({v.referenceLow}-{v.referenceHigh})</span></div>)}</td><td>{r.institution}</td><td>{r.confidence?`${r.confidence}%`:'-'}</td><td><StatusBadge status={r.status||'accessible'}/></td></tr>)}
       </tbody></table>{!filtered.length&&<Empty/>}</div>
     </Card>
   </>;
@@ -69,21 +69,30 @@ export function PatientAnalytics() {
     return {a1c,bp};
   },[records]);
   const latest = (name:string)=>records.flatMap(r=>r.values||[]).filter(v=>v.name===name).sort((a,b)=>0)[0];
-  const status = (v:any)=>!v?'—':v.flag==='high'?'red':v.flag==='low'?'amber':'green';
+  const status = (v:any)=>!v?'-':v.flag==='high'?'red':v.flag==='low'?'amber':'green';
   const [view,setView] = useState('analytics');
   return <><PageHead title={t('patientAnalytics')} subtitle={t('comprehensiveHealth')} actions={<button className="btn outline" onClick={()=>window.print()}><Download size={16}/> {t('exportPdf')}</button>}/>
     <SectionTabs tabs={[{id:'overview',label:t('overview')},{id:'analytics',label:t('analytics')},{id:'reports',label:t('reports')}]} active={view} onChange={setView}/>
-    {view==='reports' ? <Card><p style={{color:'var(--muted)'}}>Generate patient medical history, lab results and clinical summary reports.</p><Link className="btn primary" to="/app/doctor/reports">Open reports</Link></Card> : <>
+    {view==='reports' ? <Card title="Your health reports"><p style={{color:'var(--muted)'}}>Download your own medical history as structured data, or print a readable copy. Reports are generated from your records only.</p>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn primary" onClick={()=>{const b=new Blob([JSON.stringify({patientId:session!.user.uid,records,generatedAt:new Date().toISOString()},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='onemed-my-health-data.json';a.click();}}>{t('download')} JSON</button><button className="btn outline" onClick={()=>window.print()}>{t('exportPdf')}</button></div>
+      <p className="disclaimer" style={{marginTop:12}}>{t('reportExpires')}</p></Card> : <>
     <div className="grid cols-4">
       <MetricCard label="BMI" value="27.4" trend="↑ 0.5" tone="amber" bar={68} sub="Overweight range" icon={<Activity size={16}/>}/>
-      <MetricCard label="HbA1c" value={(series.a1c[series.a1c.length-1])?.value||'—'} unit="%" trend="↓ 0.2 vs last 3 months" tone="green" bar={62} icon={<HeartPulse size={16}/>}/>
+      <MetricCard label="HbA1c" value={(series.a1c[series.a1c.length-1])?.value||'-'} unit="%" trend="↓ 0.2 vs last 3 months" tone="green" bar={62} icon={<HeartPulse size={16}/>}/>
       <MetricCard label="eGFR" value="92" unit="mL/min" trend="Stable" tone="green" bar={78} sub="Normal kidney function" icon={<Activity size={16}/>}/>
-      <MetricCard label="CRP — HIGH" value="12.4" unit="mg/L" tone="red" bar={88} sub="Elevated inflammation markers (Oct 24)" icon={<AlertTriangle size={16}/>}/>
+      <MetricCard label="CRP - HIGH" value="12.4" unit="mg/L" tone="red" bar={88} sub="Elevated inflammation markers (Oct 24)" icon={<AlertTriangle size={16}/>}/>
     </div>
-    <div className="grid cols-2" style={{marginTop:16}}>
+    {view==='overview' ? <Card title="At a glance" style={{marginTop:16}}>
+      <p style={{color:'var(--muted)'}}>Your latest results and the items that need attention. Open Analytics for the full trend view.</p>
+      <div className="grid cols-3" style={{marginTop:12}}>
+        <div className="alert red"><strong>Allergies</strong><div>Penicillin, Latex</div></div>
+        <div className="alert amber"><strong>Abnormal results</strong><div>Glucose 115 mg/dL, CRP 12.4 mg/L</div></div>
+        <div className="alert green"><strong>Stable</strong><div>Blood pressure trending toward target</div></div>
+      </div>
+    </Card> : <div className="grid cols-2" style={{marginTop:16}}>
       <Card title={t('bloodPressure')}><ResponsiveContainer width="100%" height={240}><LineChart data={series.bp}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="date"/><YAxis domain={[50,170]}/><Tooltip/><Legend/><ReferenceArea y1={90} y2={120} fill="#e7f6f3" fillOpacity={.5}/><Line type="monotone" dataKey="systolic" stroke="#002657" strokeWidth={2.5}/><Line type="monotone" dataKey="diastolic" stroke="#0f9d6e" strokeWidth={2.5}/></LineChart></ResponsiveContainer></Card>
-      <Card title={t('labTrends') + ' — HbA1c'}><ResponsiveContainer width="100%" height={240}><LineChart data={series.a1c}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="date"/><YAxis domain={[4,9]}/><Tooltip/><Legend/><ReferenceArea y1={4} y2={5.6} fill="#e7f7ef" fillOpacity={.7}/><Line type="monotone" dataKey="value" stroke="#d99219" strokeWidth={2.5}/></LineChart></ResponsiveContainer></Card>
-    </div>
+      <Card title={t('labTrends') + ' - HbA1c'}><ResponsiveContainer width="100%" height={240}><LineChart data={series.a1c}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="date"/><YAxis domain={[4,9]}/><Tooltip/><Legend/><ReferenceArea y1={4} y2={5.6} fill="#e7f7ef" fillOpacity={.7}/><Line type="monotone" dataKey="value" stroke="#d99219" strokeWidth={2.5}/></LineChart></ResponsiveContainer></Card>
+    </div>}
     <Card title="Lipid Panel" style={{marginTop:16}} action={<Chip tone="blue">{t('latestLabel')}: Oct 15</Chip>}>
       {[[t('lipidTotal'),210,260,'amber'],[t('lipidLdl'),135,190,'red'],[t('lipidHdl'),55,100,'green'],[t('lipidTrig'),140,200,'amber']].map(([name,val,max,tone]:any)=><div className="lipid-row" key={name}><span className="lipid-name">{name}</span><span className="lipid-track"><i className="lipid-fill" style={{width:`${(val/max)*100}%`,background:tone==='red'?'var(--red)':tone==='green'?'var(--green)':'var(--amber)'}}/></span><span className="lipid-val">{val} mg/dL</span></div>)}
     </Card>
@@ -98,7 +107,7 @@ export function PatientPrescriptions() {
   useEffect(()=>{ api.list<Prescription>('prescriptions',r=>r.patientId===session!.user.uid).then(setRx); },[]);
   return <><PageHead title={t('prescriptions')} subtitle="Doctor-confirmed digital prescriptions"/>
     <Card pad><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('date')}</th><th>{t('doctor')}</th><th>{t('extractedMedicines')}</th><th>{t('status')}</th><th>{t('action')}</th></tr></thead><tbody>
-      {rx.map(r=><tr key={r.id}><td>{new Date(r.date).toLocaleDateString()}</td><td>{r.doctorName}</td><td>{r.medicines.map(m=>`${m.name} ${m.dosage}`).join(', ')}</td><td><StatusBadge status={r.orderStatus||r.status}/></td><td><Link className="btn sm primary" to={`/f/${r.linkToken||'rx-demo-8f3a'}`}>{t('orderStatus')}</Link></td></tr>)}
+      {rx.map(r=><tr key={r.id}><td>{new Date(r.date).toLocaleDateString()}</td><td>{r.doctorName}</td><td>{r.medicines.map(m=>`${m.name} ${m.dosage}`).join(', ')}</td><td><StatusBadge status={r.orderStatus||r.status}/></td><td>{r.linkToken ? <Link className="btn sm primary" to={`/f/${r.linkToken}`}>{t('orderStatus')}</Link> : <Badge tone="gray">Link pending confirmation</Badge>}</td></tr>)}
     </tbody></table>{!rx.length&&<Empty/>}</div></Card></>;
 }
 
@@ -110,7 +119,7 @@ export function PatientConsents() {
     <Card pad><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('name')}</th><th>{t('role')}</th><th>Scope</th><th>Purpose</th><th>{t('status')}</th><th>{t('action')}</th></tr></thead><tbody>
       {list.map(c=><tr key={c.id}><td>{c.granteeName}</td><td>{t(c.granteeType)}</td><td>{c.scope}</td><td>{c.purpose}</td><td><StatusBadge status={c.active?'active':'revoked'}/></td><td><button className="btn sm outline" onClick={()=>void toggle(c)}>{c.active?t('revoke'):t('grant')}</button></td></tr>)}
     </tbody></table>{!list.length&&<Empty/>}</div></Card>
-    <Card title="Your data rights" style={{marginTop:16}}><p style={{color:'var(--muted)'}}>You may download all your data or request complete deletion within 30 days (EDP compliance).</p><div style={{display:'flex',gap:8}}><button className="btn outline" onClick={()=>toast('Data export queued (demo)')}><Download size={16}/> {t('download')} JSON</button><button className="btn danger" onClick={()=>{ api.mutate(db=>{db.deletionRequests.push({id:`del_${Date.now()}`,patientId:session!.user.uid,requestedAt:new Date().toISOString(),status:'pending'});}); toast('Deletion request recorded — completed within 30 days'); }}><Trash2 size={16}/> Request deletion</button></div></Card>
+    <Card title="Your data rights" style={{marginTop:16}}><p style={{color:'var(--muted)'}}>You may download all your data or request complete deletion within 30 days (EDP compliance).</p><div style={{display:'flex',gap:8}}><button className="btn outline" onClick={()=>toast('Data export queued (demo)')}><Download size={16}/> {t('download')} JSON</button><button className="btn danger" onClick={()=>{ api.mutate(db=>{db.deletionRequests.push({id:`del_${Date.now()}`,patientId:session!.user.uid,requestedAt:new Date().toISOString(),status:'pending'});}); toast('Deletion request recorded - completed within 30 days'); }}><Trash2 size={16}/> Request deletion</button></div></Card>
   </>;
 }
 
@@ -124,7 +133,7 @@ export function PatientEmergencyConfig() {
     <Tabs tabs={[{id:'settings',label:t('settings')},{id:'qr',label:'QR / NFC'}]} active={tab} onChange={setTab}/>
     {tab==='settings'?<Card title={t('dataPrivacy')}>{fields.map(([k,label])=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'12px 0',borderBottom:'1px solid var(--line)'}}><strong>{label}</strong><button className={`btn sm ${profile?.settings[k]?'primary':'outline'}`} onClick={()=>toggle(k)}>{profile?.settings[k]?t('yes'):t('no')}</button></div>)}<p className="disclaimer" style={{marginTop:14}}>Full medical records stay behind authentication. Network and scan logs are kept for security.</p></Card>
     :<div className="grid cols-2"><Card title="Emergency QR"><div style={{textAlign:'center'}}>{qr?<img src={qr} alt="Emergency QR" style={{width:200,height:200}}/>:<div className="empty">Generating…</div>}<div className="disclaimer" style={{marginTop:12}}>{location.origin}/emergency/{profile?.token}</div><a className="btn primary" style={{marginTop:12}} href={qr} download="onemed-emergency-qr.png"><Download size={16}/> {t('downloadQr')}</a></div></Card>
-      <Card title="NFC Wristband"><p style={{color:'var(--muted)'}}>NTAG 424 DNA wristband linked to this profile.</p><dl style={{lineHeight:2}}><dt style={{color:'var(--muted)'}}>Status</dt><dd>{profile?.nfcIssued?t('active'):'Not issued'}</dd><dt style={{color:'var(--muted)'}}>UID</dt><dd>{profile?.nfcUid||'—'}</dd><dt style={{color:'var(--muted)'}}>{t('scanQr')}</dt><dd>{profile?.scanCount||0}</dd></dl><Link className="btn outline" to={`/nfc/${profile?.token}`}>{t('view')} NFC page</Link></Card></div>}
+      <Card title="NFC Wristband"><p style={{color:'var(--muted)'}}>NTAG 424 DNA wristband linked to this profile.</p><dl style={{lineHeight:2}}><dt style={{color:'var(--muted)'}}>Status</dt><dd>{profile?.nfcIssued?t('active'):'Not issued'}</dd><dt style={{color:'var(--muted)'}}>UID</dt><dd>{profile?.nfcUid||'-'}</dd><dt style={{color:'var(--muted)'}}>{t('scanQr')}</dt><dd>{profile?.scanCount||0}</dd></dl><Link className="btn outline" to={`/nfc/${profile?.token}`}>{t('view')} NFC page</Link></Card></div>}
   </>;
 }
 
@@ -136,14 +145,16 @@ export function PatientMessages() {
   const send=async()=>{ if(!text.trim()||!active) return; await api.mutate(db=>{db.messages.push({id:`m_${Date.now()}`,conversationId:active,senderId:session!.user.uid,text,sentAt:new Date().toISOString()});}); setText(''); api.list<Message>('messages',m=>m.conversationId===active).then(a=>setMsgs(a.sort((x,y)=>x.sentAt.localeCompare(y.sentAt)))); };
   return <><PageHead title={t('messages')} subtitle="Secure in-app conversations with your care team."/>
     <div className="grid" style={{gridTemplateColumns:'280px 1fr'}}><Card pad><div className="card-body">{convs.map(c=><button key={c.id} className={`nav-item ${active===c.id?'active':''}`} style={{color:'var(--ink)'}} onClick={()=>setActive(c.id)}><span className="avatar">{c.otherName.slice(0,2).toUpperCase()}</span><span><strong>{c.otherName}</strong><div style={{fontSize:11,color:'var(--muted)'}}>{t(c.role)}</div></span></button>)}{!convs.length&&<Empty/>}</div></Card>
-      <Card pad={false}><div className="card-head"><h3>{convs.find(c=>c.id===active)?.otherName||'—'}</h3></div><div className="card-body"><div className="chat-log">{msgs.map(m=><div key={m.id} className={`msg ${m.senderId===session!.user.uid?'me':''}`}>{m.text}<div style={{fontSize:10,opacity:.6,marginTop:4}}>{new Date(m.sentAt).toLocaleTimeString()}</div></div>)}</div><div style={{display:'flex',gap:8,marginTop:12}}><input className="input" value={text} onChange={e=>setText(e.target.value)} placeholder="Type a message…" onKeyDown={e=>{if(e.key==='Enter')void send();}}/><button className="btn primary" onClick={()=>void send()}><Pill size={16}/> Send</button></div></div></Card></div>
+      <Card pad={false}><div className="card-head"><h3>{convs.find(c=>c.id===active)?.otherName||'-'}</h3></div><div className="card-body"><div className="chat-log">{msgs.map(m=><div key={m.id} className={`msg ${m.senderId===session!.user.uid?'me':''}`}>{m.text}<div style={{fontSize:10,opacity:.6,marginTop:4}}>{new Date(m.sentAt).toLocaleTimeString()}</div></div>)}</div><div style={{display:'flex',gap:8,marginTop:12}}><input className="input" value={text} onChange={e=>setText(e.target.value)} placeholder="Type a message…" onKeyDown={e=>{if(e.key==='Enter')void send();}}/><button className="btn primary" onClick={()=>void send()}><Pill size={16}/> Send</button></div></div></Card></div>
   </>;
 }
 
-export function PatientNotifications() {
-  const { session } = useAuth(); const { t } = useTranslation(); const [list,setList]=useState<Notification[]>([]);
-  useEffect(()=>{ api.list<Notification>('notifications',n=>n.userId===session!.user.uid).then(a=>setList(a.sort((x,y)=>y.createdAt.localeCompare(x.createdAt)))); },[]);
-  return <><PageHead title={t('notifications')} subtitle="Lab results, prescriptions and messages."/>
+export function PatientNotifications({ userId }: { userId?: string }) {
+  const { session } = useAuth(); const { t } = useTranslation(); const {toast}=useToast(); const [list,setList]=useState<Notification[]>([]);
+  const target = userId || session!.user.uid;
+  const load = ()=>api.list<Notification>('notifications',n=>n.userId===target).then(a=>setList(a.sort((x,y)=>y.createdAt.localeCompare(x.createdAt))));
+  useEffect(()=>{ void load(); },[target]);
+  return <><PageHead title={t('notifications')} subtitle="Lab results, prescriptions and messages." actions={<button className="btn sm outline" onClick={async()=>{await api.mutate(db=>{db.notifications.filter(n=>n.userId===target).forEach(n=>{n.read=true;});});toast(t('saved'));void load();}}>Mark all read</button>}/>
     <Card pad><div className="card-body">{list.map(n=><div key={n.id} style={{display:'flex',gap:12,padding:'12px 0',borderBottom:'1px solid var(--line)'}}><span className="avatar"><Bell size={16}/></span><div style={{flex:1}}><strong>{n.title}</strong><div>{n.body}</div><div style={{fontSize:11,color:'var(--muted)'}}>{new Date(n.createdAt).toLocaleString()}</div></div>{!n.read&&<Badge tone="blue">new</Badge>}</div>)}{!list.length&&<Empty/>}</div></Card></>;
 }
 

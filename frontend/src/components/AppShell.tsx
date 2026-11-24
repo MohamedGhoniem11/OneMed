@@ -67,6 +67,12 @@ export function AppShell({children}:{children:React.ReactNode}) {
   if (!session) return <>{children}</>;
   const items = navByRole[session.user.role] || [];
   const roleLabel = t(session.user.role === 'lab_staff' ? 'labStaff' : session.user.role === 'hospital_admin' ? 'hospitalAdmin' : session.user.role);
+  // Global search must stay inside the current portal instead of sending every
+  // role to the doctor's patient list (a guard redirect that looked like a bug).
+  const searchTarget: Record<Role,string> = {
+    patient:'/app/patient/records', doctor:'/app/doctor/patients', lab_staff:'/app/lab/history',
+    pharmacy:'/app/pharmacy', hospital_admin:'/app/hospital/staff', admin:'/app/admin/users',
+  };
   return <div className="app-shell">
     <aside className="sidebar" aria-label="Main navigation">
       <div className="brand"><span className="brand-mark">✚</span><span className="brand-name">OneMed</span><span className="brand-sub">Healthcare Platform</span></div>
@@ -80,11 +86,11 @@ export function AppShell({children}:{children:React.ReactNode}) {
     <div className="main-area">
       <header className="topbar">
         <button className="btn sm outline" aria-label="Menu" onClick={()=>setOpen(!open)}><Menu size={16}/></button>
-        <div className="search"><input className="input" placeholder={t('search')} value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter' && q.trim()) navigate(`/app/doctor/patients?q=${encodeURIComponent(q)}`); }} aria-label={t('search')}/></div>
+        <div className="search"><input className="input" placeholder={t('search')} value={q} onChange={e=>setQ(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter' && q.trim()) navigate(`${searchTarget[session.user.role]}?q=${encodeURIComponent(q)}`); }} aria-label={t('search')}/></div>
         <div className="spacer"/>
         {API_MODE==='demo' && <span className="demo-flag">{t('demoMode')}</span>}
         <button className="btn sm outline" onClick={()=>setLang(i18n.language==='en'?'ar':'en')} aria-label={t('language')}><Languages size={15}/> {i18n.language==='en'?'العربية':'English'}</button>
-        <NavLink to={session.user.role==='patient'?'/app/patient/notifications':'/app/doctor/messages'} className="btn sm outline" aria-label={t('notifications')} style={{position:'relative'}}><Bell size={16}/><span className="bell-dot" aria-hidden="true"/></NavLink>
+        <NavLink to="/app/notifications" className="btn sm outline" aria-label={t('notifications')} style={{position:'relative'}}><Bell size={16}/><span className="bell-dot" aria-hidden="true"/></NavLink>
         <div className="avatar" title={session.user.name}>{session.user.name.slice(0,2).toUpperCase()}</div>
         <div><strong>{session.user.name}</strong><div style={{fontSize:11,color:'var(--muted)'}}>{t(session.user.role==='lab_staff'?'labStaff':session.user.role)}</div></div>
       </header>

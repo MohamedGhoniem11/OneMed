@@ -12,7 +12,7 @@ import {
 } from 'recharts';
 import * as api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
-import type { Patient, MedicalRecord, Prescription, Medicine, Consent, AuditEntry, ChatTurn } from '../types';
+import type { Patient, MedicalRecord, Prescription, Medicine, Consent, AuditEntry, ChatTurn, Conversation, Message } from '../types';
 import { Badge, Card, Empty, Field, IdentityStrip, Modal, PageHead, SectionTabs, Stat, StatusBadge, Tabs, useToast } from '../components/ui';
 
 export function DoctorDashboard() {
@@ -21,7 +21,7 @@ export function DoctorDashboard() {
   useEffect(()=>{ api.list<Patient>('patients').then(setPatients); api.list<Prescription>('prescriptions',x=>x.doctorId===session!.user.uid).then(setRx); },[]);
   const filtered = patients.filter(p=>`${p.name} ${p.nationalId} ${p.phone}`.toLowerCase().includes(q.toLowerCase()));
   return <>
-    <PageHead title={`Good Morning, ${session!.user.name.split(' ').slice(-1)[0]}`} subtitle={`${t('dashboard')} — ${new Date().toLocaleDateString()}`} actions={<span className="badge green">● {t('systemOnline')}</span>}/>
+    <PageHead title={`Good Morning, ${session!.user.name.split(' ').slice(-1)[0]}`} subtitle={`${t('dashboard')} - ${new Date().toLocaleDateString()}`} actions={<span className="badge green">● {t('systemOnline')}</span>}/>
     <div style={{display:'flex',gap:10,marginBottom:16,flexWrap:'wrap'}}><input className="input" style={{maxWidth:400}} placeholder={`Search Patient by ${t('nationalId')}, NFC, or QR…`} value={q} onChange={e=>setQ(e.target.value)}/>
       <button className="btn danger" onClick={()=>window.open('/emergency/em-demo-mona','_blank')}>✚ {t('emergencyShortcut')}</button>
       <button className="btn outline" onClick={()=>nav('/app/doctor/qr')}><ScanLine size={16}/> {t('nfcScanner')}</button>
@@ -45,7 +45,7 @@ export function DoctorPatients() {
   const allowed = patients.filter(p=>q===''||`${p.name} ${p.nationalId} ${p.phone}`.toLowerCase().includes(q.toLowerCase()));
   return <><PageHead title={t('patients')} subtitle="Search by name, National ID or phone. Access is consent-gated and logged."/>
     <Card pad><div className="card-body"><div style={{display:'flex',gap:8,marginBottom:12}}><input className="input" placeholder={`${t('search')} ${t('name')} / ${t('nationalId')} / ${t('phoneNumber')}`} value={q} onChange={e=>setQ(e.target.value)}/><button className="btn primary" onClick={()=>nav('/app/doctor/qr')}><ScanLine size={16}/> NFC / QR</button></div>
-      <div className="table-wrap"><table className="tbl"><thead><tr><th>{t('name')}</th><th>{t('nationalId')}</th><th>{t('bloodGroup')}</th><th>{t('allergies')}</th><th>{t('consents')}</th><th>{t('action')}</th></tr></thead><tbody>{allowed.map(p=><tr key={p.id}><td><strong>{p.name}</strong><div style={{fontSize:12,color:'var(--muted)'}}>{p.dateOfBirth} · {p.phone}</div></td><td style={{fontFamily:'monospace',fontSize:12}}>{p.nationalId}</td><td><Badge tone="red">{p.bloodGroup}</Badge></td><td style={{color:'var(--red)'}}>{p.allergies.join(', ')||'—'}</td><td><Badge tone={consents.some(c=>c.patientId===p.id&&c.active)?'green':'gray'}>{consents.filter(c=>c.patientId===p.id&&c.active).length}</Badge></td><td><Link className="btn sm primary" to={`/app/doctor/patients/${p.id}`}>{t('view')}</Link></td></tr>)}</tbody></table>{!allowed.length&&<Empty/>}</div></div></Card>
+      <div className="table-wrap"><table className="tbl"><thead><tr><th>{t('name')}</th><th>{t('nationalId')}</th><th>{t('bloodGroup')}</th><th>{t('allergies')}</th><th>{t('consents')}</th><th>{t('action')}</th></tr></thead><tbody>{allowed.map(p=><tr key={p.id}><td><strong>{p.name}</strong><div style={{fontSize:12,color:'var(--muted)'}}>{p.dateOfBirth} · {p.phone}</div></td><td style={{fontFamily:'monospace',fontSize:12}}>{p.nationalId}</td><td><Badge tone="red">{p.bloodGroup}</Badge></td><td style={{color:'var(--red)'}}>{p.allergies.join(', ')||'-'}</td><td><Badge tone={consents.some(c=>c.patientId===p.id&&c.active)?'green':'gray'}>{consents.filter(c=>c.patientId===p.id&&c.active).length}</Badge></td><td><Link className="btn sm primary" to={`/app/doctor/patients/${p.id}`}>{t('view')}</Link></td></tr>)}</tbody></table>{!allowed.length&&<Empty/>}</div></div></Card>
   </>;
 }
 
@@ -69,12 +69,12 @@ export function PatientViewer() {
       <Card title={t('clinicalTimeline')} action={<div className="tabs" style={{border:0,margin:0}}>{['all','lab','prescription','imaging','note','vitals'].map(x=><button key={x} className={`tab ${type===x?'active':''}`} onClick={()=>setType(x)}>{t(x)}</button>)}</div>} pad={false}>
         <div className="card-body"><div className="timeline">{filtered.map(r=><div className="timeline-item" key={r.id}><Badge tone={r.type==='lab'?'blue':r.type==='imaging'?'blue':r.type==='prescription'?'green':'gray'}>{t(r.type)}</Badge> <strong>{r.title}</strong>
           <div style={{fontSize:12,color:'var(--muted)'}}>{r.institution} · {new Date(r.date).toLocaleString()}</div>
-          {r.values?.map(v=><div key={v.name} style={{fontSize:13,marginTop:4}}>{v.name}: <strong style={{color:v.flag==='high'?'var(--red)':'inherit'}}>{v.value} {v.unit}</strong> <span style={{color:'var(--muted)'}}>({v.referenceLow}–{v.referenceHigh})</span></div>)}
+          {r.values?.map(v=><div key={v.name} style={{fontSize:13,marginTop:4}}>{v.name}: <strong style={{color:v.flag==='high'?'var(--red)':'inherit'}}>{v.value} {v.unit}</strong> <span style={{color:'var(--muted)'}}>({v.referenceLow}-{v.referenceHigh})</span></div>)}
           {r.summary && <p style={{fontSize:13,margin:'4px 0'}}>{r.summary}</p>}</div>)}</div>{!filtered.length&&<Empty/>}
-          {filtered.length>0 && <p style={{color:'var(--muted)',fontSize:12,textAlign:'center',paddingTop:8}}>— {t('historyFooter')} —</p>}</div>
+          {filtered.length>0 && <p style={{color:'var(--muted)',fontSize:12,textAlign:'center',paddingTop:8}}>- {t('historyFooter')} -</p>}</div>
       </Card>
       <div className="grid" style={{gap:16}}>
-        <Card title={t('activeMedications')}><p>Metformin 500mg — PO BID with meals<br/>Lisinopril 10mg — PO QD<br/>Atorvastatin 20mg — PO QHS (refill needed)</p></Card>
+        <Card title={t('activeMedications')}><p>Metformin 500mg - PO BID with meals<br/>Lisinopril 10mg - PO QD<br/>Atorvastatin 20mg - PO QHS (refill needed)</p></Card>
         <Card title={t('latestVitals')}><div className="grid cols-2"><Stat label="Blood Pressure" value="128/82 mmHg"/><Stat label={t('heartRate')} value="74 bpm"/><Stat label={t('temperature')} value="37.1 °C"/><Stat label={t('spo2')} value="98 %"/></div></Card>
         <Card title={t('emergencyContact')}><div style={{display:'flex',justifyContent:'space-between'}}><div><strong>{patient?.emergencyContact.name}</strong><div style={{color:'var(--muted)'}}>{patient?.emergencyContact.relationship}</div></div><a className="btn sm outline" href={`tel:${patient?.emergencyContact.phone}`}>{t('call')}</a></div></Card>
         <Card title={t('clinicalSummary')} action={<button className="btn sm primary" onClick={async()=>{const s=await api.clinicalSummary(id);setSummary(s);toast(t('saved'));}}><Sparkles size={14}/> {t('generate')}</button>}>
@@ -127,12 +127,18 @@ export function DoctorQrTools() {
   const { session } = useAuth(); const { t } = useTranslation(); const {toast}=useToast();
   const [tab,setTab]=useState('nfc'); const [qr,setQr]=useState(''); const [seconds,setSeconds]=useState(900); const [token,setToken]=useState('');
   useEffect(()=>{ if(!qr) return; const t=setInterval(()=>setSeconds(s=>Math.max(0,s-1)),1000); return ()=>clearInterval(t); },[qr]);
-  const generate=()=>{ const tk=`conn-${Math.random().toString(36).slice(2,10)}`; setToken(tk); QRCode.toDataURL(`${location.origin}/qr/${tk}`).then(setQr); setSeconds(900); toast('Connection QR generated — valid 15 minutes'); };
+  const generate=()=>{
+    const tk=`conn-${Math.random().toString(36).slice(2,10)}`; setToken(tk);
+    QRCode.toDataURL(`${location.origin}/qr/${tk}`).then(setQr); setSeconds(900);
+    void api.mutate(db=>{db.connectionQrs.push({token:tk,doctorId:session!.user.uid,doctorName:session!.user.name,
+      createdAt:new Date().toISOString(),expiresAt:new Date(Date.now()+15*60000).toISOString()});});
+    toast('Connection QR generated - valid 15 minutes');
+  };
   const nfcSupported = 'NDEFReader' in window;
-  const readNfc = async ()=>{ if(!nfcSupported) return toast('Web NFC not supported in this browser — use the QR fallback',true); try { const reader = new (window as any).NDEFReader(); await reader.scan(); toast('NFC tag scanned — resolving patient'); } catch(e:any){ toast(e.message,true); } };
+  const readNfc = async ()=>{ if(!nfcSupported) return toast('Web NFC not supported in this browser - use the QR fallback',true); try { const reader = new (window as any).NDEFReader(); await reader.scan(); toast('NFC tag scanned - resolving patient'); } catch(e:any){ toast(e.message,true); } };
   return <><PageHead title={t('scannerTools')} subtitle="Patient identification and time-limited consent connections."/>
     <Tabs tabs={[{id:'nfc',label:t('nfcScanner')},{id:'qr',label:t('qrGenerator')}]} active={tab} onChange={setTab}/>
-    {tab==='nfc'?<div className="grid cols-2"><Card title={t('nfcScanner')}><div className="empty" style={{padding:50}}><ScanLine size={40}/><p>{t('readPatientId')}</p><button className="btn primary" onClick={()=>void readNfc()}>Start NFC scan</button><p className="disclaimer">Web NFC works on Chrome for Android; QR is the fallback for iOS.</p></div></Card><Card title="Supported tags"><p>NTAG 424 DNA wristbands/cards issue a signed token resolved by the backend to a patient profile.</p><Badge tone={nfcSupported?'green':'amber'}>{nfcSupported?'Web NFC available':'Web NFC unavailable — QR fallback'}</Badge></Card></div>
+    {tab==='nfc'?<div className="grid cols-2"><Card title={t('nfcScanner')}><div className="empty" style={{padding:50}}><ScanLine size={40}/><p>{t('readPatientId')}</p><button className="btn primary" onClick={()=>void readNfc()}>Start NFC scan</button><p className="disclaimer">Web NFC works on Chrome for Android; QR is the fallback for iOS.</p></div></Card><Card title="Supported tags"><p>NTAG 424 DNA wristbands/cards issue a signed token resolved by the backend to a patient profile.</p><Badge tone={nfcSupported?'green':'amber'}>{nfcSupported?'Web NFC available':'Web NFC unavailable - QR fallback'}</Badge></Card></div>
     :<div className="grid cols-2"><Card title={t('connectionQr')}><button className="btn primary" onClick={generate}><QrCode size={16}/> Generate QR</button>
       {qr && <div style={{textAlign:'center',marginTop:14}}><img src={qr} alt="Connection QR" style={{width:210,height:210}}/><div style={{fontFamily:'monospace',fontSize:12}}>{token}</div><div className={`alert ${seconds>0?'blue':'red'}`} style={{marginTop:10}}><Clock size={16}/> {seconds>0?`${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')} remaining`:'EXPIRED'}</div><a className="btn outline" href={qr} download="onemed-connection-qr.png"><DownloadIcon/> {t('downloadQr')}</a></div>}</Card>
       <Card title={t('consents')}><p style={{color:'var(--muted)'}}>Patient scans the QR, reviews the scope, and grants consent. The grant is audit logged and expires with the QR.</p><div className="alert blue">Scope: records, prescriptions · 15-minute TTL · logged with IP and timestamp</div></Card></div>}
@@ -140,18 +146,49 @@ export function DoctorQrTools() {
 }
 function DownloadIcon(){return <span>⬇</span>;}
 
-export function DoctorMessages() { const {t}=useTranslation(); return <><PageHead title={t('messages')} subtitle="Secure conversations with patients and pharmacies."/><Card><p style={{color:'var(--muted)'}}>Use the patient record viewer to open a consultation thread.</p><Link className="btn primary" to="/app/doctor/patients">Open patients</Link></Card></>; }
+export function DoctorMessages() {
+  const {t}=useTranslation(); const {session}=useAuth(); const {toast}=useToast();
+  const [convs,setConvs]=useState<Conversation[]>([]); const [active,setActive]=useState<string|null>(null);
+  const [msgs,setMsgs]=useState<Message[]>([]); const [text,setText]=useState('');
+  useEffect(()=>{ api.list<Conversation>('conversations',c=>c.otherUserId===session!.user.uid).then(a=>{setConvs(a);setActive(a[0]?.id||null);}); },[]);
+  useEffect(()=>{ if(active) api.list<Message>('messages',m=>m.conversationId===active).then(a=>setMsgs(a.sort((x,y)=>x.sentAt.localeCompare(y.sentAt)))); },[active]);
+  const send=async()=>{ if(!text.trim()||!active) return; await api.mutate(db=>{db.messages.push({id:`m_${Date.now()}`,conversationId:active,senderId:session!.user.uid,text,sentAt:new Date().toISOString()});}); setText('');
+    api.list<Message>('messages',m=>m.conversationId===active).then(a=>setMsgs(a.sort((x,y)=>x.sentAt.localeCompare(y.sentAt)))); toast(t('saved')); };
+  return <><PageHead title={t('messages')} subtitle="Secure conversations with patients and pharmacies."/>
+    <div className="grid" style={{gridTemplateColumns:'280px 1fr'}}>
+      <Card pad><div className="card-body">{convs.map(c=><button key={c.id} className={`nav-item ${active===c.id?'active':''}`} style={{color:'var(--ink)'}} onClick={()=>setActive(c.id)}><span className="avatar">{c.otherName.slice(0,2).toUpperCase()}</span><span><strong>{c.otherName}</strong><div style={{fontSize:11,color:'var(--muted)'}}>{t(c.role==='lab_staff'?'labStaff':c.role)}</div></span></button>)}{!convs.length&&<Empty message="No conversations yet. Open a patient record to start one."/>}</div></Card>
+      <Card pad={false}><div className="card-head"><h3>{convs.find(c=>c.id===active)?.otherName||'-'}</h3></div><div className="card-body"><div className="chat-log">{msgs.map(m=><div key={m.id} className={`msg ${m.senderId===session!.user.uid?'me':''}`}>{m.text}<div style={{fontSize:10,opacity:.6,marginTop:4}}>{new Date(m.sentAt).toLocaleTimeString()}</div></div>)}</div><div style={{display:'flex',gap:8,marginTop:12}}><input className="input" value={text} onChange={e=>setText(e.target.value)} placeholder="Type a message..." onKeyDown={e=>{if(e.key==='Enter')void send();}}/><button className="btn primary" onClick={()=>void send()}>Send</button></div></div></Card>
+    </div></>;
+}
 
 export function DoctorReports() {
   const { t } = useTranslation(); const {toast}=useToast(); const {session}=useAuth();
   const [type,setType]=useState('clinical'); const [patient,setPatient]=useState('user_patient_1'); const [patients,setPatients]=useState<Patient[]>([]); const [out,setOut]=useState('');
   useEffect(()=>{api.list<Patient>('patients').then(setPatients);},[]);
-  const generate=async()=>{ const p=await api.getById<Patient>('patients',patient); const s=await api.clinicalSummary(patient);
-    const text = `${t('reports')} — ${type.toUpperCase()}\n${t('generated')}: ${new Date().toLocaleString()}\nPatient: ${p?.name}\n\n${s.text}\n\n${t('aiDisclaimer')}`;
-    setOut(text); await api.mutate(db=>{db.audit.push({id:`a_${Date.now()}`,actor:session!.user.uid,actorName:session!.user.name,action:'report_generated',resource:`report:${type}`,patientId:patient,timestamp:new Date().toISOString(),ip:'127.0.0.1',hash:'',previousHash:''});}); toast(t('reportGenerated')); };
+  const generate=async()=>{
+    const p=await api.getPatient(patient);
+    const header = `${t('reports')}: ${type.toUpperCase()}\n${t('generated')}: ${new Date().toLocaleString()}\n`;
+    let body = '';
+    if(type==='audit'||type==='population') {
+      const entries=await api.list<AuditEntry>('audit');
+      body = type==='audit'
+        ? `Access events: ${entries.length}\n${entries.slice(0,12).map(e=>`${new Date(e.timestamp).toLocaleString()} | ${e.actorName} | ${e.action} | ${e.resource}`).join('\n')}\nHash chain: append-only SHA-256 verification available in admin audit.`
+        : `De-identified population summary (no patient identifiers)\n${(await api.list<Patient>('patients')).map(x=>`${x.city} | ${x.chronicDiseases.join(', ')||'none'}`).join('\n')}`;
+    } else {
+      const records=(await api.list<MedicalRecord>('records',r=>r.patientId===patient)).sort((a,b)=>b.date.localeCompare(a.date));
+      const s=await api.clinicalSummary(patient);
+      body = `Patient: ${p?.name||'-'}\nNational ID: ${p?.nationalId||'-'}\nBlood group: ${p?.bloodGroup||'-'}\n\n`;
+      body += type==='clinical' ? s.text
+        : records.map(r=>`${new Date(r.date).toLocaleDateString()} | ${r.type.toUpperCase()} | ${r.title} | ${r.institution}\n  ${r.summary||''}\n  ${(r.values||[]).map(v=>`${v.name}: ${v.value} ${v.unit} (${v.referenceLow}-${v.referenceHigh})${v.flag&&v.flag!=='normal'?` [${v.flag.toUpperCase()}]`:''}`).join('\n  ')}`).join('\n\n');
+      if(type==='clinical') body += `\n\nConfidence: ${s.confidence}\nSources: ${s.sources.join(', ')}\n${t('aiDisclaimer')}`;
+    }
+    setOut(`${header}\n${body}`);
+    await api.mutate(db=>{db.audit.push({id:`a_${Date.now()}`,actor:session!.user.uid,actorName:session!.user.name,action:'report_generated',resource:`report:${type}`,patientId:type==='audit'||type==='population'?undefined:patient,timestamp:new Date().toISOString(),ip:'127.0.0.1',hash:'',previousHash:''});});
+    toast(t('reportGenerated'));
+  };
   const download=(fmt:string)=>{ const blob=new Blob([out],{type:'text/plain'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`onemed-${type}-report.${fmt}`; a.click(); };
   return <><PageHead title={t('reports')} subtitle="Generate, print and export clinical documents."/><div className="grid cols-2"><Card title="Generate report"><Field label="Report type"><select className="input" value={type} onChange={e=>setType(e.target.value)}><option value="history">Patient Medical History</option><option value="lab">Lab Results</option><option value="clinical">Clinical Summary</option><option value="audit">Audit & Compliance</option><option value="population">Population Health</option></select></Field><Field label={t('patient')}><select className="input" value={patient} onChange={e=>setPatient(e.target.value)}>{patients.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></Field><button className="btn primary" onClick={()=>void generate()}>{t('generate')}</button><p className="disclaimer" style={{marginTop:12}}>{t('reportExpires')}</p></Card>
-    <Card title="Output"><pre style={{whiteSpace:'pre-wrap',fontSize:12,maxHeight:320,overflow:'auto'}}>{out||'—'}</pre><div style={{display:'flex',gap:6,flexWrap:'wrap'}}><button className="btn sm outline" onClick={()=>download('txt')}>{t('download')} TXT</button><button className="btn sm outline" onClick={()=>window.print()}>{t('exportPdf')}</button><button className="btn sm outline" onClick={()=>{const b=new Blob([JSON.stringify({resourceType:'Bundle',entry:[]},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='fhir-bundle.json';a.click();}}>{t('exportFhir')}</button></div></Card></div></>;
+    <Card title="Output"><pre style={{whiteSpace:'pre-wrap',fontSize:12,maxHeight:320,overflow:'auto'}}>{out||'-'}</pre><div style={{display:'flex',gap:6,flexWrap:'wrap'}}><button className="btn sm outline" onClick={()=>download('txt')}>{t('download')} TXT</button><button className="btn sm outline" onClick={()=>window.print()}>{t('exportPdf')}</button><button className="btn sm outline" onClick={async()=>{const recs=await api.list<MedicalRecord>('records',r=>r.patientId===patient);const bundle={resourceType:'Bundle',type:'collection',entry:recs.map(r=>({resource:r.type==='lab'?{resourceType:'DiagnosticReport',status:'final',code:{text:r.title},effectiveDateTime:r.date,result:(r.values||[]).map(v=>({resourceType:'Observation',status:'final',code:{text:v.name},valueQuantity:{value:v.value,unit:v.unit},referenceRange:[{low:{value:v.referenceLow},high:{value:v.referenceHigh}}]}))}:{resourceType:'DocumentReference',status:'current',type:{text:r.type},date:r.date,description:r.title,content:[{attachment:{title:r.institution}}]}}))};const b=new Blob([JSON.stringify(bundle,null,2)],{type:'application/fhir+json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='onemed-fhir-bundle.json';a.click();}}>{t('exportFhir')}</button></div></Card></div></>;
 }
 
 export function DoctorSettings() { const {session}=useAuth(); const {t}=useTranslation(); return <><PageHead title={t('settings')} subtitle={t('clinicalIdentity')}/><Card><dl style={{lineHeight:2}}><dt style={{color:'var(--muted)'}}>{t('name')}</dt><dd>{session!.user.name}</dd><dt style={{color:'var(--muted)'}}>{t('email')}</dt><dd>{session!.user.email}</dd><dt style={{color:'var(--muted)'}}>MFA</dt><dd>{session!.user.mfaEnabled?<Badge tone="green">Enabled</Badge>:<Badge tone="amber">Not enabled</Badge>}</dd></dl></Card></>; }

@@ -31,7 +31,7 @@ export function PageHead({title,subtitle,actions}:{title:string;subtitle?:string
   return <div className="page-head"><div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div><div className="no-print">{actions}</div></div>;
 }
 export function Stat({label,value,sub}:{label:string;value:React.ReactNode;sub?:string}) { return <div className="card stat"><span className="value">{value}</span><span className="label">{label}</span>{sub && <span className="hint">{sub}</span>}</div>; }
-/** One shared status vocabulary (G10) — tones and human labels. */
+/** One shared status vocabulary (G10) - tones and human labels. */
 const STATUS: Record<string,{tone:'green'|'amber'|'red'|'gray'|'blue';label?:string}> = {
   active:{tone:'green',label:'Active'}, approved:{tone:'green',label:'Approved'}, verified:{tone:'green',label:'Verified'},
   completed:{tone:'green',label:'Completed'}, ready:{tone:'green',label:'Ready'}, confirmed:{tone:'green',label:'Confirmed'},
@@ -73,8 +73,8 @@ export function VerificationRow({test,value,unit,reference,confidence,onChange,w
   return <tr className={unverified||warn?'verify-row warn':''}>
     <td>{onChange?<input className="input" value={test} readOnly aria-label={test}/>:<strong>{test}</strong>}</td>
     <td>{onChange?<input className="input verify-value" value={value} onChange={e=>onChange(e.target.value)} aria-label={`${test} value`}/>:value}</td>
-    <td>{unit||'—'}</td><td>{reference||'—'}</td>
-    <td>{confidence!==undefined?<Badge tone={unverified?'amber':'green'}>{confidence}% {unverified?'· Unverified':''}</Badge>:'—'}</td>
+    <td>{unit||'-'}</td><td>{reference||'-'}</td>
+    <td>{confidence!==undefined?<Badge tone={unverified?'amber':'green'}>{confidence}% {unverified?'· Unverified':''}</Badge>:'-'}</td>
   </tr>;
 }
 export function SectionTabs({tabs,active,onChange}:{tabs:{id:string;label:string}[];active:string;onChange:(id:string)=>void}) {

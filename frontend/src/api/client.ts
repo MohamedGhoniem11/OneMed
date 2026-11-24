@@ -36,7 +36,10 @@ export async function login(email: string, password: string): Promise<Session> {
   }
   await wait();
   const db = loadDB(); const user = findUserByEmail(email);
-  if (!user || DEMO_PASSWORDS[user.uid] !== password) throw new ApiError(401, 'Invalid email or password');
+  // Seeded accounts use DEMO_PASSWORDS; accounts created in this browser keep
+  // their demo password on the record so registration -> login works end to end.
+  const expected = (user as any)?.demoPassword || DEMO_PASSWORDS[user?.uid || ''];
+  if (!user || expected !== password) throw new ApiError(401, 'Invalid email or password');
   const session: Session = { token:`demo.jwt.${btoa(user.uid)}`, user, expiresAt:new Date(Date.now()+15*60000).toISOString() };
   saveSession(session);
   db.audit.push({ id:uid('a'), actor:user.uid, actorName:user.name, action:'login', resource:'auth', timestamp:new Date().toISOString(), ip:'127.0.0.1', previousHash:'', hash:'' });
@@ -49,23 +52,50 @@ export async function verifyMfa(mfaToken: string, code: string): Promise<Session
   }
   await wait(); const s = getSession(); if (!s) throw new ApiError(400,'No pending login'); s.user.mfaEnabled = true; saveSession(s); return s;
 }
-export async function register(payload: {name:string;email:string;password:string;role:Role;phone:string;emergencyContact:User['emergencyContact']}): Promise<{challengeId:string;devCode?:string}> {
+type RegisterPayload = {
+  name:string; email:string; password:string; role:Role; phone:string;
+  emergencyContact:User['emergencyContact'];
+  patient?:{nationalId:string;dateOfBirth:string;gender:'male'|'female';bloodGroup:string;city:string;address?:string;allergies?:string[];chronicDiseases?:string[]};
+  doctor?:{specialty:string;licenseNumber:string;city:string;clinicName?:string};
+};
+export async function register(payload: RegisterPayload): Promise<{challengeId:string;devCode?:string}> {
   if (API_MODE === 'api') return http('/auth/register',{method:'POST',body:JSON.stringify(payload)});
   await wait(); const db = loadDB();
   if (db.users.some(u=>u.email.toLowerCase()===payload.email.toLowerCase())) throw new ApiError(409,'Email already exists');
-  const user: User = { uid:uid('user'), name:payload.name, email:payload.email, phone:payload.phone, role:payload.role, emergencyContact:payload.emergencyContact, status:'pending_verification' };
-  db.users.push(user);
-  if (payload.role==='patient') db.patients.push({ id:user.uid, userId:user.uid, nationalId:'29000000000000', name:payload.name, dateOfBirth:'1990-01-01', gender:'male', bloodGroup:'O+', phone:payload.phone, address:'', city:'Alexandria', allergies:[], chronicDiseases:[], emergencyContact:payload.emergencyContact!, primaryPhysician:'—', primaryPhysicianPhone:'—' });
-  saveDB(db);
+  const uidValue = uid('user');
   const code = String(Math.floor(100000+Math.random()*900000));
-  return { challengeId:uid('challenge'), devCode:code };
+  const challengeId = uid('challenge');
+  const user: User & {demoPassword?:string; pendingOtp?:string; challengeId?:string} = {
+    uid:uidValue, name:payload.name, email:payload.email, phone:payload.phone, role:payload.role,
+    emergencyContact:payload.emergencyContact, status:'pending_verification',
+    demoPassword:payload.password, pendingOtp:code, challengeId,
+  };
+  db.users.push(user);
+  if (payload.role==='patient') {
+    const p = payload.patient;
+    db.patients.push({ id:uidValue, userId:uidValue, nationalId:p?.nationalId||'', name:payload.name,
+      dateOfBirth:p?.dateOfBirth||'', gender:p?.gender||'male', bloodGroup:p?.bloodGroup||'O+', phone:payload.phone,
+      address:p?.address||'', city:p?.city||'', allergies:p?.allergies||[], chronicDiseases:p?.chronicDiseases||[],
+      emergencyContact:payload.emergencyContact!, primaryPhysician:'-', primaryPhysicianPhone:'-' });
+    db.emergencyProfiles.push({ token:uid('em'), patientId:uidValue, qrIssued:false, nfcIssued:false,
+      activatedAt:new Date().toISOString(), scanCount:0,
+      settings:{showBloodType:true,showAllergies:true,showConditions:true,showMedications:false,showContacts:true,aiChatbotEnabled:true} });
+  }
+  if (payload.role==='doctor') {
+    const d = payload.doctor;
+    db.doctors.push({ id:uidValue, userId:uidValue, name:payload.name, specialty:d?.specialty||'', licenseNumber:d?.licenseNumber||'', city:d?.city||'', clinicName:d?.clinicName||'', verified:false });
+  }
+  saveDB(db);
+  return { challengeId, devCode:code };
 }
 export async function verifyOtp(challengeId: string, code: string): Promise<Session> {
   if (API_MODE === 'api') return http('/auth/register/verify-otp',{method:'POST',body:JSON.stringify({challengeId,code})});
   await wait();
-  const db = loadDB(); const pending = db.users.find(u=>u.status==='pending_verification');
+  const db = loadDB();
+  const pending = db.users.find(u => (u as any).challengeId===challengeId && u.status==='pending_verification');
   if (!pending) throw new ApiError(404,'Pending registration not found');
-  pending.status = 'active'; saveDB(db);
+  if ((pending as any).pendingOtp !== code) throw new ApiError(400,'Incorrect verification code');
+  pending.status = 'active'; delete (pending as any).pendingOtp; saveDB(db);
   const s: Session = { token:`demo.jwt.${btoa(pending.uid)}`, user:pending, expiresAt:new Date(Date.now()+15*60000).toISOString() }; saveSession(s); return s;
 }
 export async function logout(): Promise<void> {
@@ -108,11 +138,11 @@ export async function chatbot(message: string, patient?: Patient): Promise<ChatT
   const q = message.toLowerCase();
   const scored = db.guidelines.filter(g => g.language === lang).map(g => ({ g, score:g.tags.reduce((a,t)=>a+(q.includes(t.toLowerCase())?1:0),0) + (q.includes(g.section.toLowerCase().split(' ')[0])?1:0) })).sort((a,b)=>b.score-a.score);
   const best = scored[0]?.score ? scored[0].g : undefined;
-  const conditionContext = patient ? `Patient: ${patient.name} — ${patient.chronicDiseases.join(', ') || 'no chronic conditions'}; allergies: ${patient.allergies.join(', ') || 'none'}; blood group ${patient.bloodGroup}. ` : '';
-  if (!best) return { role:'assistant', text:lang==='ar'?'لا أستطيع تقديم إرشادات لهذه الحالة. يرجى انتظار الإسعاف.':'I cannot provide guidance for this situation. Please wait for emergency services.', confidence:'Knowledge Gap', sources:[], disclaimer:lang==='ar'?'إرشادات إسعافات أولية فقط — ليست بديلاً عن الرعاية الطبية.':'First-aid guidance only — not a substitute for professional medical care.' };
+  const conditionContext = patient ? `Patient: ${patient.name} - ${patient.chronicDiseases.join(', ') || 'no chronic conditions'}; allergies: ${patient.allergies.join(', ') || 'none'}; blood group ${patient.bloodGroup}. ` : '';
+  if (!best) return { role:'assistant', text:lang==='ar'?'لا أستطيع تقديم إرشادات لهذه الحالة. يرجى انتظار الإسعاف.':'I cannot provide guidance for this situation. Please wait for emergency services.', confidence:'Knowledge Gap', sources:[], disclaimer:lang==='ar'?'إرشادات إسعافات أولية فقط - ليست بديلاً عن الرعاية الطبية.':'First-aid guidance only - not a substitute for professional medical care.' };
   const ar = lang === 'ar';
   const text = `${ar?'اتصل بالإسعاف (١٢٣) فوراً إن لم تكن قد فعلت ذلك.':'Call emergency services (123) immediately if you have not already.'}\n\n${conditionContext}${ar?'الإرشادات: ':'Guidance: '}${best.text}`;
-  return { role:'assistant', text, confidence:'High', sources:[`${best.source} §${best.section}`], disclaimer:ar?'إرشادات إسعافات أولية فقط — ليست بديلاً عن الرعاية الطبية.':'First-aid guidance only — not a substitute for professional medical care.' };
+  return { role:'assistant', text, confidence:'High', sources:[`${best.source} §${best.section}`], disclaimer:ar?'إرشادات إسعافات أولية فقط - ليست بديلاً عن الرعاية الطبية.':'First-aid guidance only - not a substitute for professional medical care.' };
 }
 export async function clinicalSummary(patientId: string): Promise<{ text:string; confidence:'High'|'Moderate'|'Low'|'Knowledge Gap'; sources:string[] }> {
   const db = loadDB(); const p = db.patients.find(x=>x.id===patientId); const recs = db.records.filter(r=>r.patientId===patientId);
