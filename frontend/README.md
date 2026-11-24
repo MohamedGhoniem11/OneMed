@@ -59,6 +59,19 @@ Then start the backend with Firebase credentials (see root README). `src/api/cli
 | `/app/hospital/*` | Institution overview, staff, API connections, de-identified analytics |
 | `/app/admin/*` | Overview, staff, institutions, pharmacies, hash-chained audit, compliance reports, population health |
 
+## Keyboard and quality-of-life controls
+
+| Control | What it does |
+|---------|--------------|
+| Back button (top bar, public pages) | Goes back through in-app history; falls back to the current role's home when there is no prior route |
+| `Ctrl`/`Cmd` + `K` | Opens the quick-navigation palette for the current role; type to filter, arrows + Enter to open |
+| `/` | Focuses the global search field |
+| `Esc` | Closes any dialog or the quick-navigation palette |
+| Copy buttons | Copy the emergency QR URL or prescription fulfillment link to the clipboard |
+| DEMO DATA MODE flag | Opens a confirmed reset of all local sample data |
+
+Async screens show static layout-shaped skeletons while data loads. Navigation for the rail, palette and search comes from one shared role map (`src/components/nav.tsx`).
+
 ## Landing imagery
 
 The hero and NFC feature tile use a branded CSS visual. Image generation was unavailable in this environment (`Invalid credential`), so no unrelated stock photography is shipped. To use your own licensed photos, add `public/images/landing-hero.png` and `public/images/nfc-wristband.png` and replace the two commented image slots in `src/pages/public.tsx` (`hero-visual` and `accent-cell`).

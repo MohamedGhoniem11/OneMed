@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState } from 'react';
-import { X, CheckCircle2, AlertCircle } from 'lucide-react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { X, CheckCircle2, AlertCircle, ArrowLeft, Copy } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 type Toast = { id:number; message:string; error?:boolean };
 const ToastCtx = createContext<{toast:(m:string,error?:boolean)=>void}>({toast:()=>{}});
@@ -19,11 +20,54 @@ export function Field({label,hint,children}:{label:string;hint?:string;children:
 export function Empty({message}:{message?:string}) { const {t}=useTranslation(); return <div className="empty">{message || t('noRecords')}</div>; }
 export function Modal({title,children,onClose,footer}:{title:string;children:React.ReactNode;onClose:()=>void;footer?:React.ReactNode}) {
   const {t}=useTranslation();
-  return <div className="modal-backdrop" onClick={onClose}><div className="modal" onClick={e=>e.stopPropagation()} role="dialog" aria-label={title}>
+  useEffect(()=>{
+    const onKey=(e:KeyboardEvent)=>{ if(e.key==='Escape') onClose(); };
+    document.addEventListener('keydown',onKey);
+    return ()=>document.removeEventListener('keydown',onKey);
+  },[onClose]);
+  return <div className="modal-backdrop" onClick={onClose}><div className="modal" onClick={e=>e.stopPropagation()} role="dialog" aria-modal="true" aria-label={title}>
     <div className="modal-head"><h3>{title}</h3><button className="btn sm" onClick={onClose} aria-label={t('close')}><X size={16}/></button></div>
     <div className="modal-body">{children}</div>{footer && <div className="modal-foot">{footer}</div>}
   </div></div>;
 }
+
+/** Back navigation that falls back to a known safe route when there is no in-app history. */
+export function BackButton({fallback,label,floating=false}:{fallback:string;label?:string;floating?:boolean}) {
+  const navigate = useNavigate(); const location = useLocation(); const {t}=useTranslation();
+  const back = () => {
+    // React Router sets location.key to "default" only for the first entry in a session.
+    if (location.key && location.key !== 'default') navigate(-1);
+    else navigate(fallback);
+  };
+  return <button className={`btn sm outline back-btn ${floating?'floating':''}`} onClick={back} title={t('back')}>
+    <ArrowLeft size={15}/><span>{label || t('back')}</span>
+  </button>;
+}
+
+/** Copy a value with visible confirmation. Used for IDs, links and tokens. */
+export function CopyButton({value,label,compact=false}:{value:string;label?:string;compact?:boolean}) {
+  const {toast}=useToast(); const {t}=useTranslation();
+  const copy=async()=>{
+    try { await navigator.clipboard.writeText(value); toast(t('copied')); }
+    catch { toast('Copy is unavailable in this browser',true); }
+  };
+  return <button className={`btn sm outline copy-btn ${compact?'compact':''}`} onClick={()=>void copy()} title={label||t('copy')}>
+    <Copy size={compact?13:14}/>{!compact && <span>{label||t('copy')}</span>}
+  </button>;
+}
+
+/** Static placeholders that match final layout. No infinite shimmer animation. */
+export function Skeleton({lines=3,table=false}:{lines?:number;table?:boolean}) {
+  return <div className="skeleton" aria-hidden="true">
+    {table ? <div className="skeleton-table">{Array.from({length:Math.max(3,lines)},(_,i)=><div className="skeleton-row" key={i}><i/><i/><i/></div>)}</div>
+      : Array.from({length:lines},(_,i)=><div className="skeleton-line" key={i} style={{width:`${90-i*14}%`}}/>)}
+  </div>;
+}
+export function SkeletonCards({count=4}:{count?:number}) {
+  return <div className="grid cols-4">{Array.from({length:count},(_,i)=><div className="card skeleton-card" key={i}><Skeleton lines={2}/></div>)}</div>;
+}
+
+export function Kbd({children}:{children:React.ReactNode}) { return <kbd className="kbd">{children}</kbd>; }
 export function Tabs({tabs,active,onChange}:{tabs:{id:string;label:string}[];active:string;onChange:(id:string)=>void}) {
   return <div className="tabs" role="tablist">{tabs.map(x=><button key={x.id} role="tab" aria-selected={active===x.id} className={`tab ${active===x.id?'active':''}`} onClick={()=>onChange(x.id)}>{x.label}</button>)}</div>;
 }

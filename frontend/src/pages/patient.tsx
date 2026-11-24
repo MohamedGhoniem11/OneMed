@@ -14,18 +14,22 @@ import {
 import * as api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import type { Patient, MedicalRecord, Prescription, Consent, EmergencyProfile, Notification, Conversation, Message, AuditEntry } from '../types';
-import { Badge, Card, Chip, Empty, Field, IdentityStrip, MetricCard, Modal, PageHead, SectionTabs, Stat, StatusBadge, Tabs, useToast } from '../components/ui';
+import { Badge, Card, Chip, CopyButton, Empty, Field, IdentityStrip, MetricCard, Modal, PageHead, SectionTabs, SkeletonCards, Stat, StatusBadge, Tabs, useToast } from '../components/ui';
 
 const RECORD_COLORS:Record<string,string> = { lab:'blue', imaging:'purple', prescription:'green', note:'gray', visit:'blue', vitals:'teal' };
 
 export function PatientDashboard() {
   const { session } = useAuth(); const { t } = useTranslation(); const nav = useNavigate();
-  const [patient,setPatient] = useState<Patient|null>(null); const [records,setRecords] = useState<MedicalRecord[]>([]); const [rx,setRx] = useState<Prescription[]>([]);
-  useEffect(()=>{ api.getPatient(session!.user.uid).then(setPatient); api.list<MedicalRecord>('records',r=>r.patientId===session!.user.uid).then(a=>setRecords(a.sort((x,y)=>y.date.localeCompare(x.date)))); api.list<Prescription>('prescriptions',r=>r.patientId===session!.user.uid).then(setRx); },[]);
+  const [patient,setPatient] = useState<Patient|null>(null); const [records,setRecords] = useState<MedicalRecord[]>([]); const [rx,setRx] = useState<Prescription[]>([]); const [loading,setLoading]=useState(true);
+  useEffect(()=>{ Promise.all([
+    api.getPatient(session!.user.uid).then(setPatient),
+    api.list<MedicalRecord>('records',r=>r.patientId===session!.user.uid).then(a=>setRecords(a.sort((x,y)=>y.date.localeCompare(x.date)))),
+    api.list<Prescription>('prescriptions',r=>r.patientId===session!.user.uid).then(setRx),
+  ]).finally(()=>setLoading(false)); },[]);
   const abnormal = records.flatMap(r=>r.values||[]).filter(v=>v.flag && v.flag!=='normal');
   return <>
     <PageHead title={`${t('welcomeBack')}, ${patient?.name.split(' ')[0]||session?.user.name.split(' ')[0]}`} subtitle={`${t('dashboard')} - ${new Date().toLocaleDateString()}`} actions={<Link className="btn primary" to="/app/patient/analytics"><BarChart3 size={16}/> {t('analytics')}</Link>}/>
-    <div className="grid cols-4">
+    {loading ? <SkeletonCards/> : <><div className="grid cols-4">
       <Stat label={t('records')} value={records.length} sub={`${records.filter(r=>r.type==='lab').length} ${t('lab')}`}/>
       <Stat label={t('activeMedications')} value={rx.reduce((a,r)=>a+r.medicines.length,0)}/>
       <Stat label="Blood Group" value={patient?.bloodGroup||'-'}/>
@@ -43,7 +47,7 @@ export function PatientDashboard() {
         <Card title={t('prescriptions')}>{rx.map(r=><div key={r.id} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--line)'}}><div><strong>{r.medicines.map(m=>m.name).join(', ')}</strong><div style={{fontSize:12,color:'var(--muted)'}}>{r.doctorName} · {new Date(r.date).toLocaleDateString()}</div></div><StatusBadge status={r.orderStatus||r.status}/></div>)}{!rx.length&&<Empty/>}</Card>
         <Card title={t('emergencyQr')}><p style={{color:'var(--muted)'}}>Your QR wearable gives bystanders instant access to approved critical information.</p><Link className="btn primary" to="/app/patient/emergency"><QrCode size={16}/> {t('configure')}</Link></Card>
       </div>
-    </div>
+    </div></>}
   </>;
 }
 
@@ -132,7 +136,7 @@ export function PatientEmergencyConfig() {
   return <><PageHead title={t('emergencyQr')} subtitle="Choose what bystanders see when they scan your QR wearable."/>
     <Tabs tabs={[{id:'settings',label:t('settings')},{id:'qr',label:'QR / NFC'}]} active={tab} onChange={setTab}/>
     {tab==='settings'?<Card title={t('dataPrivacy')}>{fields.map(([k,label])=><div key={k} style={{display:'flex',justifyContent:'space-between',padding:'12px 0',borderBottom:'1px solid var(--line)'}}><strong>{label}</strong><button className={`btn sm ${profile?.settings[k]?'primary':'outline'}`} onClick={()=>toggle(k)}>{profile?.settings[k]?t('yes'):t('no')}</button></div>)}<p className="disclaimer" style={{marginTop:14}}>Full medical records stay behind authentication. Network and scan logs are kept for security.</p></Card>
-    :<div className="grid cols-2"><Card title="Emergency QR"><div style={{textAlign:'center'}}>{qr?<img src={qr} alt="Emergency QR" style={{width:200,height:200}}/>:<div className="empty">Generating…</div>}<div className="disclaimer" style={{marginTop:12}}>{location.origin}/emergency/{profile?.token}</div><a className="btn primary" style={{marginTop:12}} href={qr} download="onemed-emergency-qr.png"><Download size={16}/> {t('downloadQr')}</a></div></Card>
+    :<div className="grid cols-2"><Card title="Emergency QR"><div style={{textAlign:'center'}}>{qr?<img src={qr} alt="Emergency QR" style={{width:200,height:200}}/>:<div className="empty">Generating…</div>}<div className="disclaimer" style={{marginTop:12}}>{location.origin}/emergency/{profile?.token} {profile && <CopyButton value={`${location.origin}/emergency/${profile.token}`} compact/>}</div><a className="btn primary" style={{marginTop:12}} href={qr} download="onemed-emergency-qr.png"><Download size={16}/> {t('downloadQr')}</a></div></Card>
       <Card title="NFC Wristband"><p style={{color:'var(--muted)'}}>NTAG 424 DNA wristband linked to this profile.</p><dl style={{lineHeight:2}}><dt style={{color:'var(--muted)'}}>Status</dt><dd>{profile?.nfcIssued?t('active'):'Not issued'}</dd><dt style={{color:'var(--muted)'}}>UID</dt><dd>{profile?.nfcUid||'-'}</dd><dt style={{color:'var(--muted)'}}>{t('scanQr')}</dt><dd>{profile?.scanCount||0}</dd></dl><Link className="btn outline" to={`/nfc/${profile?.token}`}>{t('view')} NFC page</Link></Card></div>}
   </>;
 }

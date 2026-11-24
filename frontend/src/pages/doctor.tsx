@@ -13,12 +13,12 @@ import {
 import * as api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import type { Patient, MedicalRecord, Prescription, Medicine, Consent, AuditEntry, ChatTurn, Conversation, Message } from '../types';
-import { Badge, Card, Empty, Field, IdentityStrip, Modal, PageHead, SectionTabs, Stat, StatusBadge, Tabs, useToast } from '../components/ui';
+import { Badge, Card, CopyButton, Empty, Field, IdentityStrip, Modal, PageHead, SectionTabs, SkeletonCards, Stat, StatusBadge, Tabs, useToast } from '../components/ui';
 
 export function DoctorDashboard() {
   const { session } = useAuth(); const { t } = useTranslation(); const nav = useNavigate();
-  const [patients,setPatients]=useState<Patient[]>([]); const [rx,setRx]=useState<Prescription[]>([]); const [q,setQ]=useState('');
-  useEffect(()=>{ api.list<Patient>('patients').then(setPatients); api.list<Prescription>('prescriptions',x=>x.doctorId===session!.user.uid).then(setRx); },[]);
+  const [patients,setPatients]=useState<Patient[]>([]); const [rx,setRx]=useState<Prescription[]>([]); const [q,setQ]=useState(''); const [loading,setLoading]=useState(true);
+  useEffect(()=>{ Promise.all([api.list<Patient>('patients').then(setPatients), api.list<Prescription>('prescriptions',x=>x.doctorId===session!.user.uid).then(setRx)]).finally(()=>setLoading(false)); },[]);
   const filtered = patients.filter(p=>`${p.name} ${p.nationalId} ${p.phone}`.toLowerCase().includes(q.toLowerCase()));
   return <>
     <PageHead title={`Good Morning, ${session!.user.name.split(' ').slice(-1)[0]}`} subtitle={`${t('dashboard')} - ${new Date().toLocaleDateString()}`} actions={<span className="badge green">● {t('systemOnline')}</span>}/>
@@ -27,14 +27,14 @@ export function DoctorDashboard() {
       <button className="btn outline" onClick={()=>nav('/app/doctor/qr')}><ScanLine size={16}/> {t('nfcScanner')}</button>
       <button className="btn outline" onClick={()=>nav('/app/doctor/qr')}><QrCode size={16}/> {t('qrGenerator')}</button>
       <Link className="btn navy" to="/app/doctor/prescriptions"><Plus size={16}/> {t('newConsultation')}</Link></div>
-    <div className="grid cols-2"><Card title={t('recentPatients')} action={<Link className="btn sm" to="/app/doctor/patients">{t('viewAll')}</Link>} pad={false}>
+    {loading ? <SkeletonCards/> : <div className="grid cols-2"><Card title={t('recentPatients')} action={<Link className="btn sm" to="/app/doctor/patients">{t('viewAll')}</Link>} pad={false}>
       <div className="table-wrap"><table className="tbl"><thead><tr><th>{t('patient')}</th><th>{t('nationalId')}</th><th>{t('status')}</th><th>{t('action')}</th></tr></thead><tbody>
         {filtered.map(p=><tr key={p.id}><td><strong>{p.name}</strong><div style={{fontSize:12,color:'var(--muted)'}}>{p.gender==='male'?'M':'F'} · {p.city}</div></td><td style={{fontFamily:'monospace',fontSize:12}}>{p.nationalId}</td><td><StatusBadge status={p.chronicDiseases.length>1?'in_progress':'waiting'}/></td><td><Link className="btn sm primary" to={`/app/doctor/patients/${p.id}`}>{t('view')}</Link></td></tr>)}
       </tbody></table>{!filtered.length&&<Empty/>}</div></Card>
       <div className="grid" style={{gap:16}}><Card title={t('quickStats')}><div className="grid cols-2"><Stat label={t('patients')} value={patients.length}/><Stat label={t('pending')} value={rx.filter(r=>r.extractionStatus!=='confirmed').length}/></div></Card>
       <Card title={t('pending')} pad={false}><div className="card-body">{rx.filter(r=>r.extractionStatus!=='confirmed').map(r=><div key={r.id} style={{padding:'8px 0',borderBottom:'1px solid var(--line)'}}><strong>{r.medicines.map(m=>m.name).join(', ')}</strong><div style={{fontSize:12,color:'var(--muted)'}}>{r.patientName} · Review & sign</div><Link className="btn sm primary" to="/app/doctor/prescriptions">Review</Link></div>)}{rx.every(r=>r.extractionStatus==='confirmed')&&<Empty message="Nothing pending"/>}</div></Card>
       <Card title={t('aiAssistant')}><p style={{color:'var(--muted)'}}>{t('clinicalSummary')} with confidence and citations.</p><Link className="btn primary" to="/app/doctor/patients/user_patient_1"><Sparkles size={16}/> Open patient</Link></Card></div>
-    </div>
+    </div>}
   </>;
 }
 
@@ -117,7 +117,7 @@ export function DoctorPrescriptions() {
         <button className="btn sm" style={{marginTop:8}} onClick={()=>setItems(a=>[...a,{name:'',dosage:'',frequency:'',duration:''}])}><Plus size={14}/> {t('addMedication')}</button>
         <p className="disclaimer" style={{marginTop:12}}>AI-extracted from OCR text. Errors may occur; the doctor is responsible for verifying every field before a link is generated. No drug-interaction checking in this version.</p>
         <div style={{display:'flex',gap:8,marginTop:12}}><button className="btn outline" onClick={()=>setItems([])}>{t('edit')}</button><button className="btn primary" onClick={()=>void confirm()} disabled={busy||!items.length}>{t('confirmGenerateLink')}</button></div>
-        {link && <div className="alert green" style={{marginTop:12}}><CheckCircle2 size={16}/> {link}<br/><Link to={`/f/${link.split('/f/')[1]}`}>Open fulfillment page</Link></div>}
+        {link && <div className="alert green" style={{marginTop:12}}><CheckCircle2 size={16}/> {link}<br/><Link to={`/f/${link.split('/f/')[1]}`}>Open fulfillment page</Link> <CopyButton value={link} label="Copy link"/></div>}
       </div></Card>
     </div></>}
   </>;

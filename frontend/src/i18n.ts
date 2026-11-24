@@ -89,6 +89,10 @@ export const resources = {
       uploadHint: 'Supports PDF, JPG, PNG, CSV/JSON, FHIR, DICOM - up to 50MB', processingComplete: 'Processing Complete',
       importBatch: 'Import batch', saveEntry: 'Save entry', latestLabel: 'Latest',
       lipidTotal: 'Total Chol', lipidLdl: 'LDL (Bad)', lipidHdl: 'HDL (Good)', lipidTrig: 'Triglycerides',
+      menu: 'Menu', quickNav: 'Quick navigation', searchScreens: 'Search screens or paths', navigate: 'to navigate',
+      open: 'to open', copied: 'Copied to clipboard', copy: 'Copy', resetDemo: 'Reset demo data',
+      demoReset: 'Demo data reset. Reloading...', resetDemoHint: 'This clears all local changes and restores the original sample records, accounts and settings.',
+      refresh: 'Refresh', lastUpdated: 'Last updated',
     },
   },
   ar: {
@@ -178,6 +182,10 @@ export const resources = {
       uploadHint: 'يدعم PDF و JPG و PNG و CSV/JSON و FHIR و DICOM - حتى ٥٠ ميجابايت', processingComplete: 'اكتملت المعالجة',
       importBatch: 'استيراد الدفعة', saveEntry: 'حفظ الإدخال', latestLabel: 'الأحدث',
       lipidTotal: 'الكوليسترول الكلي', lipidLdl: 'LDL (ضار)', lipidHdl: 'HDL (مفيد)', lipidTrig: 'الدهون الثلاثية',
+      menu: 'القائمة', quickNav: 'التنقل السريع', searchScreens: 'ابحث عن الشاشات أو المسارات', navigate: 'للتنقل',
+      open: 'للفتح', copied: 'تم النسخ', copy: 'نسخ', resetDemo: 'إعادة ضبط البيانات التجريبية',
+      demoReset: 'تمت إعادة الضبط. جارٍ التحديث...', resetDemoHint: 'سيؤدي هذا إلى مسح كل التغييرات المحلية واستعادة السجلات والحسابات والإعدادات الأصلية.',
+      refresh: 'تحديث', lastUpdated: 'آخر تحديث',
     },
   },
 } as const;

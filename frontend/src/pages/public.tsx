@@ -9,7 +9,7 @@ import {
 import { useAuth } from '../auth/AuthContext';
 import * as api from '../api/client';
 import type { ChatTurn, EmergencySettings, Patient, Prescription, Pharmacy, Role } from '../types';
-import { Badge, Card, Empty, Field, Modal, PageHead, StatusBadge, useToast } from '../components/ui';
+import { BackButton, Badge, Card, CopyButton, Empty, Field, Modal, PageHead, StatusBadge, useToast } from '../components/ui';
 
 export function Landing() {
   const { t, i18n } = useTranslation(); const navigate = useNavigate();
@@ -173,7 +173,7 @@ export function EmergencyPage() {
   const send = async (text:string) => { if(!text.trim()) return; setChat(p=>[...p,{role:'user',text}]); setMsg(''); const reply = await api.chatbot(text, data?.patient); setChat(p=>[...p,reply]); };
   const p = data?.patient; const s = data?.settings;
   return <div className="public-shell">
-    <div className="public-top"><span className="logo">OneMed</span><span style={{fontSize:12}}>{t('noLogin')}</span><button className="btn sm" style={{background:'transparent',color:'#fff'}} onClick={()=>i18n.changeLanguage(i18n.language==='en'?'ar':'en')}><Languages size={14}/></button></div>
+    <div className="public-top"><span className="logo">OneMed</span><span style={{fontSize:12}}>{t('noLogin')}</span><div style={{flex:1}}/><BackButton fallback="/"/><button className="btn sm" style={{background:'transparent',color:'#fff'}} onClick={()=>{const next=i18n.language==='en'?'ar':'en';localStorage.setItem('onemed.lang',next);void i18n.changeLanguage(next);document.documentElement.dir=next==='ar'?'rtl':'ltr';}}><Languages size={14}/></button></div>
     <div className="public-wrap">
       <Card pad={false}><div className="card-body" style={{display:'flex',gap:14,alignItems:'center'}}><div className="avatar" style={{width:54,height:54,fontSize:18}}>{p?.name.slice(0,2).toUpperCase()}</div><div><h2>{p?.name||'…'}</h2><div style={{color:'var(--muted)'}}>DOB: {p?.dateOfBirth}</div>{s?.showBloodType && <div className="chip"><DropletIcon/> {p?.bloodGroup} {t('bloodGroup')}</div>}</div></div></Card>
       {s?.showAllergies && <Card title={t('criticalAllergies')}><div className="alert red"><strong>{p?.allergies.join(', ')||'-'}</strong></div></Card>}
@@ -207,7 +207,7 @@ function DropletIcon(){ return <span style={{fontSize:14}}>🩸</span>; }
 
 export function NfcLanding() {
   const { token='' } = useParams(); const { t } = useTranslation(); const nav = useNavigate();
-  return <div className="public-shell"><div className="public-top"><span className="logo">OneMed</span><span style={{fontSize:12}}>NFC / QR</span></div>
+  return <div className="public-shell"><div className="public-top"><span className="logo">OneMed</span><span style={{fontSize:12}}>NFC / QR</span><div style={{flex:1}}/><BackButton fallback="/"/></div>
     <div className="public-wrap" style={{paddingTop:50}}><Card title="OneMed Patient ID" pad><p style={{color:'var(--muted)'}}>This wristband links to a verified OneMed patient profile.</p>
       <button className="btn navy" style={{width:'100%',marginBottom:10}} onClick={()=>nav('/login')}><Stethoscope size={16}/> {t('patientDashboard')} ({t('login')})</button>
       <button className="btn outline" style={{width:'100%'}} onClick={()=>nav(`/emergency/${token}`)}><HeartPulseIcon size={16}/> {t('emergencyInfo')}</button>
@@ -238,7 +238,7 @@ export function FulfillmentPage() {
     const url = `https://wa.me/${p.whatsapp.replace(/\D/g,'')}?text=${encodeURIComponent(text)}`;
     api.mutate(db=>{ const r=db.prescriptions.find(x=>x.id===rx.id); if(r){r.pharmacyId=p.id;r.orderStatus='received';r.whatsappUrl=url;} }).then(()=>{ window.open(url,'_blank'); toast(t('orderPlaced')); });
   };
-  return <div className="public-shell"><div className="public-top"><span className="logo">OneMed</span><span style={{fontSize:12}}>{t('prescriptions')}</span></div>
+  return <div className="public-shell"><div className="public-top"><span className="logo">OneMed</span><span style={{fontSize:12}}>{t('prescriptions')}</span><div style={{flex:1}}/><BackButton fallback="/"/></div>
     <div className="public-wrap" style={{maxWidth:680}}>
       <PageHead title={t('selectPharmacy')} subtitle={rx?`${rx.patientName} - ${rx.medicines.length} ${t('extractedMedicines').toLowerCase()}`:''}/>
       {rx && <Card title={t('extractedMedicines')}><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('medicine')}</th><th>{t('dosage')}</th><th>{t('frequency')}</th><th>{t('duration')}</th></tr></thead><tbody>{rx.medicines.map((m,i)=><tr key={i}><td>{m.name}</td><td>{m.dosage}</td><td>{m.frequency}</td><td>{m.duration}</td></tr>)}</tbody></table></div><div className="disclaimer" style={{marginTop:10}}>{rx.linkExpiresAt && `${t('expires')}: ${new Date(rx.linkExpiresAt).toLocaleString()}`}</div></Card>}

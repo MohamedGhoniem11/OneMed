@@ -5,7 +5,7 @@ import { ShieldCheck, Clock, AlertTriangle } from 'lucide-react';
 import * as api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import type { Patient } from '../types';
-import { Badge, Card, useToast } from '../components/ui';
+import { BackButton, Badge, Card, useToast } from '../components/ui';
 
 interface Connection { token:string; doctorId:string; doctorName:string; createdAt:string; expiresAt:string }
 
@@ -32,7 +32,7 @@ export function ConsentQrPage({ token }: { token:string }) {
     });
     setGranted(true); toast(t('consentGranted'));
   };
-  return <div className="auth-wrap"><div className="auth-card"><div className="head"><h2>{t('consentPrompt')}</h2><p style={{color:'var(--muted)'}}>Connection token: {token}</p></div><div style={{padding:24}}>
+  return <div className="auth-wrap"><div className="auth-card"><div className="head" style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start'}}><div><h2>{t('consentPrompt')}</h2><p style={{color:'var(--muted)'}}>Connection token: {token}</p></div><BackButton fallback="/"/></div><div style={{padding:24}}>
     {expired && <div className="alert red"><AlertTriangle size={16}/> This connection QR has expired. Ask the doctor to generate a new one.</div>}
     {!expired && conn && <>
       <div className="alert blue"><ShieldCheck size={16}/> <strong>{conn.doctorName}</strong> requests access to your medical records for treatment.</div>
