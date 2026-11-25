@@ -109,11 +109,12 @@ available).
 | Complete role-based frontend | Implemented | every documented portal/page; demo-data mode by default, REST-ready via `VITE_API_MODE=api` |
 | Automated tests + CI | Implemented | Vitest/Supertest, ESLint, GitHub Actions |
 | Medical ingestion API (M2) | Implemented | PDF/image/CSV/JSON/FHIR/DICOM + manual entry, AES-256-GCM originals, <80% review gate |
-| Patient/lab/pharmacy portals | Partial | UI complete; patient/lab wired to real APIs, pharmacy still demo-only |
+| Patient/lab/pharmacy portals | Implemented | patient/lab/pharmacy screens wired to REST APIs with demo fallbacks |
 | Consent, audit hash chain, QR/NFC | Implemented | scoped consent, hash chain, signed 15-min QR and NFC tokens, emergency override |
 | Emergency RAG chatbot / Gemini | Implemented | privacy-filtered public page, signed QR, 123-first grounded answers with citations |
 | Fulfillment link + GPS pharmacy match | Implemented | 24h signed links, GPS-sorted pharmacies, WhatsApp orders |
-| Analytics, reports, bilingual PWA | Planned | M6–M7 |
+| Clinical AI, analytics, reports, credits | Implemented | grounded summaries, patient/population analytics, 5 reports (PDF/FHIR/CSV/JSON), credit ledger |
+| Bilingual PWA / accessibility polish | Planned | M7 |
 
 ---
 
@@ -217,6 +218,15 @@ Base path: `/api`. Protected routes require `Authorization: Bearer <token>`.
 | GET/POST | `/api/messages/conversations` | signed-in | Conversations |
 | GET/POST | `/api/messages/conversations/:id/messages` | participant | Messages |
 | GET | `/api/notifications` | signed-in | In-app notification center |
+| GET | `/api/analytics/clinical/:patientId/summary` | patient/doctor/admin (consent-gated) | Grounded clinical summary with confidence, sources and disclaimer |
+| GET | `/api/analytics/patient/:patientId` | patient/doctor/admin (consent-gated) | Lab trends, BP, lipids, medications, health score |
+| GET | `/api/analytics/population` | hospital_admin/admin | De-identified aggregate analytics |
+| GET | `/api/analytics/credits` | doctor/lab_staff/hospital_admin/admin | Institution credit balance |
+| GET | `/api/reports/:type?format=pdf\|csv\|json\|fhir\|text` | patient/doctor/hospital_admin/admin | Reports: `history`, `labs`, `clinical-summary`, `audit`, `population` |
+
+**Reports:** `history` and `labs` export FHIR R4 Bundles/DiagnosticReports; `audit` and `population` export CSV; every type exports PDF. All five report generations are audit logged.
+
+**Documented heuristics (OQ17):** the patient health score is the percentage of tracked indicators inside their reference range (0 when no numeric indicator exists); contribution credits award 10 per verified (non-review) upload to the uploading institution. Reference ranges are illustrative catalog values in `src/utils/clinical-values.js`, not a diagnostic device.
 
 **Fulfillment:** links expire after `FULFILLMENT_TTL_SECONDS` (default 24h); pharmacy selection is GPS-sorted and generates a `wa.me` deep link with structured medicines. FCM device push is not configured in this environment; notifications are available in-app.
 
@@ -366,7 +376,7 @@ documented in the final submission, not hidden.
 - **M3** — patient search, record timeline, consent QR, NFC landing
 - **M4** — patient portal, emergency QR/public page, first-aid RAG chatbot
 - **M5** — doctor confirmation gate, 24h fulfillment link, GPS pharmacy match, WhatsApp, messaging
-- **M6** — clinical summary, analytics, reports, population metrics
+- **M6** ✅ — clinical summary, analytics, reports, population metrics, credit ledger
 - **M7** — Arabic/English RTL, PWA, landing page, accessibility
 - **M8** — hardening, measured performance, UAT, traceability/demo/limitations docs
 

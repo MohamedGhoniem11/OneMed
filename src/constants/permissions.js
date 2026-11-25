@@ -20,7 +20,10 @@ export const PERMISSIONS = Object.freeze({
   "consents:read": ["patient", "doctor", "admin"],
   "consents:revoke": ["patient", "admin"],
   "pharmacy:orders": ["pharmacy", "admin"],
-  "reports:read": ["doctor", "hospital_admin", "admin"],
+  "reports:read": ["patient", "doctor", "hospital_admin", "admin"],
+  "analytics:read": ["patient", "doctor", "hospital_admin", "admin"],
+  "analytics:population": ["hospital_admin", "admin"],
+  "credits:read": ["doctor", "lab_staff", "hospital_admin", "admin"],
 });
 
 export function can(role, permission) {

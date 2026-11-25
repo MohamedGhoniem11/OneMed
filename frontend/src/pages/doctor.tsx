@@ -197,32 +197,33 @@ export function DoctorMessages() {
 
 export function DoctorReports() {
   const { t } = useTranslation(); const {toast}=useToast(); const {session}=useAuth();
-  const [type,setType]=useState('clinical'); const [patient,setPatient]=useState('user_patient_1'); const [patients,setPatients]=useState<Patient[]>([]); const [out,setOut]=useState('');
-  useEffect(()=>{api.searchPatients('').then(setPatients);},[]);
-  const generate=async()=>{
-    const p=await api.getPatient(patient);
-    const header = `${t('reports')}: ${type.toUpperCase()}\n${t('generated')}: ${new Date().toLocaleString()}\n`;
-    let body = '';
-    if(type==='audit'||type==='population') {
-      const entries=await api.list<AuditEntry>('audit');
-      body = type==='audit'
-        ? `Access events: ${entries.length}\n${entries.slice(0,12).map(e=>`${new Date(e.timestamp).toLocaleString()} | ${e.actorName} | ${e.action} | ${e.resource}`).join('\n')}\nHash chain: append-only SHA-256 verification available in admin audit.`
-        : `De-identified population summary (no patient identifiers)\n${(await api.searchPatients('')).map(x=>`${x.city} | ${x.chronicDiseases.join(', ')||'none'}`).join('\n')}`;
-    } else {
-      const records=(await api.listRecords(patient)).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
-      const s=await api.clinicalSummary(patient);
-      body = `Patient: ${p?.name||'-'}\nNational ID: ${p?.nationalId||'-'}\nBlood group: ${p?.bloodGroup||'-'}\n\n`;
-      body += type==='clinical' ? s.text
-        : records.map(r=>`${new Date(r.date).toLocaleDateString()} | ${r.type.toUpperCase()} | ${r.title} | ${r.institution}\n  ${r.summary||''}\n  ${(r.values||[]).map(v=>`${v.name}: ${v.value} ${v.unit} (${v.referenceLow}-${v.referenceHigh})${v.flag&&v.flag!=='normal'?` [${v.flag.toUpperCase()}]`:''}`).join('\n  ')}`).join('\n\n');
-      if(type==='clinical') body += `\n\nConfidence: ${s.confidence}\nSources: ${s.sources.join(', ')}\n${t('aiDisclaimer')}`;
-    }
-    setOut(`${header}\n${body}`);
-    await api.mutate(db=>{db.audit.push({id:`a_${Date.now()}`,actor:session!.user.uid,actorName:session!.user.name,action:'report_generated',resource:`report:${type}`,patientId:type==='audit'||type==='population'?undefined:patient,timestamp:new Date().toISOString(),ip:'127.0.0.1',hash:'',previousHash:''});});
-    toast(t('reportGenerated'));
-  };
-  const download=(fmt:string)=>{ const blob=new Blob([out],{type:'text/plain'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`onemed-${type}-report.${fmt}`; a.click(); };
-  return <><PageHead title={t('reports')} subtitle="Generate, print and export clinical documents."/><div className="grid cols-2"><Card title="Generate report"><Field label="Report type"><select className="input" value={type} onChange={e=>setType(e.target.value)}><option value="history">Patient Medical History</option><option value="lab">Lab Results</option><option value="clinical">Clinical Summary</option><option value="audit">Audit & Compliance</option><option value="population">Population Health</option></select></Field><Field label={t('patient')}><select className="input" value={patient} onChange={e=>setPatient(e.target.value)}>{patients.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></Field><button className="btn primary" onClick={()=>void generate()}>{t('generate')}</button><p className="disclaimer" style={{marginTop:12}}>{t('reportExpires')}</p></Card>
-    <Card title="Output"><pre style={{whiteSpace:'pre-wrap',fontSize:12,maxHeight:320,overflow:'auto'}}>{out||'-'}</pre><div style={{display:'flex',gap:6,flexWrap:'wrap'}}><button className="btn sm outline" onClick={()=>download('txt')}>{t('download')} TXT</button><button className="btn sm outline" onClick={()=>window.print()}>{t('exportPdf')}</button><button className="btn sm outline" onClick={async()=>{const recs=await api.listRecords(patient);const bundle={resourceType:'Bundle',type:'collection',entry:recs.map(r=>({resource:r.type==='lab'?{resourceType:'DiagnosticReport',status:'final',code:{text:r.title},effectiveDateTime:r.date,result:(r.values||[]).map(v=>({resourceType:'Observation',status:'final',code:{text:v.name},valueQuantity:{value:v.value,unit:v.unit},referenceRange:[{low:{value:v.referenceLow},high:{value:v.referenceHigh}}]}))}:{resourceType:'DocumentReference',status:'current',type:{text:r.type},date:r.date,description:r.title,content:[{attachment:{title:r.institution}}]}}))};const b=new Blob([JSON.stringify(bundle,null,2)],{type:'application/fhir+json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='onemed-fhir-bundle.json';a.click();}}>{t('exportFhir')}</button></div></Card></div></>;
+  const [type,setType]=useState('history'); const [patient,setPatient]=useState(''); const [patients,setPatients]=useState<Patient[]>([]);
+  const [out,setOut]=useState(''); const [busy,setBusy]=useState(false);
+  const isAdmin = session?.user.role==='admin' || session?.user.role==='hospital_admin';
+  useEffect(()=>{ void api.searchPatients('').then(a=>{setPatients(a);setPatient(p=>p||a[0]?.id||'');}); },[]);
+  const preview=async()=>{ setBusy(true); try{ setOut(await api.reportText(type,{patientId:patient})); }catch(e:any){ toast(e.message,true); } finally{ setBusy(false); } };
+  const download=async(fmt:string)=>{ try{ await api.downloadReport(type,{patientId:patient,format:fmt}); toast(t('reportGenerated')); }catch(e:any){ toast(e.message,true); } };
+  const needsPatient = !['audit','population'].includes(type);
+  return <><PageHead title={t('reports')} subtitle="Generate, print and export clinical documents from real records."/><div className="grid cols-2"><Card title="Generate report">
+    <Field label="Report type"><select className="input" value={type} onChange={e=>{setType(e.target.value);setOut('');}}>
+      <option value="history">Patient Medical History (PDF/FHIR/CSV)</option>
+      <option value="labs">Lab Results (PDF/FHIR/CSV)</option>
+      <option value="clinical-summary">Clinical Summary (PDF/text)</option>
+      {isAdmin && <option value="audit">Audit & Compliance (PDF/CSV)</option>}
+      {isAdmin && <option value="population">Population Health (PDF/CSV/JSON)</option>}
+    </select></Field>
+    {needsPatient && <Field label={t('patient')}><select className="input" value={patient} onChange={e=>setPatient(e.target.value)}>{patients.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>}
+    <button className="btn primary" onClick={()=>void preview()} disabled={busy||(needsPatient&&!patient)}>{t('generate')} preview</button>
+    <p className="disclaimer" style={{marginTop:12}}>{t('reportExpires')}</p>
+  </Card>
+  <Card title="Output"><pre style={{whiteSpace:'pre-wrap',fontSize:12,maxHeight:320,overflow:'auto'}}>{out||t('generate')+' a preview…'}</pre>
+    <div style={{display:'flex',gap:6,flexWrap:'wrap',marginTop:12}}>
+      <button className="btn sm outline" onClick={()=>void download('pdf')} disabled={needsPatient&&!patient}>{t('exportPdf')}</button>
+      <button className="btn sm outline" onClick={()=>void download('csv')} disabled={needsPatient&&!patient}>{t('download')} CSV</button>
+      <button className="btn sm outline" onClick={()=>void download('json')} disabled={needsPatient&&!patient}>{t('download')} JSON</button>
+      {['history','labs'].includes(type)&&<button className="btn sm outline" onClick={()=>void download('fhir')} disabled={!patient}>{t('exportFhir')}</button>}
+    </div>
+  </Card></div></>;
 }
 
 export function DoctorSettings() { const {session}=useAuth(); const {t}=useTranslation(); return <><PageHead title={t('settings')} subtitle={t('clinicalIdentity')}/><Card><dl style={{lineHeight:2}}><dt style={{color:'var(--muted)'}}>{t('name')}</dt><dd>{session!.user.name}</dd><dt style={{color:'var(--muted)'}}>{t('email')}</dt><dd>{session!.user.email}</dd><dt style={{color:'var(--muted)'}}>MFA</dt><dd>{session!.user.mfaEnabled?<Badge tone="green">Enabled</Badge>:<Badge tone="amber">Not enabled</Badge>}</dd></dl></Card></>; }

@@ -48,6 +48,19 @@ export function sha256(buffer) {
   return crypto.createHash("sha256").update(buffer).digest("hex");
 }
 
+export function encryptBytes(buffer) {
+  const iv = crypto.randomBytes(IV_BYTES);
+  const cipher = crypto.createCipheriv("aes-256-gcm", getUploadKey(), iv);
+  const ciphertext = Buffer.concat([cipher.update(buffer), cipher.final()]);
+  return { iv, tag: cipher.getAuthTag(), ciphertext };
+}
+
+export function decryptBytes({ iv, tag, ciphertext }) {
+  const decipher = crypto.createDecipheriv("aes-256-gcm", getUploadKey(), Buffer.from(iv));
+  decipher.setAuthTag(Buffer.from(tag));
+  return Buffer.concat([decipher.update(Buffer.from(ciphertext)), decipher.final()]);
+}
+
 function safeSegment(value) {
   return String(value).replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80) || "unknown";
 }

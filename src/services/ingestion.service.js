@@ -9,6 +9,7 @@ import { extractPdfText } from "./pdf.service.js";
 import { normalizeCsv, normalizeDicom, normalizeJson, normalizeOcrText, normalizeType, toNumber, flagFor } from "./normalization.service.js";
 import { saveEncrypted, sha256 } from "./file-storage.service.js";
 import { canReadPatient } from "../middleware/consent.js";
+import { awardForUpload } from "./credit.service.js";
 
 const RECORDS = "records";
 const PATIENTS = "patients";
@@ -82,6 +83,7 @@ async function persistNormalized({ req, patientId, normalized, meta = {} }) {
     createdAt: new Date(),
     updatedAt: new Date(),
   });
+  if (!normalized.needsReview) await awardForUpload(req.user, { resourceId: record.id });
   await auditRequest(req, {
     action: "record_ingested",
     resourceType: "record",

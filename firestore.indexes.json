@@ -142,6 +142,26 @@
         { "fieldPath": "patientId", "order": "ASCENDING" },
         { "fieldPath": "otherUserId", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "credits",
+      "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "institutionId", "order": "ASCENDING" }]
+    },
+    {
+      "collectionGroup": "creditsLedger",
+      "queryScope": "COLLECTION",
+      "fields": [{ "fieldPath": "institutionId", "order": "ASCENDING" }]
+    },
+    {
+      "collectionGroup": "consents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "patientId", "order": "ASCENDING" },
+        { "fieldPath": "granteeType", "order": "ASCENDING" },
+        { "fieldPath": "granteeId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

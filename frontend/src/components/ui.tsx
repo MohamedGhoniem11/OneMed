@@ -88,9 +88,9 @@ const STATUS: Record<string,{tone:'green'|'amber'|'red'|'gray'|'blue';label?:str
   suspended:{tone:'red',label:'Suspended'}, revoked:{tone:'red',label:'Revoked'}, inactive:{tone:'gray',label:'Inactive'},
   archived:{tone:'gray',label:'Archived'}, stable:{tone:'green',label:'Stable'},
 };
-export function StatusBadge({status}:{status:string}) {
-  const s = STATUS[status] || {tone:'blue' as const};
-  return <Badge tone={s.tone}>{s.label || status.replace(/_/g,' ')}</Badge>;
+export function StatusBadge({status}:{status:string|null|undefined}) {
+  const s = STATUS[status||''] || {tone:'blue' as const};
+  return <Badge tone={s.tone}>{s.label || String(status||'unknown').replace(/_/g,' ')}</Badge>;
 }
 export function Chip({children,tone='blue'}:{children:React.ReactNode;tone?:'blue'|'green'|'red'|'amber'|'gray'}) {
   return <span className={`chip ${tone}`}>{children}</span>;

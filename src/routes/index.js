@@ -14,6 +14,8 @@ import fulfillmentRoutes from "./fulfillment.routes.js";
 import pharmacyRoutes from "./pharmacy.routes.js";
 import messagingRoutes from "./messaging.routes.js";
 import notificationRoutes from "./notification.routes.js";
+import analyticsRoutes from "./analytics.routes.js";
+import reportRoutes from "./report.routes.js";
 import auditRoutes from "./audit.routes.js";
 
 const router = Router();
@@ -33,6 +35,8 @@ router.use("/fulfillment", fulfillmentRoutes);
 router.use("/pharmacy", pharmacyRoutes);
 router.use("/messages", messagingRoutes);
 router.use("/notifications", notificationRoutes);
+router.use("/analytics", analyticsRoutes);
+router.use("/reports", reportRoutes);
 router.use("/audit", auditRoutes);
 
 export default router;

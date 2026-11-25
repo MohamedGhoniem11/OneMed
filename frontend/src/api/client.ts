@@ -418,11 +418,84 @@ export async function chatbot(message: string, patient?: Patient): Promise<ChatT
   const text = `${ar?'اتصل بالإسعاف (١٢٣) فوراً إن لم تكن قد فعلت ذلك.':'Call emergency services (123) immediately if you have not already.'}\n\n${conditionContext}${ar?'الإرشادات: ':'Guidance: '}${best.text}`;
   return { role:'assistant', text, confidence:'High', sources:[`${best.source} §${best.section}`], disclaimer:ar?'إرشادات إسعافات أولية فقط - ليست بديلاً عن الرعاية الطبية.':'First-aid guidance only - not a substitute for professional medical care.' };
 }
-export async function clinicalSummary(patientId: string): Promise<{ text:string; confidence:'High'|'Moderate'|'Low'|'Knowledge Gap'; sources:string[] }> {
-  const db = loadDB(); const p = db.patients.find(x=>x.id===patientId); const recs = db.records.filter(r=>r.patientId===patientId);
+// ---------------- M6 clinical AI / analytics / reports (demo + REST) ----------------
+export type ClinicalSummary = { text:string; confidence:'High'|'Moderate'|'Low'|'Knowledge Gap'; sources:string[]; disclaimer?:string; mode?:string };
+
+function demoValues(r:any):any[] { return Array.isArray(r.values)?r.values:(Array.isArray(r.data?.values)?r.data.values:Object.entries(r.data||{}).map(([name,value]:any)=>({name,value}))); }
+
+export async function clinicalSummary(patientId: string): Promise<ClinicalSummary> {
+  if (API_MODE === 'api') return http<ClinicalSummary>(`/analytics/clinical/${patientId}/summary`,{},token());
+  const db = loadDB(); const p:any = db.patients.find(x=>x.id===patientId); const recs = db.records.filter(r=>r.patientId===patientId);
   if (!p) return { text:'', confidence:'Knowledge Gap', sources:[] };
-  const abnormal = recs.flatMap(r=>r.values||[]).filter(v=>v.flag && v.flag!=='normal');
-  const text = `${p.name}, ${p.dateOfBirth}, blood group ${p.bloodGroup}. Chronic conditions: ${p.chronicDiseases.join(', ')||'none'}. Critical allergies: ${p.allergies.join(', ')||'none'}. Recent abnormal results: ${abnormal.map(v=>`${v.name} ${v.value} ${v.unit}`).join('; ')||'none'}. Active medications from latest prescriptions: ${db.prescriptions.filter(r=>r.patientId===patientId).flatMap(r=>r.medicines.map(m=>m.name)).join(', ')||'none recorded'}.`;
-  return { text, confidence: recs.length>3?'High':'Moderate', sources: recs.slice(0,5).map(r=>r.title) };
+  const abnormal = recs.flatMap(demoValues).filter(v=>v.flag && v.flag!=='normal');
+  const text = `${p.name}, ${p.dateOfBirth}, blood group ${p.bloodGroup}. Chronic conditions: ${(p.chronicDiseases||[]).join(', ')||'none'}. Critical allergies: ${(p.allergies||[]).join(', ')||'none'}. Recent abnormal results: ${abnormal.map(v=>`${v.name} ${v.value} ${v.unit}`).join('; ')||'none'}. Active medications: ${db.prescriptions.filter(r=>r.patientId===patientId).flatMap((r:any)=>(r.medicines||r.items||[]).map((m:any)=>m.name)).join(', ')||'none recorded'}.\nAI-generated navigation aid only. Not medical advice.`;
+  return { text, confidence: recs.length>3?'High':recs.length>1?'Moderate':'Low', sources: recs.slice(0,5).map(r=>r.title), disclaimer:'AI-generated navigation aid only. Not medical advice.', mode:'demo' };
+}
+
+export async function patientAnalytics(patientId: string): Promise<any> {
+  if (API_MODE === 'api') return http<any>(`/analytics/patient/${patientId}`,{},token());
+  const db = loadDB(); const p:any = db.patients.find(x=>x.id===patientId);
+  const recs = db.records.filter(r=>r.patientId===patientId);
+  const values = recs.flatMap(demoValues);
+  const latest = (name:string) => [...values].reverse().find(v=>v.name===name)||null;
+  const indicators:any = { hba1c:latest('HbA1c'), systolic:latest('Systolic'), diastolic:latest('Diastolic'), ldl:latest('LDL'), hdl:latest('HDL') };
+  const known = Object.values(indicators).filter((v:any)=>v&&typeof v.value==='number') as any[];
+  const inRange = known.filter((v:any)=>v.flag!=='high'&&v.flag!=='low').length;
+  return { patientId, patientName:p?.name||patientId, generatedAt:new Date().toISOString(), indicators,
+    labTrends:recs.map((r:any)=>({date:String(r.date).slice(0,7),...(Object.fromEntries(demoValues(r).map((v:any)=>[v.name,v.value])))})),
+    bloodPressure:[], lipidPanel:[], medications:db.prescriptions.filter(r=>r.patientId===patientId).flatMap((r:any)=>(r.medicines||r.items||[]).map((m:any)=>({name:m.name,dosage:m.dosage||m.dose||'',frequency:m.frequency||'',status:r.status}))),
+    visits:{}, conditions:p?.chronicDiseases||[], allergies:p?.allergies||[], abnormalCount:values.filter(v=>v.flag==='high'||v.flag==='low').length,
+    recordCount:recs.length, healthScore:known.length?Math.round(inRange/known.length*100):0 };
+}
+
+export async function populationAnalytics(): Promise<any> {
+  if (API_MODE === 'api') return http<any>('/analytics/population',{},token());
+  const db = loadDB();
+  const cities:Record<string,number> = {}; const conditions:Record<string,number> = {};
+  for (const p of db.patients as any[]) { const city=p.city||'unknown'; cities[city]=(cities[city]||0)+1; for(const c of p.chronicDiseases||[]) conditions[c]=(conditions[c]||0)+1; }
+  return { generatedAt:new Date().toISOString(), totalPatients:db.patients.length, totalRecords:db.records.length, patientsByCity:cities, conditionCounts:conditions, labAverages:{}, visitsByMonth:{} };
+}
+
+export async function auditEntries(): Promise<any[]> {
+  if (API_MODE === 'api') { const r=await http<any>('/audit',{},token()); return r.auditLog||[]; }
+  return loadDB().audit;
+}
+export async function verifyAuditChain(): Promise<any> {
+  if (API_MODE === 'api') return http<any>('/audit/verify',{},token());
+  return { valid:true, count:loadDB().audit.length };
+}
+
+export async function creditBalance(): Promise<any> {
+  if (API_MODE === 'api') { try { return await http<any>('/analytics/credits',{},token()); } catch { return { balance:0 }; } }
+  return { institutionId:'demo', balance:120 };
+}
+
+export async function reportText(type: string, opts: { patientId?:string; institutionId?:string } = {}): Promise<string> {
+  if (API_MODE === 'api') {
+    const params = new URLSearchParams({ format:'text', ...(opts.patientId?{patientId:opts.patientId}:{}) , ...(opts.institutionId?{institutionId:opts.institutionId}:{}) });
+    const res = await fetch(`${BASE}/reports/${type}?${params}`, { headers: token()?{Authorization:`Bearer ${token()}`}:{} });
+    if (!res.ok) { const e:any = await res.json().catch(()=>({})); throw new ApiError(res.status, e.message||'Report generation failed'); }
+    return res.text();
+  }
+  await wait(200);
+  return type==='clinical-summary'?(await clinicalSummary(opts.patientId||'')).text:`OneMed ${type} report preview (demo). Generated ${new Date().toLocaleString()}.`;
+}
+
+export async function downloadReport(type: string, opts: { patientId?:string; format?:string; institutionId?:string } = {}): Promise<void> {
+  const format = opts.format || 'pdf';
+  if (API_MODE === 'api') {
+    const params = new URLSearchParams({ format, ...(opts.patientId?{patientId:opts.patientId}:{}) , ...(opts.institutionId?{institutionId:opts.institutionId}:{}) });
+    const res = await fetch(`${BASE}/reports/${type}?${params}`, { headers: token()?{Authorization:`Bearer ${token()}`}:{} });
+    if (!res.ok) { const e:any = await res.json().catch(()=>({})); throw new ApiError(res.status, e.message||'Report generation failed'); }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href=url; a.download=`onemed-${type}.${format==='fhir'?'fhir.json':format}`; document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url); return;
+  }
+  await wait(300);
+  const summary = type==='clinical-summary'?await clinicalSummary(opts.patientId||''):null;
+  const body = summary?.text || `OneMed ${type} report. Generated ${new Date().toLocaleString()}. Patient ${opts.patientId||'-'}.`;
+  const blob = new Blob([summary?.text?body:`%PDF-1.4\ndemo report\n${body}`],{type:format==='pdf'?'application/pdf':'text/plain'});
+  const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href=url; a.download=`onemed-${type}.${format}`; a.click(); URL.revokeObjectURL(url);
 }
 export function routeForRole(role: Role) { return roleHome(role); }

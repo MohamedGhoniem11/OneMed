@@ -65,43 +65,50 @@ export function PatientRecords() {
 }
 
 export function PatientAnalytics() {
-  const { session } = useAuth(); const { t } = useTranslation(); const [records,setRecords] = useState<MedicalRecord[]>([]);
-  useEffect(()=>{ api.listRecords(session!.user.uid).then(setRecords); },[]);
-  const series = useMemo(()=>{
-    const a1c = records.filter(r=>r.values?.some(v=>v.name==='HbA1c')).map(r=>({date:new Date(r.date).toLocaleDateString('en',{month:'short'}),value:r.values!.find(v=>v.name==='HbA1c')!.value,low:4,high:5.6}));
-    const bp = records.filter(r=>r.values?.some(v=>v.name==='Systolic')).map(r=>({date:new Date(r.date).toLocaleDateString('en',{month:'short'}),systolic:r.values!.find(v=>v.name==='Systolic')!.value,diastolic:r.values!.find(v=>v.name==='Diastolic')!.value}));
-    return {a1c,bp};
-  },[records]);
-  const latest = (name:string)=>records.flatMap(r=>r.values||[]).filter(v=>v.name===name).sort((a,b)=>0)[0];
-  const status = (v:any)=>!v?'-':v.flag==='high'?'red':v.flag==='low'?'amber':'green';
+  const { session } = useAuth(); const { t } = useTranslation(); const {toast}=useToast();
+  const pid = session!.user.uid;
+  const [analytics,setAnalytics]=useState<any>(null);
   const [view,setView] = useState('analytics');
-  return <><PageHead title={t('patientAnalytics')} subtitle={t('comprehensiveHealth')} actions={<button className="btn outline" onClick={()=>window.print()}><Download size={16}/> {t('exportPdf')}</button>}/>
+  useEffect(()=>{ void api.patientAnalytics(pid).then(setAnalytics).catch(()=>{}); },[pid]);
+  const ind:any = analytics?.indicators || {};
+  const bp = analytics?.bloodPressure || [];
+  const a1c = (analytics?.labTrends||[]).filter((x:any)=>x.HbA1c!=null).map((x:any)=>({date:x.date,value:x.HbA1c}));
+  const lipids:any[] = analytics?.lipidPanel || [];
+  const meds:any[] = analytics?.medications || [];
+  const toneOf = (v:any)=>v?.flag==='high'?'red':v?.flag==='low'?'amber':'green';
+  const dl = async(type:string,format:string)=>{ try{ await api.downloadReport(type,{patientId:pid,format}); toast(t('saved')); }catch(e:any){ toast(e.message,true); } };
+  return <><PageHead title={t('patientAnalytics')} subtitle={t('comprehensiveHealth')} actions={<button className="btn outline" onClick={()=>void dl('history','pdf')}><Download size={16}/> {t('exportPdf')}</button>}/>
     <SectionTabs tabs={[{id:'overview',label:t('overview')},{id:'analytics',label:t('analytics')},{id:'reports',label:t('reports')}]} active={view} onChange={setView}/>
-    {view==='reports' ? <Card title="Your health reports"><p style={{color:'var(--muted)'}}>Download your own medical history as structured data, or print a readable copy. Reports are generated from your records only.</p>
-      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}><button className="btn primary" onClick={()=>{const b=new Blob([JSON.stringify({patientId:session!.user.uid,records,generatedAt:new Date().toISOString()},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='onemed-my-health-data.json';a.click();}}>{t('download')} JSON</button><button className="btn outline" onClick={()=>window.print()}>{t('exportPdf')}</button></div>
+    {view==='reports' ? <Card title="Your health reports"><p style={{color:'var(--muted)'}}>Reports are generated from your records only and include a doctor-readable export.</p>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+        <button className="btn primary" onClick={()=>void dl('history','pdf')}>{t('exportPdf')} - History</button>
+        <button className="btn outline" onClick={()=>void dl('history','fhir')}>{t('exportFhir')}</button>
+        <button className="btn outline" onClick={()=>void dl('labs','pdf')}>Lab Results PDF</button>
+        <button className="btn outline" onClick={()=>void dl('clinical-summary','text')}>Clinical Summary</button>
+      </div>
       <p className="disclaimer" style={{marginTop:12}}>{t('reportExpires')}</p></Card> : <>
     <div className="grid cols-4">
-      <MetricCard label="BMI" value="27.4" trend="↑ 0.5" tone="amber" bar={68} sub="Overweight range" icon={<Activity size={16}/>}/>
-      <MetricCard label="HbA1c" value={(series.a1c[series.a1c.length-1])?.value||'-'} unit="%" trend="↓ 0.2 vs last 3 months" tone="green" bar={62} icon={<HeartPulse size={16}/>}/>
-      <MetricCard label="eGFR" value="92" unit="mL/min" trend="Stable" tone="green" bar={78} sub="Normal kidney function" icon={<Activity size={16}/>}/>
-      <MetricCard label="CRP - HIGH" value="12.4" unit="mg/L" tone="red" bar={88} sub="Elevated inflammation markers (Oct 24)" icon={<AlertTriangle size={16}/>}/>
+      <MetricCard label="Health score" value={`${analytics?.healthScore??'-'}${analytics?'%':''}`} trend={`${analytics?.abnormalCount??0} flagged`} tone={(analytics?.healthScore||0)>=80?'green':'amber'} bar={analytics?.healthScore||0} sub="Indicators in range" icon={<Activity size={16}/>}/>
+      <MetricCard label="HbA1c" value={ind.hba1c?.value??'-'} unit={ind.hba1c?.unit||'%'} tone={toneOf(ind.hba1c)} bar={Math.min(100,(ind.hba1c?.value||0)*12)} icon={<HeartPulse size={16}/>}/>
+      <MetricCard label="Blood pressure" value={ind.systolic?.value?`${ind.systolic.value}/${ind.diastolic?.value??'-'}`:'-'} unit="mmHg" tone={toneOf(ind.systolic)} bar={Math.min(100,(ind.systolic?.value||0)/1.8)} icon={<Activity size={16}/>}/>
+      <MetricCard label="LDL" value={ind.ldl?.value??'-'} unit={ind.ldl?.unit||'mg/dL'} tone={toneOf(ind.ldl)} bar={Math.min(100,(ind.ldl?.value||0)/2)} sub="Low-density lipoprotein" icon={<AlertTriangle size={16}/>}/>
     </div>
     {view==='overview' ? <Card title="At a glance" style={{marginTop:16}}>
       <p style={{color:'var(--muted)'}}>Your latest results and the items that need attention. Open Analytics for the full trend view.</p>
       <div className="grid cols-3" style={{marginTop:12}}>
-        <div className="alert red"><strong>Allergies</strong><div>Penicillin, Latex</div></div>
-        <div className="alert amber"><strong>Abnormal results</strong><div>Glucose 115 mg/dL, CRP 12.4 mg/L</div></div>
-        <div className="alert green"><strong>Stable</strong><div>Blood pressure trending toward target</div></div>
+        <div className="alert red"><strong>Allergies</strong><div>{(analytics?.allergies||[]).join(', ')||'None recorded'}</div></div>
+        <div className="alert amber"><strong>Abnormal results</strong><div>{analytics?.abnormalCount??0} flagged across {analytics?.recordCount??0} records</div></div>
+        <div className="alert green"><strong>Conditions</strong><div>{(analytics?.conditions||[]).join(', ')||'None recorded'}</div></div>
       </div>
     </Card> : <div className="grid cols-2" style={{marginTop:16}}>
-      <Card title={t('bloodPressure')}><ResponsiveContainer width="100%" height={240}><LineChart data={series.bp}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="date"/><YAxis domain={[50,170]}/><Tooltip/><Legend/><ReferenceArea y1={90} y2={120} fill="#e7f6f3" fillOpacity={.5}/><Line type="monotone" dataKey="systolic" stroke="#002657" strokeWidth={2.5}/><Line type="monotone" dataKey="diastolic" stroke="#0f9d6e" strokeWidth={2.5}/></LineChart></ResponsiveContainer></Card>
-      <Card title={t('labTrends') + ' - HbA1c'}><ResponsiveContainer width="100%" height={240}><LineChart data={series.a1c}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="date"/><YAxis domain={[4,9]}/><Tooltip/><Legend/><ReferenceArea y1={4} y2={5.6} fill="#e7f7ef" fillOpacity={.7}/><Line type="monotone" dataKey="value" stroke="#d99219" strokeWidth={2.5}/></LineChart></ResponsiveContainer></Card>
+      <Card title={t('bloodPressure')}><ResponsiveContainer width="100%" height={240}><LineChart data={bp}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="date"/><YAxis domain={[50,170]}/><Tooltip/><Legend/><ReferenceArea y1={90} y2={120} fill="#e7f6f3" fillOpacity={.5}/><Line type="monotone" dataKey="systolic" stroke="#002657" strokeWidth={2.5}/><Line type="monotone" dataKey="diastolic" stroke="#0f9d6e" strokeWidth={2.5}/></LineChart></ResponsiveContainer></Card>
+      <Card title={t('labTrends') + ' - HbA1c'}><ResponsiveContainer width="100%" height={240}><LineChart data={a1c}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="date"/><YAxis domain={[4,9]}/><Tooltip/><Legend/><ReferenceArea y1={4} y2={5.6} fill="#e7f7ef" fillOpacity={.7}/><Line type="monotone" dataKey="value" stroke="#d99219" strokeWidth={2.5}/></LineChart></ResponsiveContainer></Card>
     </div>}
-    <Card title="Lipid Panel" style={{marginTop:16}} action={<Chip tone="blue">{t('latestLabel')}: Oct 15</Chip>}>
-      {[[t('lipidTotal'),210,260,'amber'],[t('lipidLdl'),135,190,'red'],[t('lipidHdl'),55,100,'green'],[t('lipidTrig'),140,200,'amber']].map(([name,val,max,tone]:any)=><div className="lipid-row" key={name}><span className="lipid-name">{name}</span><span className="lipid-track"><i className="lipid-fill" style={{width:`${(val/max)*100}%`,background:tone==='red'?'var(--red)':tone==='green'?'var(--green)':'var(--amber)'}}/></span><span className="lipid-val">{val} mg/dL</span></div>)}
+    <Card title="Lipid Panel" style={{marginTop:16}}>
+      {lipids.length?lipids.map((v:any)=><div className="lipid-row" key={v.name}><span className="lipid-name">{v.name}</span><span className="lipid-track"><i className="lipid-fill" style={{width:`${Math.min(100,(v.value||0)/3)}%`,background:toneOf(v)==='red'?'var(--red)':toneOf(v)==='green'?'var(--green)':'var(--amber)'}}/></span><span className="lipid-val">{v.value??'-'} {v.unit||''}</span></div>):<Empty message="No lipid panel results recorded."/>}
     </Card>
-    <Card title={t('medicationTimeline')} style={{marginTop:16}}><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('medicine')}</th><th>{t('dosage')}</th><th>{t('status')}</th></tr></thead><tbody><tr><td>Lisinopril 10mg</td><td>Once daily</td><td><Badge tone="green">Ongoing · 95%</Badge></td></tr><tr><td>Atorvastatin 20mg</td><td>At evening</td><td><Badge tone="green">Started Aug 15</Badge></td></tr><tr><td>Amoxicillin 500mg</td><td>BID</td><td><Badge tone="gray">Complete</Badge></td></tr></tbody></table></div></Card>
-    <Card title={t('conditionSummary')} style={{marginTop:16}}><div className="grid cols-4">{[{label:'Type 2 Diabetes',tone:'red'},{label:'Hypertension',tone:'amber'},{label:`HbA1c ${latest('HbA1c')?.value||''}`,tone:status(latest('HbA1c'))},{label:`BP ${latest('Systolic')?.value||''}/${latest('Diastolic')?.value||''}`,tone:status(latest('Systolic'))}].map((c,i)=><div key={i} className="alert" style={{background:'#fff',padding:12}}><Badge tone={c.tone as any}>{c.label}</Badge></div>)}</div></Card>
+    <Card title={t('medicationTimeline')} style={{marginTop:16}}><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('medicine')}</th><th>{t('dosage')}</th><th>{t('status')}</th></tr></thead><tbody>{meds.map((m:any,i:number)=><tr key={i}><td>{m.name}</td><td>{m.dosage||m.dose||'-'}</td><td><Badge tone={m.status==='confirmed'?'green':'amber'}>{m.status||'recorded'}</Badge></td></tr>)}</tbody></table>{!meds.length&&<Empty/>}</div></Card>
+    <Card title={t('conditionSummary')} style={{marginTop:16}}><div className="grid cols-4">{[...(analytics?.conditions||[]), `HbA1c ${ind.hba1c?.value??'-'}`, `BP ${ind.systolic?.value??'-'}/${ind.diastolic?.value??'-'}`].map((label,i)=><div key={i} className="alert" style={{background:'#fff',padding:12}}><Badge tone={i>=(analytics?.conditions||[]).length?toneOf(i===(analytics?.conditions||[]).length?ind.hba1c:ind.systolic) as any:'red'}>{label}</Badge></div>)}</div></Card>
     </>}
   </>;
 }
