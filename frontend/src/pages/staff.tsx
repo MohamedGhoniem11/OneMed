@@ -60,26 +60,36 @@ function Browse(){return <span/>;}
 
 export function PharmacyPortal() {
   const { t } = useTranslation(); const {toast}=useToast(); const {session}=useAuth();
-  const [rx,setRx]=useState<Prescription[]>([]); const [tab,setTab]=useState('inbox'); const [chat,setChat]=useState<Prescription|null>(null); const [text,setText]=useState('');
+  const [rx,setRx]=useState<Prescription[]>([]); const [tab,setTab]=useState('inbox'); const [chat,setChat]=useState<Prescription|null>(null); const [text,setText]=useState(''); const [chatMsgs,setChatMsgs]=useState<any[]>([]); const [conversationId,setConversationId]=useState('');
   const steps:OrderStatus[]=['received','verifying','preparing','ready','handed_over','completed'];
-  useEffect(()=>{ api.list<Prescription>('prescriptions').then(a=>setRx(a.filter(r=>r.status==='confirmed'))); },[]);
-  const advance=async(r:Prescription)=>{ const i=steps.indexOf(r.orderStatus||'received'); if(i>=steps.length-1) return; const next=steps[i+1]; await api.mutate(db=>{const x=db.prescriptions.find(p=>p.id===r.id);if(x)x.orderStatus=next;}); setRx(a=>a.map(x=>x.id===r.id?{...x,orderStatus:next}:x)); toast(`${r.patientName}: ${next}`); };
+  useEffect(()=>{ void api.pharmacyOrders().then(setRx); },[]);
+  const advance=async(r:Prescription)=>{ try{ const updated=await api.advanceOrder(r.id); setRx(a=>a.map(x=>x.id===r.id?{...x,orderStatus:updated.orderStatus}:x)); toast(`${r.patientName}: ${updated.orderStatus}`); }catch(e:any){ toast(e.message,true); } };
+  const openChat=async(r:Prescription)=>{ setChat(r); setText('');
+    try{ const c=await api.createConversation({patientId:r.patientId,otherUserId:session!.user.uid,otherName:session!.user.name,role:'pharmacy'}); setConversationId(c.id);
+      const msgs=await api.listMessages(c.id); setChatMsgs(msgs);
+    }catch(e:any){ toast(e.message,true); }
+  };
+  const sendChat=async()=>{ if(!text.trim()||!conversationId) return; try{ await api.sendMessage(conversationId,text); setChatMsgs(await api.listMessages(conversationId)); setText(''); }catch(e:any){ toast(e.message,true); } };
   return <><PageHead title={t('inbox')} subtitle="Prescription orders, real-time patient chat, and fulfillment status."/>
     <Tabs tabs={[{id:'inbox',label:t('inbox')},{id:'flow',label:t('fulfillmentFlow')}]} active={tab} onChange={setTab}/>
-    {tab==='inbox'?<Card pad><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('patient')}</th><th>{t('doctor')}</th><th>{t('medicines')}</th><th>{t('orderStatus')}</th><th>{t('action')}</th></tr></thead><tbody>{rx.map(r=><tr key={r.id}><td><strong>{r.patientName}</strong></td><td>{r.doctorName}</td><td>{(r.medicines||[]).map(m=>`${m.name} ${m.dosage}`).join(', ')}</td><td><StatusBadge status={r.orderStatus||'received'}/></td><td><div style={{display:'flex',gap:4}}><button className="btn sm primary" onClick={()=>advance(r)}>Advance</button><button className="btn sm outline" onClick={()=>setChat(r)}><MessageCircle size={14}/> Chat</button></div></td></tr>)}</tbody></table>{!rx.length&&<Empty/>}</div></Card>
+    {tab==='inbox'?<Card pad><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('patient')}</th><th>{t('doctor')}</th><th>{t('medicines')}</th><th>{t('orderStatus')}</th><th>{t('action')}</th></tr></thead><tbody>{rx.map(r=><tr key={r.id}><td><strong>{r.patientName}</strong></td><td>{r.doctorName}</td><td>{(r.medicines||[]).map(m=>`${m.name} ${m.dosage}`).join(', ')}</td><td><StatusBadge status={r.orderStatus||'received'}/></td><td><div style={{display:'flex',gap:4}}><button className="btn sm primary" onClick={()=>advance(r)}>Advance</button><button className="btn sm outline" onClick={()=>void openChat(r)}><MessageCircle size={14}/> Chat</button></div></td></tr>)}</tbody></table>{!rx.length&&<Empty/>}</div></Card>
     :<Card title={t('fulfillmentFlow')}><div className="grid cols-3">{steps.map((s,i)=><div key={s} className="card" style={{boxShadow:'none'}}><Badge tone="blue">{i+1}</Badge><h3 style={{marginTop:8}}>{t(s)}</h3><p style={{color:'var(--muted)',fontSize:12}}>Order state: {s.replace('_',' ')}</p></div>)}</div></Card>}
-    {chat && <Modal title={`${t('messages')} - ${chat.patientName}`} onClose={()=>setChat(null)}><div className="chat-log"><div className="msg me">{(chat.medicines||[]).map(m=>`${m.name} ${m.dosage} - ${m.frequency}`).join('\n')}</div></div><div style={{display:'flex',gap:8,marginTop:12}}><input className="input" value={text} onChange={e=>setText(e.target.value)} placeholder="Message patient…"/><button className="btn primary" onClick={()=>{toast('Message sent');setText('');}}><SendIcon/></button></div></Modal>}
+    {chat && <Modal title={`${t('messages')} - ${chat.patientName}`} onClose={()=>setChat(null)}>
+      <div className="chat-log"><div className="msg me">{(chat.medicines||[]).map(m=>`${m.name} ${m.dosage} - ${m.frequency}`).join('\n')}</div>
+        {chatMsgs.map(m=><div key={m.id} className={`msg ${m.senderId===session!.user.uid?'me':''}`}>{m.text}</div>)}</div>
+      <div style={{display:'flex',gap:8,marginTop:12}}><input className="input" value={text} onChange={e=>setText(e.target.value)} placeholder="Message patient…" onKeyDown={e=>{if(e.key==='Enter')void sendChat();}}/><button className="btn primary" onClick={()=>void sendChat()}><SendIcon/></button></div>
+    </Modal>}
   </>;
 }
 function SendIcon(){return <span>➤</span>;}
 
 export function PharmacyProfile() {
-  const { t } = useTranslation(); const [pharmacies,setPharmacies]=useState<Pharmacy[]>([]); const {toast}=useToast();
-  useEffect(()=>{api.list<Pharmacy>('pharmacies').then(setPharmacies);},[]);
-  const p=pharmacies.find(x=>x.id==='pharm_medica')||pharmacies[0];
+  const { t } = useTranslation(); const {toast}=useToast(); const [profile,setProfile]=useState<any>(null);
+  useEffect(()=>{void api.pharmacyProfile().then(setProfile);},[]);
+  const save=async(patch:any)=>{ if(!profile?.id) return; try{ const updated=await api.updatePharmacyProfile(profile.id,patch); setProfile(updated); toast(t('saved')); }catch(e:any){ toast(e.message,true); } };
   return <><PageHead title={t('settings')} subtitle="Location, WhatsApp number and operating hours."/>
-    <div className="grid cols-2"><Card title="Pharmacy details"><Field label={t('name')}><input className="input" defaultValue={p?.name}/></Field><Field label={t('address')}><input className="input" defaultValue={p?.address}/></Field><Field label="WhatsApp number"><input className="input" defaultValue={p?.whatsapp}/></Field><Field label={t('phoneNumber')}><input className="input" defaultValue={p?.phone}/></Field><button className="btn primary" onClick={()=>toast(t('saved'))}>{t('save')}</button></Card>
-      <Card title="GPS & hours"><Field label="Latitude"><input className="input" defaultValue={p?.lat}/></Field><Field label="Longitude"><input className="input" defaultValue={p?.lng}/></Field><Field label="Operating hours"><input className="input" defaultValue={p?.hours}/></Field><button className="btn outline" onClick={()=>toast('Location updated')}><MapPin size={16}/> Update location</button><p className="disclaimer" style={{marginTop:12}}>Patients see your pharmacy sorted by distance from their location.</p></Card></div></>;
+    <div className="grid cols-2"><Card title="Pharmacy details"><Field label={t('name')}><input className="input" value={profile?.name||''} onChange={e=>setProfile({...profile,name:e.target.value})}/></Field><Field label={t('address')}><input className="input" value={profile?.address||''} onChange={e=>setProfile({...profile,address:e.target.value})}/></Field><Field label="WhatsApp number"><input className="input" value={profile?.whatsapp||''} onChange={e=>setProfile({...profile,whatsapp:e.target.value})}/></Field><Field label={t('phoneNumber')}><input className="input" value={profile?.phone||''} onChange={e=>setProfile({...profile,phone:e.target.value})}/></Field><button className="btn primary" onClick={()=>void save({name:profile?.name,address:profile?.address,whatsapp:profile?.whatsapp,phone:profile?.phone})}>{t('save')}</button></Card>
+      <Card title="GPS & hours"><Field label="Latitude"><input className="input" type="number" value={profile?.location?.lat??profile?.lat??''} onChange={e=>setProfile({...profile,location:{...profile?.location,lat:Number(e.target.value)}})}/></Field><Field label="Longitude"><input className="input" type="number" value={profile?.location?.lng??profile?.lng??''} onChange={e=>setProfile({...profile,location:{...profile?.location,lng:Number(e.target.value)}})}/></Field><Field label="Operating hours"><input className="input" value={profile?.hours||profile?.openingHours||''} onChange={e=>setProfile({...profile,hours:e.target.value,openingHours:e.target.value})}/></Field><button className="btn outline" onClick={()=>void save({location:profile?.location,hours:profile?.hours,openingHours:profile?.hours})}><MapPin size={16}/> Update location</button><p className="disclaimer" style={{marginTop:12}}>Patients see your pharmacy sorted by distance from their location.</p></Card></div></>;
 }
 
 export function HospitalAdmin() {

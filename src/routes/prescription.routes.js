@@ -9,6 +9,7 @@ router.use(authenticate);
 
 router.post("/extract", requireRole("doctor"), ocrLimiter, upload.single("image"), c.extract);
 router.post("/", requirePermission("prescriptions:write"), c.create);
+router.post("/:id/confirm", requirePermission("prescriptions:write"), c.confirm);
 router.get("/", requireRole("doctor", "admin", "patient"), c.list);
 router.get("/patient/:patientId", requirePermission("prescriptions:read"), c.listForPatient);
 router.get("/:id", requireRole("doctor", "admin", "patient"), c.getOne);

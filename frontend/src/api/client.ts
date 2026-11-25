@@ -188,6 +188,93 @@ export async function updateEmergencyPrivacy(settings: any) {
 // ---------------- M2/M3 domain helpers (demo + REST) ----------------
 const token = () => getSession()?.token;
 
+// ---------------- M5 pharmacy / messaging helpers (demo + REST) ----------------
+const normMeds = (p:any) => ({ ...p, date:p.date||p.createdAt, medicines:(p.medicines||p.items||[]).map((m:any)=>({...m,dosage:m.dosage||m.dose||''})) });
+
+export async function extractPrescription(file: File, lang = 'ara+eng') {
+  if (API_MODE === 'api') {
+    const form = new FormData(); form.append('image', file); form.append('lang', lang);
+    return http<any>('/prescriptions/extract', { method:'POST', body:form }, token());
+  }
+  await wait(500);
+  return { rawText:'Amoxicillin 500mg 1x3 5 days\nParacetamol 650mg BID 3 days', ocrConfidence:92, lang,
+    items:[{name:'Amoxicillin',dosage:'500mg',frequency:'1x3',duration:'5 days',instructions:'',confidence:97},
+           {name:'Paracetamol',dosage:'650mg',frequency:'BID',duration:'3 days',instructions:'',confidence:88}],
+    warnings:[], mode:'demo' };
+}
+
+export async function createPrescription(payload: any) {
+  if (API_MODE === 'api') return normMeds(await http<any>('/prescriptions',{method:'POST',body:JSON.stringify(payload)},token()));
+  return mutate(db => { const r:any = { id:uid('rx'), doctorId:getSession()?.user.uid, doctorName:getSession()?.user.name,
+    ...payload, status:'pending', extractionStatus:'extracted', date:new Date().toISOString() }; db.prescriptions.push(r); return normMeds(r); });
+}
+
+export async function confirmPrescription(id: string, items: any[]) {
+  if (API_MODE === 'api') return normMeds(await http<any>(`/prescriptions/${id}/confirm`,{method:'POST',body:JSON.stringify({confirmed:true,items})},token()));
+  return mutate(db => { const r:any = db.prescriptions.find(x=>x.id===id); if(!r) throw new ApiError(404,'Prescription not found');
+    const tk=`rx-${Math.random().toString(36).slice(2,10)}`; Object.assign(r,{items,medicines:items,status:'confirmed',extractionStatus:'confirmed',linkToken:tk,
+      fulfillmentLink:`/f/${tk}`,linkExpiresAt:new Date(Date.now()+86400000).toISOString(),date:new Date().toISOString()}); return normMeds(r); });
+}
+
+export async function fulfillmentProfile(linkToken: string) {
+  if (API_MODE === 'api') return http<any>(`/fulfillment/${linkToken}`);
+  const db=loadDB(); const rx:any=db.prescriptions.find(x=>x.linkToken===linkToken);
+  if(!rx) throw new ApiError(404,'Invalid fulfillment link');
+  const pharmacies=db.pharmacies.filter(p=>p.active&&p.status==='approved');
+  return { prescription:normMeds(rx), pharmacies };
+}
+
+export async function selectPharmacy(linkToken: string, pharmacyId: string) {
+  if (API_MODE === 'api') return http<any>(`/fulfillment/${linkToken}/select`,{method:'POST',body:JSON.stringify({pharmacyId})});
+  const db=loadDB(); const rx:any=db.prescriptions.find(x=>x.linkToken===linkToken); const p:any=db.pharmacies.find(x=>x.id===pharmacyId);
+  if(!rx||!p) throw new ApiError(404,'Not found');
+  const text=`Hello ${p.name},\n\n*Medicines:*\n${(rx.medicines||rx.items||[]).map((m:any,i:number)=>`${i+1}. ${m.name} ${m.dosage||m.dose}`).join('\n')}`;
+  const url=`https://wa.me/${String(p.whatsapp||'').replace(/\D/g,'')}?text=${encodeURIComponent(text)}`;
+  Object.assign(rx,{pharmacyId,orderStatus:'received',whatsappUrl:url}); saveDB(db); return {prescription:normMeds(rx),whatsappUrl:url};
+}
+
+export async function pharmacyOrders() {
+  if (API_MODE === 'api') { const r=await http<any>('/pharmacy/orders',{},token()); return (r.orders||[]).map(normMeds); }
+  return loadDB().prescriptions.filter(p=>p.status==='confirmed'&&p.orderStatus).map(normMeds);
+}
+export async function advanceOrder(id: string) {
+  if (API_MODE === 'api') return normMeds(await http<any>(`/pharmacy/orders/${id}/status`,{method:'PATCH'},token()));
+  return mutate(db=>{ const r:any=db.prescriptions.find(x=>x.id===id); const flow=['received','verifying','preparing','ready','handed_over','completed'];
+    if(r){const i=flow.indexOf(r.orderStatus||'received');r.orderStatus=flow[Math.min(flow.length-1,i+1)];} return normMeds(r); });
+}
+export async function pharmacyProfile() {
+  if (API_MODE === 'api') { try { return await http<any>('/pharmacy/profile',{},token()); } catch { return null; } }
+  return loadDB().pharmacies[0]||null;
+}
+export async function updatePharmacyProfile(id: string, patch: any) {
+  if (API_MODE === 'api') return http<any>(`/pharmacy/profile`,{method:'PATCH',body:JSON.stringify({...patch,id})},token());
+  return mutate(db=>{ const p:any=db.pharmacies.find(x=>x.id===id); if(p) Object.assign(p,patch); return p; });
+}
+export async function listConversations() {
+  if (API_MODE === 'api') { const r=await http<any>('/messages/conversations',{},token()); return r.conversations||[]; }
+  return loadDB().conversations;
+}
+export async function createConversation(data:any) {
+  if (API_MODE === 'api') return http<any>('/messages/conversations',{method:'POST',body:JSON.stringify(data)},token());
+  return mutate(db=>{ const c={id:uid('conv'),...data,updatedAt:new Date().toISOString()}; db.conversations.push(c); return c; });
+}
+export async function listMessages(conversationId:string) {
+  if (API_MODE === 'api') { const r=await http<any>(`/messages/conversations/${conversationId}/messages`,{},token()); return r.messages||[]; }
+  return loadDB().messages.filter(m=>m.conversationId===conversationId).sort((a:any,b:any)=>String(a.sentAt).localeCompare(String(b.sentAt)));
+}
+export async function sendMessage(conversationId:string, text:string) {
+  if (API_MODE === 'api') return http<any>(`/messages/conversations/${conversationId}/messages`,{method:'POST',body:JSON.stringify({text})},token());
+  return mutate(db=>{ const m:any={id:uid('m'),conversationId,senderId:getSession()?.user.uid,text,sentAt:new Date().toISOString()}; db.messages.push(m); return m; });
+}
+export async function listNotifications() {
+  if (API_MODE === 'api') { const r=await http<any>('/notifications',{},token()); return r.items||[]; }
+  return loadDB().notifications.filter(n=>n.userId===getSession()?.user.uid).sort((a:any,b:any)=>String(b.createdAt).localeCompare(String(a.createdAt)));
+}
+export async function markNotificationsRead() {
+  if (API_MODE === 'api') return http<any>('/notifications/read-all',{method:'POST'},token());
+  return mutate(db=>{db.notifications.filter(n=>n.userId===getSession()?.user.uid).forEach(n=>{n.read=true;});return true;});
+}
+
 export async function listRecords(patientId?: string, type?: string): Promise<MedicalRecord[]> {
   if (API_MODE === 'api') {
     const params = new URLSearchParams();

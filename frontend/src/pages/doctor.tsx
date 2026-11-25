@@ -93,17 +93,35 @@ export function PatientViewer() {
 export function DoctorPrescriptions() {
   const { session } = useAuth(); const { t } = useTranslation(); const {toast}=useToast();
   const [tab,setTab]=useState('list'); const [rx,setRx]=useState<Prescription[]>([]); const [patients,setPatients]=useState<Patient[]>([]);
-  const [image,setImage]=useState<string|null>(null); const [items,setItems]=useState<Medicine[]>([]); const [confidence,setConfidence]=useState(0); const [patientId,setPatientId]=useState(''); const [busy,setBusy]=useState(false); const [link,setLink]=useState('');
+  const [image,setImage]=useState<string|null>(null); const [items,setItems]=useState<Medicine[]>([]); const [confidence,setConfidence]=useState(0); const [patientId,setPatientId]=useState(''); const [busy,setBusy]=useState(false); const [link,setLink]=useState(''); const [draftId,setDraftId]=useState('');
   const [zoom,setZoom]=useState(1); const [rotate,setRotate]=useState(0);
-  useEffect(()=>{ api.list<Prescription>('prescriptions',x=>x.doctorId===session!.user.uid).then(setRx); api.searchPatients('').then(a=>{setPatients(a);setPatientId(a[0]?.id||'');}); },[]);
-  const file = (f:File|undefined)=>{ if(!f) return; const r=new FileReader(); r.onload=()=>setImage(String(r.result)); r.readAsDataURL(f);
-    setTimeout(()=>{ setItems([{name:'Amoxicillin',dosage:'500mg',frequency:'1-0-1 (BID)',duration:'5 Days',confidence:97},{name:'Paracetamol',dosage:'650mg',frequency:'SOS',duration:'3 Days',confidence:88}]); setConfidence(94); },600);
+  useEffect(()=>{ api.list<Prescription>('prescriptions').then(a=>setRx(a.filter(r=>r.doctorId===session!.user.uid))); api.searchPatients('').then(a=>{setPatients(a);setPatientId(a[0]?.id||'');}); },[]);
+  const file = async (f:File|undefined)=>{
+    if(!f) return;
+    const r=new FileReader(); r.onload=()=>setImage(String(r.result)); r.readAsDataURL(f);
+    setBusy(true);
+    try {
+      const result=await api.extractPrescription(f);
+      setItems((result.items||[]).map((m:any)=>({name:m.name||'',dosage:m.dosage||'',frequency:m.frequency||'',duration:m.duration||'',confidence:m.confidence??undefined})));
+      setConfidence(result.ocrConfidence||0);
+      if(!patientId) return toast('Select a patient first',true);
+      const draft=await api.createPrescription({patientId,diagnosis:'Prescription review',items:result.items||[]});
+      setDraftId(draft.id);
+      toast(result.warnings?.length?result.warnings[0]:'Medicines extracted. Review before confirming.');
+    } catch(e:any){ toast(e.message,true); } finally { setBusy(false); }
   };
   const update=(i:number,k:keyof Medicine,v:string)=>setItems(a=>a.map((m,j)=>j===i?{...m,[k]:v}:m));
-  const confirm=async()=>{ if(!patientId||!items.length) return toast('Select a patient and extract medicines',true); setBusy(true);
-    const token = `rx-${Math.random().toString(36).slice(2,10)}`;
-    const created = await api.mutate(db=>{ const p=db.patients.find(x=>x.id===patientId)!; const r:Prescription={id:`rx_${Date.now()}`,doctorId:session!.user.uid,doctorName:session!.user.name,patientId:p.id,patientName:p.name,date:new Date().toISOString(),status:'confirmed',extractionStatus:'confirmed',medicines:items,confidence,linkToken:token,linkExpiresAt:new Date(Date.now()+86400000).toISOString(),fulfillmentLink:`/f/${token}`,orderStatus:'received'}; db.prescriptions.push(r); db.notifications.push({id:`n_${Date.now()}`,userId:p.id,title:'New prescription',body:`${session!.user.name} issued a prescription`,type:'prescription',read:false,createdAt:new Date().toISOString()}); return r; });
-    setRx(a=>[created,...a]); setLink(`${location.origin}/f/${token}`); setBusy(false); toast(t('saved')); setTab('list');
+  const confirm=async()=>{
+    if(!patientId||!items.length) return toast('Select a patient and extract medicines',true);
+    setBusy(true);
+    try {
+      let id=draftId;
+      if(!id){ const draft=await api.createPrescription({patientId,diagnosis:'Prescription review',items}); id=draft.id; }
+      const confirmed=await api.confirmPrescription(id,items);
+      setRx(a=>[confirmed,...a]);
+      setLink(`${location.origin}/f/${confirmed.linkToken||''}`);
+      setDraftId(''); setBusy(false); toast(t('saved')); setTab('list');
+    } catch(e:any){ setBusy(false); toast(e.message,true); }
   };
   return <><PageHead title={t('prescriptions')} subtitle="AI-assisted extraction with mandatory doctor confirmation." actions={<button className="btn primary" onClick={()=>setTab('review')}><Upload size={16}/> New extraction</button>}/>
     <Tabs tabs={[{id:'list',label:t('prescriptions')},{id:'review',label:'Extraction Review'}]} active={tab} onChange={setTab}/>
@@ -167,10 +185,9 @@ export function DoctorMessages() {
   const {t}=useTranslation(); const {session}=useAuth(); const {toast}=useToast();
   const [convs,setConvs]=useState<Conversation[]>([]); const [active,setActive]=useState<string|null>(null);
   const [msgs,setMsgs]=useState<Message[]>([]); const [text,setText]=useState('');
-  useEffect(()=>{ api.list<Conversation>('conversations',c=>c.otherUserId===session!.user.uid).then(a=>{setConvs(a);setActive(a[0]?.id||null);}); },[]);
-  useEffect(()=>{ if(active) api.list<Message>('messages',m=>m.conversationId===active).then(a=>setMsgs(a.sort((x,y)=>x.sentAt.localeCompare(y.sentAt)))); },[active]);
-  const send=async()=>{ if(!text.trim()||!active) return; await api.mutate(db=>{db.messages.push({id:`m_${Date.now()}`,conversationId:active,senderId:session!.user.uid,text,sentAt:new Date().toISOString()});}); setText('');
-    api.list<Message>('messages',m=>m.conversationId===active).then(a=>setMsgs(a.sort((x,y)=>x.sentAt.localeCompare(y.sentAt)))); toast(t('saved')); };
+  useEffect(()=>{ void api.listConversations().then(a=>{setConvs(a);setActive(a[0]?.id||null);}); },[]);
+  useEffect(()=>{ if(active) void api.listMessages(active).then(setMsgs); },[active]);
+  const send=async()=>{ if(!text.trim()||!active) return; await api.sendMessage(active,text); setText(''); setMsgs(await api.listMessages(active)); toast(t('saved')); };
   return <><PageHead title={t('messages')} subtitle="Secure conversations with patients and pharmacies."/>
     <div className="grid" style={{gridTemplateColumns:'280px 1fr'}}>
       <Card pad><div className="card-body">{convs.map(c=><button key={c.id} className={`nav-item ${active===c.id?'active':''}`} style={{color:'var(--ink)'}} onClick={()=>setActive(c.id)}><span className="avatar">{c.otherName.slice(0,2).toUpperCase()}</span><span><strong>{c.otherName}</strong><div style={{fontSize:11,color:'var(--muted)'}}>{t(c.role==='lab_staff'?'labStaff':c.role)}</div></span></button>)}{!convs.length&&<Empty message="No conversations yet. Open a patient record to start one."/>}</div></Card>

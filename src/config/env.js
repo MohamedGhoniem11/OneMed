@@ -129,6 +129,7 @@ if (!/^https?:\/\//.test(publicBaseUrl)) {
 }
 const connectionTtlSeconds = readInt("CONNECTION_TTL_SECONDS", 900, { min: 60, max: 3600 });
 const emergencyRateLimitMax = readInt("EMERGENCY_RATE_LIMIT_MAX", 60, { min: 5, max: 600 });
+const fulfillmentTtlSeconds = readInt("FULFILLMENT_TTL_SECONDS", 86400, { min: 3600, max: 604800 });
 
 const jsonBodyLimit = readString("JSON_BODY_LIMIT", "1mb");
 if (!/^\d+(kb|mb)$/i.test(jsonBodyLimit)) {
@@ -210,6 +211,7 @@ export const env = Object.freeze({
   publicBaseUrl,
   connectionTtlSeconds,
   emergencyRateLimitMax,
+  fulfillmentTtlSeconds,
   geminiApiKey,
   geminiModel,
   geminiEmbeddingModel,

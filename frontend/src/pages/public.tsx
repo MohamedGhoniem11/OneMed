@@ -224,24 +224,15 @@ export function FulfillmentPage() {
   const { token='' } = useParams(); const { t } = useTranslation(); const {toast} = useToast();
   const [rx,setRx] = useState<Prescription|null>(null); const [pharmacies,setPharmacies] = useState<Pharmacy[]>([]); const [selected,setSelected] = useState<string|null>(null);
   useEffect(()=>{
-    api.list<Prescription>('prescriptions',x=>x.linkToken===token).then(async a=>{
-      const found=a[0]||null; setRx(found);
-      const patient=found ? await api.getPatient(found.patientId) : null;
-      const origin=patient?.location || {lat:31.2,lng:29.92};
-      api.list<Pharmacy>('pharmacies',x=>x.active&&x.status==='approved').then(list=>{
-        // Haversine distance in km from the prescription's patient, not a fixed city.
-        const dist=(p:Pharmacy)=>{const R=6371,dLat=(p.lat-origin.lat)*Math.PI/180,dLng=(p.lng-origin.lng)*Math.PI/180;
-          const h=Math.sin(dLat/2)**2+Math.cos(origin.lat*Math.PI/180)*Math.cos(p.lat*Math.PI/180)*Math.sin(dLng/2)**2;
-          return R*2*Math.asin(Math.sqrt(h));};
-        setPharmacies([...list].sort((x,y)=>dist(x)-dist(y)));
-      });
-    });
+    void api.fulfillmentProfile(token).then(result=>{
+      setRx(result.prescription);
+      setPharmacies(result.pharmacies.map((p:any)=>({...p,lat:p.lat??31.2,lng:p.lng??29.92,location:{lat:p.lat??31.2,lng:p.lng??29.92}})));
+    }).catch(()=>toast('Invalid or expired fulfillment link',true));
   },[token]);
-  const choose = (p:Pharmacy) => {
+  const choose = async (p:Pharmacy) => {
     if(!rx) return; setSelected(p.id);
-    const text = `Hello ${p.name},\n\nI would like to order the following prescription from OneMed:\n*Doctor:* ${rx.doctorName}\n*Patient:* ${rx.patientName}\n\n*Medicines:*\n${rx.medicines.map((m,i)=>`${i+1}. ${m.name} ${m.dosage} - ${m.frequency} - ${m.duration}`).join('\n')}`;
-    const url = `https://wa.me/${p.whatsapp.replace(/\D/g,'')}?text=${encodeURIComponent(text)}`;
-    api.mutate(db=>{ const r=db.prescriptions.find(x=>x.id===rx.id); if(r){r.pharmacyId=p.id;r.orderStatus='received';r.whatsappUrl=url;} }).then(()=>{ window.open(url,'_blank'); toast(t('orderPlaced')); });
+    try { const result=await api.selectPharmacy(token,p.id); window.open(result.whatsappUrl,'_blank'); toast(t('orderPlaced')); }
+    catch(e:any){ toast(e.message,true); }
   };
   return <div className="public-shell"><div className="public-top"><span className="logo">OneMed</span><span style={{fontSize:12}}>{t('prescriptions')}</span><div style={{flex:1}}/><BackButton fallback="/"/></div>
     <div className="public-wrap" style={{maxWidth:680}}>

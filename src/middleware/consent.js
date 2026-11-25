@@ -59,8 +59,15 @@ export function requirePatientAccess(scope, { resourceType, resourceId } = {}) {
 export async function loadAffiliation(req) {
   if (!req.user?.uid) return;
   const store = getStore();
-  const doctors = await store.get("doctors", req.user.uid);
-  if (doctors?.institutionId) {
-    req.affiliation = { institutionId: doctors.institutionId, kind: "doctor" };
+  const doctor = await store.get("doctors", req.user.uid);
+  if (doctor?.institutionId) {
+    req.affiliation = { institutionId: doctor.institutionId, kind: "doctor" };
+    req.user.institutionId = doctor.institutionId;
+    return;
+  }
+  const user = await store.get("users", req.user.uid);
+  if (user?.institutionId) {
+    req.affiliation = { institutionId: user.institutionId, kind: user.role };
+    req.user.institutionId = user.institutionId;
   }
 }

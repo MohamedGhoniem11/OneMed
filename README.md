@@ -112,7 +112,7 @@ available).
 | Patient/lab/pharmacy portals | Partial | UI complete; patient/lab wired to real APIs, pharmacy still demo-only |
 | Consent, audit hash chain, QR/NFC | Implemented | scoped consent, hash chain, signed 15-min QR and NFC tokens, emergency override |
 | Emergency RAG chatbot / Gemini | Implemented | privacy-filtered public page, signed QR, 123-first grounded answers with citations |
-| Fulfillment link + GPS pharmacy match | Planned | M5 |
+| Fulfillment link + GPS pharmacy match | Implemented | 24h signed links, GPS-sorted pharmacies, WhatsApp orders |
 | Analytics, reports, bilingual PWA | Planned | M6–M7 |
 
 ---
@@ -208,6 +208,17 @@ Base path: `/api`. Protected routes require `Authorization: Bearer <token>`.
 | PATCH | `/api/emergency/privacy` | patient | Configure public emergency fields |
 | GET | `/api/emergency/:token` | public, rate-limited | Privacy-filtered emergency profile; scan logged |
 | POST | `/api/emergency/:token/chat` | public, rate-limited | Grounded first-aid guidance with sources |
+| POST | `/api/prescriptions` | doctor | Create a pending prescription |
+| POST | `/api/prescriptions/:id/confirm` | doctor | Confirm and issue a 24h fulfillment link |
+| GET | `/api/fulfillment/:token` | public, rate-limited | Prescription summary + GPS-sorted pharmacies |
+| POST | `/api/fulfillment/:token/select` | public, rate-limited | Select pharmacy and get WhatsApp deep link |
+| GET/PATCH | `/api/pharmacy/orders` | pharmacy/admin | Order inbox and status transitions |
+| GET/PATCH | `/api/pharmacy/profile` | pharmacy/admin | Pharmacy profile and GPS/hours |
+| GET/POST | `/api/messages/conversations` | signed-in | Conversations |
+| GET/POST | `/api/messages/conversations/:id/messages` | participant | Messages |
+| GET | `/api/notifications` | signed-in | In-app notification center |
+
+**Fulfillment:** links expire after `FULFILLMENT_TTL_SECONDS` (default 24h); pharmacy selection is GPS-sorted and generates a `wa.me` deep link with structured medicines. FCM device push is not configured in this environment; notifications are available in-app.
 
 **Emergency AI:** Gemini (`GEMINI_MODEL`, default `gemini-2.5-flash`) with Firestore vector search on `guidelineChunks`, seeded via `npm run seed:guidelines`. If no key is configured, a labelled deterministic offline provider keeps the demo functional. The public page exposes only fields the patient approved; every view and chat is audit logged.
 

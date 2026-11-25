@@ -162,9 +162,9 @@ export function PatientEmergencyConfig() {
 export function PatientMessages() {
   const { session } = useAuth(); const { t } = useTranslation(); const {toast}=useToast();
   const [convs,setConvs]=useState<Conversation[]>([]); const [active,setActive]=useState<string|null>(null); const [msgs,setMsgs]=useState<Message[]>([]); const [text,setText]=useState('');
-  useEffect(()=>{ api.list<Conversation>('conversations',c=>c.patientId===session!.user.uid).then(a=>{setConvs(a);setActive(a[0]?.id||null);}); },[]);
-  useEffect(()=>{ if(active) api.list<Message>('messages',m=>m.conversationId===active).then(a=>setMsgs(a.sort((x,y)=>x.sentAt.localeCompare(y.sentAt)))); },[active]);
-  const send=async()=>{ if(!text.trim()||!active) return; await api.mutate(db=>{db.messages.push({id:`m_${Date.now()}`,conversationId:active,senderId:session!.user.uid,text,sentAt:new Date().toISOString()});}); setText(''); api.list<Message>('messages',m=>m.conversationId===active).then(a=>setMsgs(a.sort((x,y)=>x.sentAt.localeCompare(y.sentAt)))); };
+  useEffect(()=>{ void api.listConversations().then(a=>{setConvs(a);setActive(a[0]?.id||null);}); },[]);
+  useEffect(()=>{ if(active) void api.listMessages(active).then(setMsgs); },[active]);
+  const send=async()=>{ if(!text.trim()||!active) return; await api.sendMessage(active,text); setText(''); setMsgs(await api.listMessages(active)); };
   return <><PageHead title={t('messages')} subtitle="Secure in-app conversations with your care team."/>
     <div className="grid" style={{gridTemplateColumns:'280px 1fr'}}><Card pad><div className="card-body">{convs.map(c=><button key={c.id} className={`nav-item ${active===c.id?'active':''}`} style={{color:'var(--ink)'}} onClick={()=>setActive(c.id)}><span className="avatar">{c.otherName.slice(0,2).toUpperCase()}</span><span><strong>{c.otherName}</strong><div style={{fontSize:11,color:'var(--muted)'}}>{t(c.role)}</div></span></button>)}{!convs.length&&<Empty/>}</div></Card>
       <Card pad={false}><div className="card-head"><h3>{convs.find(c=>c.id===active)?.otherName||'-'}</h3></div><div className="card-body"><div className="chat-log">{msgs.map(m=><div key={m.id} className={`msg ${m.senderId===session!.user.uid?'me':''}`}>{m.text}<div style={{fontSize:10,opacity:.6,marginTop:4}}>{new Date(m.sentAt).toLocaleTimeString()}</div></div>)}</div><div style={{display:'flex',gap:8,marginTop:12}}><input className="input" value={text} onChange={e=>setText(e.target.value)} placeholder="Type a message…" onKeyDown={e=>{if(e.key==='Enter')void send();}}/><button className="btn primary" onClick={()=>void send()}><Pill size={16}/> Send</button></div></div></Card></div>
@@ -174,9 +174,9 @@ export function PatientMessages() {
 export function PatientNotifications({ userId }: { userId?: string }) {
   const { session } = useAuth(); const { t } = useTranslation(); const {toast}=useToast(); const [list,setList]=useState<Notification[]>([]);
   const target = userId || session!.user.uid;
-  const load = ()=>api.list<Notification>('notifications',n=>n.userId===target).then(a=>setList(a.sort((x,y)=>y.createdAt.localeCompare(x.createdAt))));
+  const load = ()=>api.listNotifications().then(a=>setList(a.sort((x:any,y:any)=>String(y.createdAt).localeCompare(String(x.createdAt)))));
   useEffect(()=>{ void load(); },[target]);
-  return <><PageHead title={t('notifications')} subtitle="Lab results, prescriptions and messages." actions={<button className="btn sm outline" onClick={async()=>{await api.mutate(db=>{db.notifications.filter(n=>n.userId===target).forEach(n=>{n.read=true;});});toast(t('saved'));void load();}}>Mark all read</button>}/>
+  return <><PageHead title={t('notifications')} subtitle="Lab results, prescriptions and messages." actions={<button className="btn sm outline" onClick={async()=>{await api.markNotificationsRead();toast(t('saved'));void load();}}>Mark all read</button>}/>
     <Card pad><div className="card-body">{list.map(n=><div key={n.id} style={{display:'flex',gap:12,padding:'12px 0',borderBottom:'1px solid var(--line)'}}><span className="avatar"><Bell size={16}/></span><div style={{flex:1}}><strong>{n.title}</strong><div>{n.body}</div><div style={{fontSize:11,color:'var(--muted)'}}>{new Date(n.createdAt).toLocaleString()}</div></div>{!n.read&&<Badge tone="blue">new</Badge>}</div>)}{!list.length&&<Empty/>}</div></Card></>;
 }
 

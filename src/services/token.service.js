@@ -13,6 +13,7 @@ import { httpError } from "../utils/http-error.js";
 const CONNECTIONS = "connectionTokens";
 const NFC_TOKENS = "nfcTokens";
 const EMERGENCY = "emergencyQr";
+const FULFILLMENT = "fulfillmentLinks";
 const hash = (token) => crypto.createHash("sha256").update(token).digest("hex");
 // Domain separation from the login access-token key, without a second secret.
 const key = (domain) => crypto.createHmac("sha256", getJwtSecret()).update(domain).digest();
@@ -164,6 +165,37 @@ export async function resolveEmergency(token) {
     lastScanAt: new Date(),
   });
   return { patientId: payload.patientId, record: updated };
+}
+
+export async function createFulfillment({ prescriptionId, patientId, ttlSeconds = env.fulfillmentTtlSeconds }) {
+  const jti = crypto.randomUUID();
+  const token = sign({
+    domain: "onemed-fulfillment",
+    audience: "onemed-fulfillment",
+    subject: patientId,
+    expiresIn: ttlSeconds,
+    jti,
+    payload: { typ: "fulfillment", prescriptionId, patientId },
+  });
+  const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
+  const record = await getStore().set(FULFILLMENT, jti, {
+    tokenHash: hash(token),
+    prescriptionId,
+    patientId,
+    createdAt: new Date(),
+    expiresAt,
+    usedAt: null,
+    revokedAt: null,
+  });
+  return { token, record, expiresAt, url: `${env.publicBaseUrl}/f/${token}` };
+}
+
+export async function resolveFulfillment(token) {
+  const payload = verify(token, { domain: "onemed-fulfillment", audience: "onemed-fulfillment" });
+  if (payload.typ !== "fulfillment") throw httpError(400, "Invalid token type");
+  const record = activeRecord(await getStore().get(FULFILLMENT, payload.jti));
+  if (record.tokenHash !== hash(token)) throw httpError(400, "Token mismatch");
+  return { prescriptionId: payload.prescriptionId, patientId: payload.patientId, record };
 }
 
 export async function revokeNfc(id) {

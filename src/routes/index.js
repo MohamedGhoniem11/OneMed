@@ -10,6 +10,10 @@ import recordRoutes from "./records.routes.js";
 import connectRoutes from "./connect.routes.js";
 import nfcRoutes from "./nfc.routes.js";
 import emergencyRoutes from "./emergency.routes.js";
+import fulfillmentRoutes from "./fulfillment.routes.js";
+import pharmacyRoutes from "./pharmacy.routes.js";
+import messagingRoutes from "./messaging.routes.js";
+import notificationRoutes from "./notification.routes.js";
 import auditRoutes from "./audit.routes.js";
 
 const router = Router();
@@ -25,6 +29,10 @@ router.use("/records", recordRoutes);
 router.use("/connect", connectRoutes);
 router.use("/nfc", nfcRoutes);
 router.use("/emergency", emergencyRoutes);
+router.use("/fulfillment", fulfillmentRoutes);
+router.use("/pharmacy", pharmacyRoutes);
+router.use("/messages", messagingRoutes);
+router.use("/notifications", notificationRoutes);
 router.use("/audit", auditRoutes);
 
 export default router;

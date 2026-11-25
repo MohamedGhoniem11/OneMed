@@ -3,8 +3,49 @@ import * as parser from "../services/prescription.parser.js";
 import * as service from "../services/prescription.service.js";
 import { hasActiveConsent } from "../services/consent.service.js";
 import { auditRequest } from "../services/audit.service.js";
+import { generate, llmMode } from "../services/llm.service.js";
 import { httpError } from "../utils/http-error.js";
 import { parseLimit } from "../utils/query.js";
+
+const EXTRACT_SYSTEM = "You are a medical prescription data extractor. Extract all medicines from the provided prescription text. For each medicine return name, dosage, frequency, duration, instructions. Use null for missing fields. Return ONLY a valid JSON array. Do not diagnose or recommend medication.";
+
+function fallbackItems(text, confidence) {
+  return parser.parse(text, { confidence }).items.map((item) => ({
+    name: item.name,
+    dosage: item.dose || null,
+    frequency: item.frequency || null,
+    duration: item.duration || null,
+    instructions: item.notes || null,
+    confidence: null,
+  }));
+}
+
+async function extractWithLlm(text, confidence) {
+  const heuristic = fallbackItems(text, confidence);
+  if (llmMode() !== "gemini") return { items: heuristic, mode: "offline", warnings: [] };
+  try {
+    const result = await generate({
+      system: EXTRACT_SYSTEM,
+      prompt: `Prescription OCR text:\n${text}\n\nReturn JSON array only.`,
+      maxOutputTokens: 800,
+    });
+    const match = result.text.match(/\[[\s\S]*\]/);
+    if (!match) return { items: heuristic, mode: "gemini-fallback", warnings: ["LLM did not return JSON; used local parser"] };
+    const parsed = JSON.parse(match[0]);
+    if (!Array.isArray(parsed) || !parsed.length) return { items: heuristic, mode: "gemini-fallback", warnings: ["LLM returned no medicines; used local parser"] };
+    const items = parsed.map((m) => ({
+      name: String(m.name || "").slice(0, 120),
+      dosage: m.dosage ? String(m.dosage).slice(0, 80) : null,
+      frequency: m.frequency ? String(m.frequency).slice(0, 80) : null,
+      duration: m.duration ? String(m.duration).slice(0, 80) : null,
+      instructions: m.instructions ? String(m.instructions).slice(0, 300) : null,
+      confidence: typeof m.confidence === "number" ? m.confidence : null,
+    })).filter((m) => m.name);
+    return { items, mode: "gemini", warnings: [] };
+  } catch {
+    return { items: heuristic, mode: "gemini-fallback", warnings: ["LLM unavailable; used local parser"] };
+  }
+}
 
 export async function extract(req, res, next) {
   try {
@@ -12,8 +53,13 @@ export async function extract(req, res, next) {
     const { text, confidence, lang } = await ocr.extractText(req.file.buffer, {
       lang: req.body?.lang || undefined,
     });
-    const { items, warnings } = parser.parse(text, { confidence });
-    res.json({ rawText: text, ocrConfidence: confidence, lang, items, warnings });
+    const result = await extractWithLlm(text, confidence);
+    await auditRequest(req, {
+      action: "prescription_extracted",
+      resourceType: "prescription",
+      metadata: { confidence, mode: result.mode, items: result.items.length },
+    });
+    res.json({ rawText: text, ocrConfidence: confidence, lang, items: result.items, warnings: result.warnings, mode: result.mode });
   } catch (err) {
     next(err);
   }
@@ -29,6 +75,21 @@ export async function create(req, res, next) {
       patientId: prescription.patientId,
     });
     res.status(201).json(prescription);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function confirm(req, res, next) {
+  try {
+    const prescription = await service.confirm(req.params.id, req.user.uid, req.body, { actorName: req.user.email });
+    await auditRequest(req, {
+      action: "prescription_confirmed",
+      resourceType: "prescription",
+      resourceId: prescription.id,
+      patientId: prescription.patientId,
+    });
+    res.json(prescription);
   } catch (err) {
     next(err);
   }
@@ -58,11 +119,13 @@ export async function listForPatient(req, res, next) {
 export async function list(req, res, next) {
   try {
     const limit = parseLimit(req.query.limit);
-    const doctorId = req.user.role === "admin" ? req.query.doctorId : req.user.uid;
+    const isPatient = req.user.role === "patient";
+    const doctorId = req.user.role === "admin" ? req.query.doctorId : (isPatient ? undefined : req.user.uid);
+    const patientId = isPatient ? req.user.uid : req.query.patientId;
     res.json(
       await service.list({
         doctorId,
-        patientId: req.query.patientId,
+        patientId,
         limit,
         startAfter: req.query.startAfter,
       }),

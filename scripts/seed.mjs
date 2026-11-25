@@ -99,6 +99,7 @@ const DEMO = {
       password: "Demo!onemedP1",
       role: "pharmacy",
       phone: "01098765432",
+      institutionId: "pharm_medica",
     },
     {
       uid: "user_hospital_admin",
@@ -168,6 +169,44 @@ const DEMO = {
       clinicAddress: "El Ibrahimiya, Alexandria",
       yearsOfExperience: 10,
       verified: true,
+    },
+  ],
+  pharmacies: [
+    {
+      id: "pharm_medica",
+      institutionId: "pharm_medica",
+      licenseNumber: "PH-ALX-001",
+      name: "MediCare Plus Pharmacy",
+      address: "14 El-Geish Road, Alexandria",
+      city: "Alexandria",
+      phone: "01098765432",
+      whatsapp: "01098765432",
+      location: { lat: 31.201, lng: 29.921 },
+      openingHours: "Open 24/7",
+      hours: "Open 24/7",
+      rating: 4.8,
+      active: true,
+      status: "approved",
+      verified: true,
+      monthlyFee: 1500,
+    },
+    {
+      id: "pharm_city",
+      institutionId: "pharm_city",
+      licenseNumber: "PH-ALX-002",
+      name: "City Central Care",
+      address: "3 Saad Zaghloul Square, Alexandria",
+      city: "Alexandria",
+      phone: "01234567891",
+      whatsapp: "01234567891",
+      location: { lat: 31.198, lng: 29.918 },
+      openingHours: "08:00 - 22:00",
+      hours: "08:00 - 22:00",
+      rating: 4.5,
+      active: true,
+      status: "approved",
+      verified: true,
+      monthlyFee: 1500,
     },
   ],
   prescriptions: [
@@ -309,7 +348,7 @@ async function seed() {
   const store = getStore();
   const idp = getIdp();
   const now = new Date();
-  const report = { institutions: 0, users: 0, patients: 0, doctors: 0, prescriptions: 0, records: 0, consents: 0, guidelineChunks: 0, skipped: 0 };
+  const report = { institutions: 0, users: 0, patients: 0, doctors: 0, pharmacies: 0, prescriptions: 0, records: 0, consents: 0, guidelineChunks: 0, skipped: 0 };
 
   for (const institution of DEMO.institutions) {
     const existing = await store.get("institutions", institution.id);
@@ -343,7 +382,9 @@ async function seed() {
       });
       report.users += 1;
     } else {
-      report.skipped += 1;
+      if (user.institutionId && existingProfile.institutionId !== user.institutionId) {
+        await store.update("users", user.uid, { institutionId: user.institutionId, updatedAt: now });
+      } else report.skipped += 1;
     }
   }
 
@@ -366,10 +407,26 @@ async function seed() {
     report.doctors += 1;
   }
 
+  for (const pharmacy of DEMO.pharmacies) {
+    const existing = await store.get("pharmacies", pharmacy.id);
+    if (existing) { report.skipped += 1; continue; }
+    await store.set("pharmacies", pharmacy.id, { ...pharmacy, createdAt: now, updatedAt: now });
+    report.pharmacies += 1;
+  }
+
   for (const prescription of DEMO.prescriptions) {
     const existing = await store.get("prescriptions", prescription.id);
     if (existing) { report.skipped += 1; continue; }
-    await store.set("prescriptions", prescription.id, { ...prescription, createdAt: now, updatedAt: now });
+    await store.set("prescriptions", prescription.id, {
+      ...prescription,
+      doctorName: "Dr. Karim Hassan",
+      patientName: "Mona Ali Hassan",
+      status: prescription.status || "confirmed",
+      extractionStatus: "confirmed",
+      orderStatus: null,
+      createdAt: now,
+      updatedAt: now,
+    });
     report.prescriptions += 1;
   }
 
