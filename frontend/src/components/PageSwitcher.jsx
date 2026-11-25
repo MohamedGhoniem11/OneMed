@@ -6,9 +6,10 @@ const pages = [
   { to: '/prescription',      emoji: '📄', label: 'Prescription' },
   { to: '/admin',             emoji: '⚙️',  label: 'Admin'        },
   { to: '/system',            emoji: '🏥', label: 'System'       },
+  { to: '/lab',               emoji: '🧪', label: 'Lab'          },
+  { to: '/patient-analytics', emoji: '📊', label: 'Analytics'    },
   { to: '/pharmacy-order',    emoji: '💊', label: 'Pharmacy'     },
   { to: '/emergency',         emoji: '🚨', label: 'Emergency'    },
-  { to: '/patient-analytics', emoji: '📊', label: 'Analytics'    },
 ]
 
 export default function PageSwitcher() {
