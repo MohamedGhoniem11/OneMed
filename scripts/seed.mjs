@@ -1,6 +1,8 @@
 import "dotenv/config";
 import crypto from "node:crypto";
 import { createEmergency, createFulfillment, createNfc } from "../src/services/token.service.js";
+import { generateSecret } from "otplib";
+import { requiresMfa } from "../src/constants/auth.js";
 
 /**
  * Idempotent demo seed (R82, M1 acceptance).
@@ -404,7 +406,7 @@ async function seed() {
         ...profile,
         status: "active",
         emailVerified: true,
-        mfaEnabled: user.role !== "patient",
+        mfaEnabled: requiresMfa(user.role),
         emergencyContact:
           user.role === "patient"
             ? { name: "Family Contact", phone: "01000000001", relationship: "family" }
@@ -418,6 +420,17 @@ async function seed() {
         await store.update("users", user.uid, { institutionId: user.institutionId, updatedAt: now });
       } else report.skipped += 1;
     }
+  }
+
+  // Seed real TOTP credentials for staff so their seeded `mfaEnabled` flag is
+  // true in the backend, not just a UI claim, and demo runs can authenticate.
+  for (const user of DEMO.users.filter((u) => requiresMfa(u.role))) {
+    if (await store.get("userMfa", user.uid)) { report.skipped += 1; continue; }
+    await store.set("userMfa", user.uid, {
+      userId: user.uid, secret: generateSecret(), enabled: true,
+      createdAt: now, updatedAt: now,
+    });
+    report.mfa = (report.mfa || 0) + 1;
   }
 
   for (const patient of DEMO.patients) {

@@ -129,7 +129,20 @@ export function createLocalStore({ dataDir, file } = {}) {
       await fsp.mkdir(path.dirname(dbFile), { recursive: true });
       const tmp = `${dbFile}.${process.pid}.${crypto.randomUUID()}.tmp`;
       await fsp.writeFile(tmp, snapshot, { encoding: "utf8", mode: 0o600 });
-      await fsp.rename(tmp, dbFile);
+      let lastError;
+      for (let attempt = 0; attempt < 6; attempt += 1) {
+        try { await fsp.rename(tmp, dbFile); lastError = null; break; }
+        catch (error) {
+          lastError = error;
+          if (!["EPERM", "EBUSY", "EACCES"].includes(error.code)) throw error;
+          await new Promise((resolve) => setTimeout(resolve, 25 * (attempt + 1)));
+        }
+      }
+      if (lastError) {
+        // Windows can lock the target briefly when another process reads it.
+        await fsp.writeFile(dbFile, snapshot, { encoding: "utf8", mode: 0o600 });
+        await fsp.unlink(tmp).catch(() => {});
+      }
     });
     return writeQueue;
   }

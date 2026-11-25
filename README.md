@@ -25,6 +25,7 @@ Requires Node.js 20.19+ (Node 22 LTS recommended).
 ```bash
 npm install
 cd frontend && npm install && cd ..
+npm run seed        # create empty demo DB + accounts BEFORE starting the API
 npm run dev:all     # API :3000 + frontend :5173 in API mode
 ```
 

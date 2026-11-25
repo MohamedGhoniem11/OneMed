@@ -4,7 +4,8 @@
  * Uses the seeded demo accounts; no fake data is injected.
  */
 import "dotenv/config";
-import { createSession } from "../src/services/session.service.js";
+import { generate } from "otplib";
+import { getStore } from "../src/store/index.js";
 
 const BASE = process.env.DEMO_BASE_URL || "http://localhost:3000/api";
 const H = (t) => ({ "content-type": "application/json", authorization: `Bearer ${t}` });
@@ -21,15 +22,35 @@ async function json(path, token, init = {}) {
   return body;
 }
 
+/** Authenticate through the real API, including first-login TOTP enrollment. */
+async function staffToken(uid, email, password) {
+  const first = await json("/auth/login", null, { method: "POST", body: JSON.stringify({ email, password }) });
+  if (first.accessToken) return first.accessToken;
+  if (first.mfaToken) {
+    const record = await getStore().get("userMfa", uid);
+    if (!record?.secret) throw new Error(`No seeded MFA secret for ${email}; run npm run seed`);
+    const code = await generate({ secret: record.secret });
+    const verified = await json("/auth/mfa/verify", null, { method: "POST", body: JSON.stringify({ mfaToken: first.mfaToken, code }) });
+    return verified.accessToken;
+  }
+  if (!first.setupToken) throw new Error(`No session or MFA token for ${email}`);
+  const setup = await json("/auth/mfa/setup", null, { method: "POST", body: JSON.stringify({ setupToken: first.setupToken }) });
+  const code = await generate({ secret: setup.secret });
+  await json("/auth/mfa/enable", null, { method: "POST", body: JSON.stringify({ setupToken: first.setupToken, code }) });
+  const second = await json("/auth/login", null, { method: "POST", body: JSON.stringify({ email, password }) });
+  const verified = await json("/auth/mfa/verify", null, { method: "POST", body: JSON.stringify({ mfaToken: second.mfaToken, code }) });
+  return verified.accessToken;
+}
+
 async function main() {
   const health = await fetch(`${BASE.replace(/\/api$/, "")}/`).then(r => r.json());
   console.log(`OneMed demo · ${health.persistence} persistence · ${health.authProvider} auth`);
 
   const patientLogin = await json("/auth/login", null, { method: "POST", body: JSON.stringify({ email: "mona.patient@example.com", password: "Demo!onemed1" }) });
   const patient = patientLogin.accessToken;
-  const doctor = (await createSession({ id: "user_doctor_1", role: "doctor", email: "karim.doctor@example.com" }, { mfa: true })).accessToken;
-  const pharmacy = (await createSession({ id: "user_pharmacy", role: "pharmacy", email: "pharmacy.desk@example.com" }, { mfa: true })).accessToken;
-  const admin = (await createSession({ id: "user_admin", role: "admin", email: "admin.onemed@example.com" }, { mfa: true })).accessToken;
+  const doctor = await staffToken("user_doctor_1", "karim.doctor@example.com", "Demo!onemedD1");
+  const pharmacy = await staffToken("user_pharmacy", "pharmacy.desk@example.com", "Demo!onemedP1");
+  const admin = await staffToken("user_admin", "admin.onemed@example.com", "Demo!onemedA1");
 
   await check("Patient search", async () => (await json("/patients/search?q=Mona", doctor)).patients.length);
   await check("Clinical summary", async () => (await json("/analytics/clinical/user_patient_1/summary", doctor)).confidence);
