@@ -426,6 +426,13 @@ export async function resolveNfc(tokenValue: string): Promise<{patientId:string;
   return { patientId:direct.patientId, valid:true, emergencyToken:direct.token };
 }
 
+/** Issue (or re-issue) a signed NFC landing link for the signed-in patient. */
+export async function issueMyNfc() {
+  if (API_MODE === 'api') return http<any>('/nfc', { method:'POST', body:JSON.stringify({ patientId:getSession()?.user.uid }) }, token());
+  const p = loadDB().emergencyProfiles.find(x => x.patientId === getSession()?.user.uid);
+  return { token: p?.nfcUid || null };
+}
+
 export async function myNfc() {
   if (API_MODE === 'api') {
     return http<any>('/nfc/mine', {}, token());

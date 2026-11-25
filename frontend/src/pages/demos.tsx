@@ -1,18 +1,18 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Activity, FileText, HeartPulse, Pill, QrCode, ShieldCheck, Stethoscope, Store } from 'lucide-react';
+import * as api from '../api/client';
+import { useAuth } from '../auth/AuthContext';
 import { Card, PageHead } from '../components/ui';
 
 type Demo = { titleKey: string; descKey: string; to: string; icon: React.ReactNode };
 
 /** One hub for the documented demos. Public links work without signing in. */
-const PUBLIC: Demo[] = [
+const DEMO_TOKENS = { emergency: 'em-demo-mona', nfc: 'NTAG424-0A1B', fulfillment: 'rx-demo-8f3a' };
+const PUBLIC_BASE: Demo[] = [
   { titleKey: 'demoLandingTitle', descKey: 'demoLandingDesc', to: '/', icon: <HeartPulse size={18}/> },
   { titleKey: 'demoRegistrationTitle', descKey: 'demoRegistrationDesc', to: '/register', icon: <ShieldCheck size={18}/> },
-  { titleKey: 'demoEmergencyTitle', descKey: 'demoEmergencyDesc', to: '/emergency/demo', icon: <HeartPulse size={18}/> },
-  { titleKey: 'demoNfcTitle', descKey: 'demoNfcDesc', to: '/nfc/demo', icon: <QrCode size={18}/> },
-  { titleKey: 'demoPharmacyTitle', descKey: 'demoPharmacyDesc', to: '/f/demo', icon: <Pill size={18}/> },
 ];
 
 const ROLE_DEMOS: { roleKey: string; items: Demo[] }[] = [
@@ -52,10 +52,35 @@ function DemoCard({ demo }: { demo: Demo }) {
 }
 
 export function DemoHub() {
-  const { t } = useTranslation();
+  const { t } = useTranslation(); const { session } = useAuth();
+  const [links,setLinks] = useState({ emergency:'', nfc:'', fulfillment:'' });
+  useEffect(()=>{
+    if (api.API_MODE !== 'api' || session?.user.role !== 'patient') return;
+    void Promise.all([
+      api.myEmergencyLink().catch(()=>null),
+      api.issueMyNfc().catch(()=>null),
+      api.list<any>('prescriptions',p=>p.patientId===session.user.uid).catch(()=>[]),
+    ]).then(([emergency,nfc,prescriptions])=>setLinks({
+      emergency: emergency || '',
+      nfc: nfc?.token ? `/nfc/${nfc.token}` : '',
+      fulfillment: prescriptions.find(p=>p.linkToken)?.linkToken ? `/f/${prescriptions.find(p=>p.linkToken).linkToken}` : '',
+    }));
+  },[session?.user.uid]);
+  const publicDemos = [
+    ...PUBLIC_BASE,
+    ...(api.API_MODE === 'demo' ? [
+      { titleKey:'demoEmergencyTitle', descKey:'demoEmergencyDesc', to:`/emergency/${DEMO_TOKENS.emergency}`, icon:<HeartPulse size={18}/> },
+      { titleKey:'demoNfcTitle', descKey:'demoNfcDesc', to:`/nfc/${DEMO_TOKENS.nfc}`, icon:<QrCode size={18}/> },
+      { titleKey:'demoPharmacyTitle', descKey:'demoPharmacyDesc', to:`/f/${DEMO_TOKENS.fulfillment}`, icon:<Pill size={18}/> },
+    ] : [
+      ...(links.emergency ? [{ titleKey:'demoEmergencyTitle', descKey:'demoEmergencyDesc', to:links.emergency, icon:<HeartPulse size={18}/> }] : []),
+      ...(links.nfc ? [{ titleKey:'demoNfcTitle', descKey:'demoNfcDesc', to:links.nfc, icon:<QrCode size={18}/> }] : []),
+      ...(links.fulfillment ? [{ titleKey:'demoPharmacyTitle', descKey:'demoPharmacyDesc', to:links.fulfillment, icon:<Pill size={18}/> }] : []),
+    ]),
+  ];
   return <>
     <PageHead title={t('demos')} subtitle={t('demoHubSubtitle')}/>
-    <Card title={t('publicDemos')}><div className="grid cols-3">{PUBLIC.map(d => <DemoCard key={d.titleKey} demo={d}/>)}</div></Card>
+    <Card title={t('publicDemos')}><div className="grid cols-3">{publicDemos.map(d => <DemoCard key={d.titleKey} demo={d}/>)}</div></Card>
     {ROLE_DEMOS.map(group => <Card key={group.roleKey} title={t('rolePortal', { role: t(group.roleKey) })} style={{ marginTop: 16 }}>
       <div className="grid cols-3">{group.items.map(d => <DemoCard key={d.titleKey} demo={d}/>)}</div>
     </Card>)}

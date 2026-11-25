@@ -33,7 +33,14 @@ export function LabPortal({ initialTab = 'upload' }: { initialTab?: string }) {
     if(!patientId) return toast(t('fieldRequired'),true);
     setBusy(true);
     try {
-      if(file) { const result=await api.ingestRecord(file,patientId,session!.user.institutionId); toast(result.record?.status==='needs_review'?t('uploadStoredLowConfidence'):t('saved')); }
+      if(file) {
+        const result=await api.ingestRecord(file,patientId,session!.user.institutionId);
+        const extracted = result.record?.values || result.record?.data?.values || result.values || [];
+        if(extracted.length) setRows(extracted.map((v:any)=>({test:v.name,value:String(v.value),unit:v.unit||'',ref:`${v.referenceLow??''} - ${v.referenceHigh??''}`,confidence:result.record?.confidence??100})));
+        const needsReview = ['needs_review','manual_review'].includes(result.record?.status);
+        toast(needsReview?t('uploadStoredLowConfidence'):t('saved'));
+        if(needsReview){ setTab('upload'); await load(); return; }
+      }
       else if(rows.length) { await savePanel(t('uploadedLabPanel'),rows); toast(t('saved')); }
       else return toast(t('addValuesOrFile'),true);
       setFile(null); setRows([]); await load(); setTab('history');
