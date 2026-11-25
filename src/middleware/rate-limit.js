@@ -1,7 +1,9 @@
 import rateLimit from "express-rate-limit";
 import { env } from "../config/env.js";
 
-const disabled = () => env.rateLimitDisabled || env.isTest;
+// Tests remain deterministic via RATE_LIMIT_DISABLED=true in tests/setup.js.
+// Do not implicitly disable limiters for NODE_ENV=test: that hides regressions.
+const disabled = () => env.rateLimitDisabled;
 
 const base = {
   windowMs: env.rateLimitWindowMs,

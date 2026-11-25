@@ -21,6 +21,7 @@
     "seed:guidelines": "node scripts/seed-guidelines.mjs",
     "dev:all": "node scripts/dev-all.mjs",
     "demo": "node scripts/demo-walkthrough.mjs",
+    "perf:smoke": "node scripts/perf-smoke.mjs",
     "purge:deletions": "node scripts/purge-deletions.mjs",
     "set:admin": "node scripts/setAdmin.js"
   },

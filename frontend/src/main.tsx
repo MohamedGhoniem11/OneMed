@@ -12,6 +12,7 @@ import {
 } from './pages/public';
 import { ConsentQrPage } from './pages/consent-qr';
 import { DemoHub } from './pages/demos';
+import { PrivacyPage, TermsPage } from './pages/legal';
 import {
   PatientDashboard, PatientRecords, PatientAnalytics, PatientPrescriptions, PatientConsents,
   PatientEmergencyConfig, PatientMessages, PatientNotifications, PatientSettings,
@@ -51,6 +52,8 @@ function Root() {
     <Route path="/" element={session ? <Navigate to="/app" replace/> : <Landing/>}/>
     <Route path="/login" element={<Login/>}/>
     <Route path="/register" element={<Register/>}/>
+    <Route path="/privacy" element={<PrivacyPage/>}/>
+    <Route path="/terms" element={<TermsPage/>}/>
     <Route path="/emergency/:token" element={<EmergencyPage/>}/>
     <Route path="/nfc/:token" element={<NfcLanding/>}/>
     <Route path="/f/:token" element={<FulfillmentPage/>}/>
