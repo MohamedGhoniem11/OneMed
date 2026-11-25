@@ -16,7 +16,9 @@
     "lint:fix": "eslint . --fix",
     "check": "npm run lint && npm test",
     "test:ocr": "node scripts/ocr-smoke.mjs",
-    "test:ocr:accuracy": "node scripts/ocr-accuracy.mjs"
+    "test:ocr:accuracy": "node scripts/ocr-accuracy.mjs",
+    "seed": "node scripts/seed.mjs",
+    "seed:guidelines": "node scripts/seed-guidelines.mjs"
   },
   "license": "ISC",
   "dependencies": {

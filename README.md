@@ -111,7 +111,7 @@ available).
 | Medical ingestion API (M2) | Implemented | PDF/image/CSV/JSON/FHIR/DICOM + manual entry, AES-256-GCM originals, <80% review gate |
 | Patient/lab/pharmacy portals | Partial | UI complete; patient/lab wired to real APIs, pharmacy still demo-only |
 | Consent, audit hash chain, QR/NFC | Implemented | scoped consent, hash chain, signed 15-min QR and NFC tokens, emergency override |
-| Emergency RAG chatbot / Gemini | Planned | M4 |
+| Emergency RAG chatbot / Gemini | Implemented | privacy-filtered public page, signed QR, 123-first grounded answers with citations |
 | Fulfillment link + GPS pharmacy match | Planned | M5 |
 | Analytics, reports, bilingual PWA | Planned | M6–M7 |
 
@@ -204,6 +204,12 @@ Base path: `/api`. Protected routes require `Authorization: Bearer <token>`.
 | POST | `/api/nfc` | staff with `patients:read` | Issue a signed NFC patient token |
 | GET | `/api/nfc/:token` | public | Resolve a wristband tap (scan logged) |
 | GET | `/api/nfc/mine` | patient | Own wristband status (never returns the raw token) |
+| POST | `/api/emergency/qr` | patient | Issue a signed emergency QR token |
+| PATCH | `/api/emergency/privacy` | patient | Configure public emergency fields |
+| GET | `/api/emergency/:token` | public, rate-limited | Privacy-filtered emergency profile; scan logged |
+| POST | `/api/emergency/:token/chat` | public, rate-limited | Grounded first-aid guidance with sources |
+
+**Emergency AI:** Gemini (`GEMINI_MODEL`, default `gemini-2.5-flash`) with Firestore vector search on `guidelineChunks`, seeded via `npm run seed:guidelines`. If no key is configured, a labelled deterministic offline provider keeps the demo functional. The public page exposes only fields the patient approved; every view and chat is audit logged.
 
 **Connection/NFC tokens:** JWT-based capability tokens, SHA-256 hashes at rest, domain-separated from login tokens. QR connections expire after `CONNECTION_TTL_SECONDS` (default 900); NFC tokens are revocable. Raw tokens are returned once.
 

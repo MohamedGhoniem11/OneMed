@@ -19,3 +19,4 @@ export const globalLimiter = rateLimit({ ...base, limit: env.rateLimitMax });
 export const authLimiter = rateLimit({ ...base, limit: env.authRateLimitMax });
 export const ocrLimiter = rateLimit({ ...base, limit: env.ocrRateLimitMax });
 export const aiLimiter = rateLimit({ ...base, limit: env.aiRateLimitMax });
+export const emergencyLimiter = rateLimit({ ...base, limit: env.emergencyRateLimitMax });

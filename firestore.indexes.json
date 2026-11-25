@@ -108,6 +108,14 @@
       "collectionGroup": "authSessions",
       "queryScope": "COLLECTION",
       "fields": [{ "fieldPath": "userId", "order": "ASCENDING" }]
+    },
+    {
+      "collectionGroup": "nfcTokens",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "patientId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

@@ -189,6 +189,19 @@ export function createLocalStore({ dataDir, file } = {}) {
       return true;
     },
 
+    async vectorSearch(name, vector, { limit = 5 } = {}) {
+      const { items } = await this.query(name, { limit: 1000 });
+      const norm = Math.sqrt(vector.reduce((s, x) => s + x * x, 0)) || 1;
+      const scored = items.map((doc) => {
+        const v = Array.isArray(doc.embedding) ? doc.embedding : [];
+        const vnorm = Math.sqrt(v.reduce((s, x) => s + x * x, 0)) || 1;
+        const score = v.length === vector.length
+          ? vector.reduce((s, x, i) => s + x * (v[i] || 0), 0) / (norm * vnorm) : 0;
+        return { ...doc, score };
+      }).filter((doc) => doc.score > 0).sort((a, b) => b.score - a.score);
+      return scored.slice(0, limit);
+    },
+
     async query(name, { where = [], orderBy = [], limit, startAfter } = {}) {
       const coll = collection(name);
       const clauses = normalizeWhere(where);

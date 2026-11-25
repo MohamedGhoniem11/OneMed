@@ -1,0 +1,183 @@
+import { getStore } from "../store/index.js";
+import { httpError } from "../utils/http-error.js";
+import { auditRequest } from "./audit.service.js";
+import { resolveEmergency } from "./token.service.js";
+import { embed, generate, llmMode, offlineRank } from "./llm.service.js";
+
+const PATIENTS = "patients";
+const CHUNKS = "guidelineChunks";
+
+export const DEFAULT_PRIVACY = Object.freeze({
+  showBloodType: true,
+  showAllergies: true,
+  showConditions: true,
+  showMedications: false,
+  showContacts: true,
+  aiChatbotEnabled: true,
+});
+
+function privacyOf(patient) {
+  const p = patient?.privacy || {};
+  return {
+    showBloodType: p.showBloodGroup ?? p.showBloodType ?? DEFAULT_PRIVACY.showBloodType,
+    showAllergies: p.showAllergies ?? DEFAULT_PRIVACY.showAllergies,
+    showConditions: p.showChronicConditions ?? p.showConditions ?? DEFAULT_PRIVACY.showConditions,
+    showMedications: p.showMedications ?? DEFAULT_PRIVACY.showMedications,
+    showContacts: p.showEmergencyContacts ?? p.showContacts ?? DEFAULT_PRIVACY.showContacts,
+    aiChatbotEnabled: p.aiChatbotEnabled ?? DEFAULT_PRIVACY.aiChatbotEnabled,
+  };
+}
+
+async function displayName(patient) {
+  if (patient.name || patient.fullName) return patient.name || patient.fullName;
+  const user = await getStore().get("users", patient.id);
+  return user?.name || "OneMed patient";
+}
+
+async function resolvePatient(token, req) {
+  let resolved;
+  try { resolved = await resolveEmergency(token); }
+  catch (error) { throw httpError(error.status || 400, "Invalid or unknown emergency QR token"); }
+  const patient = await getStore().get(PATIENTS, resolved.patientId);
+  if (!patient) throw httpError(404, "Patient not found");
+  if (req) {
+    await auditRequest(req, {
+      action: "emergency_page_viewed",
+      resourceType: "emergency",
+      resourceId: resolved.record.id,
+      patientId: patient.id,
+      actorId: null,
+      actorRole: "public",
+      metadata: { scanCount: resolved.record.scanCount },
+    });
+  }
+  return { patient, record: resolved.record };
+}
+
+/** Public emergency profile: only fields the patient explicitly approved. */
+export async function publicProfile(token, req) {
+  const { patient } = await resolvePatient(token, req);
+  const privacy = privacyOf(patient);
+  const visible = { patientName: await displayName(patient) };
+  if (privacy.showBloodType) visible.bloodGroup = patient.bloodGroup || null;
+  if (privacy.showAllergies) visible.allergies = patient.allergies || [];
+  if (privacy.showConditions) visible.chronicConditions = patient.chronicDiseases || [];
+  if (privacy.showMedications) visible.medications = patient.activeMedications || [];
+  if (privacy.showContacts) {
+    visible.emergencyContacts = patient.emergencyContacts || (patient.emergencyContact ? [patient.emergencyContact] : []);
+    visible.primaryPhysician = patient.primaryPhysician || null;
+  }
+  return { visible, settings: privacy, language: "en" };
+}
+
+function approvedContext(patient) {
+  const privacy = privacyOf(patient);
+  const parts = [`Patient: ${patient.name || " unnamed "}`];
+  if (privacy.showBloodType && patient.bloodGroup) parts.push(`Blood group: ${patient.bloodGroup}`);
+  if (privacy.showAllergies && patient.allergies?.length) parts.push(`Known allergies: ${patient.allergies.join(", ")}`);
+  if (privacy.showConditions && patient.chronicDiseases?.length) parts.push(`Chronic conditions: ${patient.chronicDiseases.join(", ")}`);
+  if (privacy.showMedications && patient.activeMedications?.length) parts.push(`Current medications: ${patient.activeMedications.join(", ")}`);
+  return parts.join(". ") + ".";
+}
+
+const SYSTEM_PROMPT = `You are a first-aid guidance assistant on a public emergency page. The person using you is NOT a medical professional.
+ALWAYS begin your answer with: "Call emergency services (123) immediately if you have not already."
+Use simple, non-medical language and short numbered steps, one sentence per step.
+Use ONLY the provided guideline context. NEVER diagnose, NEVER recommend medications, NEVER suggest procedures beyond basic first aid.
+If the context does not cover the situation, reply exactly: "I cannot provide guidance for this situation. Please wait for emergency services."
+Always end with: "This guidance is for temporary assistance only until professional help arrives." and cite the source.`;
+
+function confidenceFor(topScore, mode = llmMode()) {
+  if (mode === "offline") {
+    if (topScore >= 0.3) return "High";
+    if (topScore >= 0.12) return "Moderate";
+    return "Knowledge Gap";
+  }
+  if (topScore >= 0.75) return "High";
+  if (topScore >= 0.45) return "Moderate";
+  return "Knowledge Gap";
+}
+
+function offlineAnswer(chunks, context, language) {
+  if (!chunks.length) return "I cannot provide guidance for this situation. Please wait for emergency services.";
+  const arabic = language === "ar";
+  const lead = arabic ? "اتصل بالإسعاف (١٢٣) فوراً إن لم تكن قد فعلت ذلك." : "Call emergency services (123) immediately if you have not already.";
+  const steps = chunks.slice(0, 3).map((c, i) => `${i + 1}. ${c.text}`).join("\n");
+  const tail = arabic ? "هذه إرشادات مؤقتة حتى وصول المساعدة المتخصصة." : "This guidance is for temporary assistance only until professional help arrives.";
+  return `${lead}\n\nPatient context: ${context}\n\n${steps}\n\n${tail}`;
+}
+
+/** Grounded first-aid response with citations, confidence and a hard knowledge-gap fallback. */
+export async function chat(token, message, { req, language = "en" } = {}) {
+  if (!String(message || "").trim()) throw httpError(400, "A message is required");
+  const { patient, record } = await resolvePatient(token, req);
+  const context = approvedContext({ ...patient, name: await displayName(patient) });
+  const mode = llmMode();
+  let hits;
+  if (mode === "offline") {
+    const all = await getStore().query(CHUNKS, { limit: 500 });
+    hits = offlineRank(message, all.items, 5);
+  } else {
+    const embedded = await embed([String(message)]);
+    hits = await getStore().vectorSearch(CHUNKS, embedded[0], { limit: 5 });
+  }
+  const model = mode === "gemini" ? process.env.GEMINI_EMBEDDING_MODEL : "offline-256";
+  const minScore = mode === "offline" ? 0.12 : 0.28;
+  const chunks = hits.filter((h) => (mode === "offline" || (h.embeddingModel || "") === model) && h.score > minScore && h.language === language);
+  const confidence = confidenceFor(chunks[0]?.score || 0, mode);
+
+  let text;
+  if (confidence === "Knowledge Gap") {
+    text = language === "ar"
+      ? "لا أستطيع تقديم إرشادات لهذه الحالة. يرجى انتظار الإسعاف."
+      : "I cannot provide guidance for this situation. Please wait for emergency services.";
+  } else {
+    const sources = chunks.map((c, i) => `[${i + 1}] ${c.source} - ${c.section}\n${c.text}`).join("\n\n");
+    const prompt = `Bystander question: ${message}\n\nApproved patient context: ${context}\n\nGuideline context:\n${sources}\n\nAnswer in ${language === "ar" ? "Arabic" : "English"}.`;
+    const result = await generate({ system: SYSTEM_PROMPT, prompt });
+    text = result.text || offlineAnswer(chunks, context, language);
+    if (result.mode === "gemini" && !text.includes("123") && !text.includes("١٢٣")) {
+      text = offlineAnswer(chunks, context, language);
+    }
+  }
+
+  const response = {
+    text,
+    confidence,
+    sources: chunks.map((c) => `${c.source} - ${c.section}`),
+    disclaimer: language === "ar"
+      ? "إرشادات إسعافات أولية فقط، وليست بديلاً عن الرعاية الطبية. اتصل بالإسعاف (١٢٣)."
+      : "First-aid guidance only, not a substitute for professional medical care. Call emergency services (123).",
+    mode: llmMode(),
+  };
+  await auditRequest(req, {
+    action: "emergency_chat",
+    resourceType: "emergency",
+    resourceId: record.id,
+    patientId: patient.id,
+    actorId: null,
+    actorRole: "public",
+    metadata: { confidence, sources: response.sources, mode: llmMode() },
+  });
+  return response;
+}
+
+export async function updatePrivacy(patientId, settings) {
+  const patient = await getStore().get(PATIENTS, patientId);
+  if (!patient) throw httpError(404, "Patient not found");
+  const current = privacyOf(patient);
+  const merged = { ...current };
+  for (const key of Object.keys(DEFAULT_PRIVACY)) if (settings[key] !== undefined) merged[key] = Boolean(settings[key]);
+  return getStore().update(PATIENTS, patientId, {
+    privacy: {
+      ...(patient.privacy || {}),
+      showBloodGroup: merged.showBloodType,
+      showAllergies: merged.showAllergies,
+      showChronicConditions: merged.showConditions,
+      showMedications: merged.showMedications,
+      showEmergencyContacts: merged.showContacts,
+      aiChatbotEnabled: merged.aiChatbotEnabled,
+    },
+    updatedAt: new Date(),
+  });
+}

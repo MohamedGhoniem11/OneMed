@@ -119,11 +119,16 @@ if (nodeEnv === "production" && corsOrigins.includes("*") && firebaseConfigured)
 }
 
 // Public links embeds in QR codes/NFC handoffs. Must be the origin the patient browser can reach.
+const geminiApiKey = readString("GEMINI_API_KEY");
+const geminiModel = readString("GEMINI_MODEL", "gemini-2.5-flash");
+const geminiEmbeddingModel = readString("GEMINI_EMBEDDING_MODEL", "gemini-embedding-001");
+
 const publicBaseUrl = readString("PUBLIC_BASE_URL", "http://localhost:5173").replace(/\/+$/, "");
 if (!/^https?:\/\//.test(publicBaseUrl)) {
   throw new ConfigError("PUBLIC_BASE_URL must start with http:// or https://");
 }
 const connectionTtlSeconds = readInt("CONNECTION_TTL_SECONDS", 900, { min: 60, max: 3600 });
+const emergencyRateLimitMax = readInt("EMERGENCY_RATE_LIMIT_MAX", 60, { min: 5, max: 600 });
 
 const jsonBodyLimit = readString("JSON_BODY_LIMIT", "1mb");
 if (!/^\d+(kb|mb)$/i.test(jsonBodyLimit)) {
@@ -204,6 +209,10 @@ export const env = Object.freeze({
   corsOrigins,
   publicBaseUrl,
   connectionTtlSeconds,
+  emergencyRateLimitMax,
+  geminiApiKey,
+  geminiModel,
+  geminiEmbeddingModel,
   jsonBodyLimit,
   uploadEncryptionKey,
   uploadMaxMb,

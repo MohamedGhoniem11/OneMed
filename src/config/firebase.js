@@ -1,5 +1,7 @@
 import fs from "node:fs";
-import admin from "firebase-admin";
+import { cert, getApp, getApps, initializeApp } from "firebase-admin/app";
+import { getFirestore } from "firebase-admin/firestore";
+import { getAuth as getAdminAuth } from "firebase-admin/auth";
 import { ConfigError, env } from "./env.js";
 
 /**
@@ -7,8 +9,9 @@ import { ConfigError, env } from "./env.js";
  *
  * Importing this module is always safe: nothing is read or initialized until a
  * Firestore/Auth operation actually needs it. Local mode never touches it.
+ * Firebase Admin v14 uses modular imports (`firebase-admin/app`), so the old
+ * `admin.credential.cert` shape is intentionally avoided.
  */
-
 let app = null;
 
 function loadServiceAccount() {
@@ -44,20 +47,20 @@ export function getFirebaseApp() {
 
   if (!env.hasEmulator) {
     const serviceAccount = loadServiceAccount();
-    if (serviceAccount) options.credential = admin.credential.cert(serviceAccount);
+    if (serviceAccount) options.credential = cert(serviceAccount);
     // Otherwise fall back to Application Default Credentials for hosted environments.
   } else if (!options.projectId) {
     options.projectId = "demo-onemed";
   }
 
-  app = admin.apps.length ? admin.app() : admin.initializeApp(options);
+  app = getApps().length ? getApp() : initializeApp(options);
   return app;
 }
 
 export function getDb() {
-  return getFirebaseApp().firestore();
+  return getFirestore(getFirebaseApp());
 }
 
 export function getAuth() {
-  return getFirebaseApp().auth();
+  return getAdminAuth(getFirebaseApp());
 }

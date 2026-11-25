@@ -31,9 +31,9 @@ export function saveSession(s: Session | null) {
 // ---------------- Auth ----------------
 export async function login(email: string, password: string): Promise<Session> {
   if (API_MODE === 'api') {
-    const r = await http<{ token:string; refreshExpiresAt:string; user:User; mfaRequired?:boolean; mfaToken?:string }>('/auth/login', { method:'POST', body:JSON.stringify({email,password}) });
+    const r = await http<{ accessToken:string; refreshExpiresAt:string; user:User; mfaRequired?:boolean; mfaToken?:string }>('/auth/login', { method:'POST', body:JSON.stringify({email,password}) });
     if (r.mfaRequired) throw new ApiError(428, 'MFA_REQUIRED:' + r.mfaToken);
-    const session: Session = { token:r.token, user:r.user, expiresAt:r.refreshExpiresAt };
+    const session: Session = { token:r.accessToken, user:r.user, expiresAt:r.refreshExpiresAt };
     saveSession(session); return session;
   }
   await wait();
@@ -49,8 +49,8 @@ export async function login(email: string, password: string): Promise<Session> {
 }
 export async function verifyMfa(mfaToken: string, code: string): Promise<Session> {
   if (API_MODE === 'api') {
-    const r = await http<{token:string;refreshExpiresAt:string;user:User}>('/auth/mfa/verify', {method:'POST',body:JSON.stringify({mfaToken,code})});
-    const s:Session = {token:r.token,user:r.user,expiresAt:r.refreshExpiresAt}; saveSession(s); return s;
+    const r = await http<{accessToken:string;refreshExpiresAt:string;user:User}>('/auth/mfa/verify', {method:'POST',body:JSON.stringify({mfaToken,code})});
+    const s:Session = {token:r.accessToken,user:r.user,expiresAt:r.refreshExpiresAt}; saveSession(s); return s;
   }
   await wait(); const s = getSession(); if (!s) throw new ApiError(400,'No pending login'); s.user.mfaEnabled = true; saveSession(s); return s;
 }
@@ -141,6 +141,50 @@ export async function getPatient(id: string): Promise<Patient | null> {
 export async function mutate<T>(fn: (db: ReturnType<typeof loadDB>) => T): Promise<T> {
   const db = loadDB(); const result = fn(db); saveDB(db); await wait(100); return result;
 }
+// ---------------- M4 emergency helpers (demo + REST) ----------------
+export async function emergencyProfile(tokenValue: string) {
+  if (API_MODE === 'api') {
+    try { return await http<any>(`/emergency/${tokenValue}`); } catch { return null; }
+  }
+  const db = loadDB();
+  const profile = db.emergencyProfiles.find(p => p.token === tokenValue || p.nfcUid === tokenValue);
+  if (!profile) return null;
+  const patient = db.patients.find(p => p.id === profile.patientId);
+  if (!patient) return null;
+  profile.scanCount++; saveDB(db);
+  return { visible: {
+    patientName: patient.name,
+    bloodGroup: profile.settings.showBloodType ? patient.bloodGroup : undefined,
+    allergies: profile.settings.showAllergies ? patient.allergies : undefined,
+    chronicConditions: profile.settings.showConditions ? patient.chronicDiseases : undefined,
+    medications: profile.settings.showMedications ? ['Metformin 500mg - with meals'] : undefined,
+    emergencyContacts: profile.settings.showContacts ? [patient.emergencyContact] : undefined,
+    primaryPhysician: profile.settings.showContacts ? patient.primaryPhysician : undefined,
+  }, settings: profile.settings };
+}
+
+export async function emergencyChat(tokenValue: string, message: string, language = 'en') {
+  if (API_MODE === 'api') return http<any>(`/emergency/${tokenValue}/chat`, { method:'POST', body:JSON.stringify({ message, language }) });
+  const db = loadDB();
+  const profile = db.emergencyProfiles.find(p => p.token === tokenValue || p.nfcUid === tokenValue);
+  const patient = profile ? db.patients.find(p => p.id === profile.patientId) : undefined;
+  const res = await chatbot(message, patient);
+  return { text:res.text, confidence:res.confidence, sources:res.sources, disclaimer:res.disclaimer, mode:'demo' };
+}
+
+export async function createEmergencyQr() {
+  if (API_MODE === 'api') return http<any>('/emergency/qr', { method:'POST' }, token());
+  return mutate(db => {
+    const p = db.emergencyProfiles.find(x => x.patientId === getSession()?.user.uid);
+    return { token:p?.token||`em-${Math.random().toString(36).slice(2,10)}`, url:`${location.origin}/emergency/${p?.token||''}` };
+  });
+}
+
+export async function updateEmergencyPrivacy(settings: any) {
+  if (API_MODE === 'api') return http<any>('/emergency/privacy', { method:'PATCH', body:JSON.stringify(settings) }, token());
+  return mutate(db => { const p = db.emergencyProfiles.find(x => x.patientId === getSession()?.user.uid); if(p) Object.assign(p.settings, settings); return p?.settings; });
+}
+
 // ---------------- M2/M3 domain helpers (demo + REST) ----------------
 const token = () => getSession()?.token;
 

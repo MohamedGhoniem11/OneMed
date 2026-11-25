@@ -31,7 +31,7 @@ export function PatientDashboard() {
     <PageHead title={`${t('welcomeBack')}, ${patient?.name.split(' ')[0]||session?.user.name.split(' ')[0]}`} subtitle={`${t('dashboard')} - ${new Date().toLocaleDateString()}`} actions={<Link className="btn primary" to="/app/patient/analytics"><BarChart3 size={16}/> {t('analytics')}</Link>}/>
     {loading ? <SkeletonCards/> : <><div className="grid cols-4">
       <Stat label={t('records')} value={records.length} sub={`${records.filter(r=>r.type==='lab').length} ${t('lab')}`}/>
-      <Stat label={t('activeMedications')} value={rx.reduce((a,r)=>a+r.medicines.length,0)}/>
+      <Stat label={t('activeMedications')} value={rx.reduce((a,r)=>a+(r.medicines||[]).length,0)}/>
       <Stat label="Blood Group" value={patient?.bloodGroup||'-'}/>
       <Stat label={t('healthScore')} value={<span style={{color:'var(--green)'}}>{Math.max(60,100-abnormal.length*4)}%</span>} sub={t('comprehensiveHealth')}/>
     </div>
@@ -44,7 +44,7 @@ export function PatientDashboard() {
       <div className="grid" style={{gap:16}}>
         <Card title={t('criticalAllergies')}><div className="alert red"><AlertTriangle size={16}/> {patient?.allergies.join(', ')||'-'}</div>
           <div style={{marginTop:10,fontSize:13}}><strong>{t('chronicConditions')}:</strong> {patient?.chronicDiseases.join(', ')||'-'}</div></Card>
-        <Card title={t('prescriptions')}>{rx.map(r=><div key={r.id} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--line)'}}><div><strong>{r.medicines.map(m=>m.name).join(', ')}</strong><div style={{fontSize:12,color:'var(--muted)'}}>{r.doctorName} · {new Date(r.date).toLocaleDateString()}</div></div><StatusBadge status={r.orderStatus||r.status}/></div>)}{!rx.length&&<Empty/>}</Card>
+        <Card title={t('prescriptions')}>{rx.map(r=><div key={r.id} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--line)'}}><div><strong>{(r.medicines||[]).map(m=>m.name).join(', ')}</strong><div style={{fontSize:12,color:'var(--muted)'}}>{r.doctorName} · {new Date(r.date).toLocaleDateString()}</div></div><StatusBadge status={r.orderStatus||r.status}/></div>)}{!rx.length&&<Empty/>}</Card>
         <Card title={t('emergencyQr')}><p style={{color:'var(--muted)'}}>Your QR wearable gives bystanders instant access to approved critical information.</p><Link className="btn primary" to="/app/patient/emergency"><QrCode size={16}/> {t('configure')}</Link></Card>
       </div>
     </div></>}
@@ -111,7 +111,7 @@ export function PatientPrescriptions() {
   useEffect(()=>{ api.list<Prescription>('prescriptions',r=>r.patientId===session!.user.uid).then(setRx); },[]);
   return <><PageHead title={t('prescriptions')} subtitle="Doctor-confirmed digital prescriptions"/>
     <Card pad><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('date')}</th><th>{t('doctor')}</th><th>{t('extractedMedicines')}</th><th>{t('status')}</th><th>{t('action')}</th></tr></thead><tbody>
-      {rx.map(r=><tr key={r.id}><td>{new Date(r.date).toLocaleDateString()}</td><td>{r.doctorName}</td><td>{r.medicines.map(m=>`${m.name} ${m.dosage}`).join(', ')}</td><td><StatusBadge status={r.orderStatus||r.status}/></td><td>{r.linkToken ? <Link className="btn sm primary" to={`/f/${r.linkToken}`}>{t('orderStatus')}</Link> : <Badge tone="gray">Link pending confirmation</Badge>}</td></tr>)}
+      {rx.map(r=><tr key={r.id}><td>{new Date(r.date).toLocaleDateString()}</td><td>{r.doctorName}</td><td>{(r.medicines||[]).map(m=>`${m.name} ${m.dosage}`).join(', ')}</td><td><StatusBadge status={r.orderStatus||r.status}/></td><td>{r.linkToken ? <Link className="btn sm primary" to={`/f/${r.linkToken}`}>{t('orderStatus')}</Link> : <Badge tone="gray">Link pending confirmation</Badge>}</td></tr>)}
     </tbody></table>{!rx.length&&<Empty/>}</div></Card></>;
 }
 
@@ -135,14 +135,20 @@ export function PatientEmergencyConfig() {
   const { session } = useAuth(); const { t } = useTranslation(); const {toast}=useToast();
   const [profile,setProfile] = useState<EmergencyProfile|null>(null); const [qr,setQr] = useState(''); const [tab,setTab]=useState('settings');
   useEffect(()=>{ void (async()=>{
-    const a=await api.list<EmergencyProfile>('emergencyProfiles',p=>p.patientId===session!.user.uid);
-    let p=a[0]||null; const n=await api.myNfc();
+    let p:any=null;
+    if(api.API_MODE==='api'){ const q=await api.createEmergencyQr(); p={ token:q.token, patientId:session!.user.uid, activatedAt:q.createdAt, settings:{showBloodType:true,showAllergies:true,showConditions:true,showMedications:false,showContacts:true,aiChatbotEnabled:true} }; }
+    else { const a=await api.list<EmergencyProfile>('emergencyProfiles',x=>x.patientId===session!.user.uid); p=a[0]||null; }
+    const n=await api.myNfc();
     if(n.issued) p={ ...(p as any), token:p?.token||'', patientId:session!.user.uid, nfcIssued:true,
       nfcUid:n.nfcUid, scanCount:n.scanCount||0, activatedAt:p?.activatedAt||new Date().toISOString(),
       settings:p?.settings||{showBloodType:true,showAllergies:true,showConditions:true,showMedications:false,showContacts:true,aiChatbotEnabled:true} };
+    if(!p?.token && api.API_MODE==='api'){ const r=await api.createEmergencyQr(); p={ ...(p as any), token:r.token }; }
     setProfile(p); if(p?.token) QRCode.toDataURL(`${location.origin}/emergency/${p.token}`).then(setQr);
   })(); },[]);
-  const toggle = (k:keyof EmergencyProfile['settings'])=>{ if(!profile) return; const next={...profile,settings:{...profile.settings,[k]:!profile.settings[k]}}; setProfile(next); api.mutate(db=>{const p=db.emergencyProfiles.find(x=>x.token===profile.token); if(p) p.settings[k]=next.settings[k];}); };
+  const toggle = async (k:keyof EmergencyProfile['settings'])=>{
+    if(!profile) return; const next={...profile,settings:{...profile.settings,[k]:!profile.settings[k]}}; setProfile(next);
+    await api.updateEmergencyPrivacy(next.settings);
+  };
   const fields:[keyof EmergencyProfile['settings'],string][] = [['showBloodType',t('bloodGroup')],['showAllergies',t('allergies')],['showConditions',t('chronicConditions')],['showMedications',t('currentMedications')],['showContacts',t('emergencyContact')],['aiChatbotEnabled',t('askAi')]];
   return <><PageHead title={t('emergencyQr')} subtitle="Choose what bystanders see when they scan your QR wearable."/>
     <Tabs tabs={[{id:'settings',label:t('settings')},{id:'qr',label:'QR / NFC'}]} active={tab} onChange={setTab}/>

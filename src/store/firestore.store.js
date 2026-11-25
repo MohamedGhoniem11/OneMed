@@ -1,4 +1,4 @@
-import admin from "firebase-admin";
+import { FieldPath } from "firebase-admin/firestore";
 import { getDb } from "../config/firebase.js";
 import { httpError } from "../utils/http-error.js";
 
@@ -25,13 +25,25 @@ function toIso(value) {
 }
 
 const toRecord = (snapshot) => ({ id: snapshot.id, ...toIso(snapshot.data()) });
+function cleanForFirestore(value) {
+  if (Array.isArray(value)) return value.map(cleanForFirestore);
+  if (value && typeof value === "object" && !(value instanceof Date)) {
+    const out = {};
+    for (const [key, item] of Object.entries(value)) {
+      if (item !== undefined) out[key] = cleanForFirestore(item);
+    }
+    return out;
+  }
+  return value;
+}
+
 const stripId = (data) => {
   const { id: _ignored, ...rest } = data ?? {};
-  return rest;
+  return cleanForFirestore(rest);
 };
 
 function orderByField(field) {
-  return field === ID_FIELD ? admin.firestore.FieldPath.documentId() : field;
+  return field === ID_FIELD ? FieldPath.documentId() : field;
 }
 
 const isNotFound = (error) => error?.code === 5 || error?.code === "not-found";
@@ -85,19 +97,66 @@ export function createFirestoreStore() {
       return true;
     },
 
-    async query(name, { where = [], orderBy = [], limit, startAfter } = {}) {
-      let query = db.collection(name);
-      for (const clause of where) query = query.where(clause.field, clause.op, clause.value);
-      for (const clause of orderBy) query = query.orderBy(orderByField(clause.field), clause.direction);
-      if (Number.isFinite(limit)) query = query.limit(limit);
-      if (startAfter) {
-        const cursor = await db.collection(name).doc(startAfter).get();
-        if (cursor.exists) query = query.startAfter(cursor);
+    async vectorSearch(name, vector, { limit = 5, field = "embedding" } = {}) {
+      try {
+        const snapshot = await db.collection(name).findNearest(field, vector, {
+          limit,
+          distanceMeasure: "COSINE",
+        }).get();
+        return snapshot.docs.map(toRecord);
+      } catch {
+        // No vector index yet: deterministic cosine fallback over the curated library.
+        const snapshot = await db.collection(name).limit(500).get();
+        const norm = Math.sqrt(vector.reduce((s, x) => s + x * x, 0)) || 1;
+        return snapshot.docs.map(toRecord).map((doc) => {
+          const v = Array.isArray(doc[field]) ? doc[field] : [];
+          const vnorm = Math.sqrt(v.reduce((s, x) => s + x * x, 0)) || 1;
+          const score = v.length === vector.length ? vector.reduce((s, x, i) => s + x * v[i], 0) / (norm * vnorm) : 0;
+          return { ...doc, score };
+        }).filter((doc) => doc.score > 0).sort((a, b) => b.score - a.score).slice(0, limit);
       }
-      const snapshot = await query.get();
-      const items = snapshot.docs.map(toRecord);
-      const nextCursor = Number.isFinite(limit) && items.length === limit ? items[items.length - 1].id : null;
-      return { items, nextCursor };
+    },
+
+    async query(name, { where = [], orderBy = [], limit, startAfter } = {}) {
+      const run = async (withOrder) => {
+        let query = db.collection(name);
+        for (const clause of where) query = query.where(clause.field, clause.op, clause.value);
+        if (withOrder) for (const clause of orderBy) query = query.orderBy(orderByField(clause.field), clause.direction);
+        if (withOrder && Number.isFinite(limit)) query = query.limit(limit);
+        if (withOrder && startAfter) {
+          const cursor = await db.collection(name).doc(startAfter).get();
+          if (cursor.exists) query = query.startAfter(cursor);
+        }
+        const snapshot = await query.get();
+        return snapshot.docs.map(toRecord);
+      };
+
+      let items;
+      try {
+        items = await run(orderBy.length > 0);
+      } catch (error) {
+        const missingIndex = error?.code === 9 || /requires an index/i.test(error?.message || "");
+        if (!missingIndex || orderBy.length === 0) throw error;
+        // No composite index deployed yet: filter/sort in memory for correctness.
+        items = await run(false);
+        items.sort((a, b) => {
+          for (const { field, direction } of orderBy) {
+            const left = field === ID_FIELD ? a.id : a[field];
+            const right = field === ID_FIELD ? b.id : b[field];
+            if (left === right) continue;
+            const result = left < right ? -1 : 1;
+            return direction === "desc" ? -result : result;
+          }
+          return 0;
+        });
+        if (startAfter) {
+          const index = items.findIndex((doc) => doc.id === startAfter);
+          if (index >= 0) items = items.slice(index + 1);
+        }
+      }
+      const page = Number.isFinite(limit) ? items.slice(0, limit) : items;
+      const nextCursor = Number.isFinite(limit) && items.length > limit ? page[page.length - 1]?.id : null;
+      return { items: page, nextCursor };
     },
   };
 }

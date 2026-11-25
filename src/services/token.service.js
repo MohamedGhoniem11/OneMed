@@ -12,6 +12,7 @@ import { httpError } from "../utils/http-error.js";
  */
 const CONNECTIONS = "connectionTokens";
 const NFC_TOKENS = "nfcTokens";
+const EMERGENCY = "emergencyQr";
 const hash = (token) => crypto.createHash("sha256").update(token).digest("hex");
 // Domain separation from the login access-token key, without a second secret.
 const key = (domain) => crypto.createHmac("sha256", getJwtSecret()).update(domain).digest();
@@ -130,6 +131,39 @@ export async function findNfcForPatient(patientId) {
     limit: 1,
   });
   return items[0] || null;
+}
+
+export async function createEmergency({ patientId, issuedBy }) {
+  const jti = crypto.randomUUID();
+  const token = sign({
+    domain: "onemed-emergency",
+    audience: "onemed-emergency",
+    subject: patientId,
+    jti,
+    payload: { typ: "emergency", patientId },
+  });
+  const record = await getStore().set(EMERGENCY, jti, {
+    tokenHash: hash(token),
+    patientId,
+    issuedBy: issuedBy || null,
+    createdAt: new Date(),
+    scanCount: 0,
+    lastScanAt: null,
+    revokedAt: null,
+  });
+  return { token, record, url: `${env.publicBaseUrl}/emergency/${token}` };
+}
+
+export async function resolveEmergency(token) {
+  const payload = verify(token, { domain: "onemed-emergency", audience: "onemed-emergency" });
+  if (payload.typ !== "emergency") throw httpError(400, "Invalid token type");
+  const record = activeRecord(await getStore().get(EMERGENCY, payload.jti));
+  if (record.tokenHash !== hash(token)) throw httpError(400, "Token mismatch");
+  const updated = await getStore().update(EMERGENCY, record.id, {
+    scanCount: (record.scanCount || 0) + 1,
+    lastScanAt: new Date(),
+  });
+  return { patientId: payload.patientId, record: updated };
 }
 
 export async function revokeNfc(id) {

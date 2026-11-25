@@ -162,35 +162,37 @@ export function Login() {
 
 export function EmergencyPage() {
   const { token = '' } = useParams(); const { t, i18n } = useTranslation();
-  const [data,setData] = useState<{patient:Patient;settings:EmergencySettings}|null>(null);
-  const [meds,setMeds] = useState<string[]>([]);
+  const [data,setData] = useState<any>(null);
   const [chat,setChat] = useState<ChatTurn[]>([]); const [msg,setMsg] = useState(''); const [openChat,setOpenChat] = useState(false);
-  useEffect(()=>{ api.patientEmergency(token).then(async r=>{
-    if(!r) return; setData({patient:r.patient,settings:r.settings});
-    const list=await api.list<Prescription>('prescriptions',x=>x.patientId===r.patient.id);
-    setMeds(list.flatMap(x=>x.medicines).map(m=>`${m.name} ${m.dosage}`.trim()));
-  }); },[token]);
-  const send = async (text:string) => { if(!text.trim()) return; setChat(p=>[...p,{role:'user',text}]); setMsg(''); const reply = await api.chatbot(text, data?.patient); setChat(p=>[...p,reply]); };
-  const p = data?.patient; const s = data?.settings;
+  useEffect(()=>{ void api.emergencyProfile(token).then(setData); },[token]);
+  const send = async (text:string) => {
+    if(!text.trim()) return;
+    setChat(p=>[...p,{role:'user',text}]); setMsg('');
+    try {
+      const r = await api.emergencyChat(token, text, i18n.language==='ar'?'ar':'en');
+      setChat(p=>[...p,{role:'assistant', text:r.text, sources:r.sources, confidence:r.confidence, disclaimer:r.disclaimer}]);
+    } catch(e:any) { setChat(p=>[...p,{role:'assistant', text:e.message||'Service unavailable. Call emergency services (123).'}]); }
+  };
+  const v = data?.visible; const s = data?.settings;
   return <div className="public-shell">
     <div className="public-top"><span className="logo">OneMed</span><span style={{fontSize:12}}>{t('noLogin')}</span><div style={{flex:1}}/><BackButton fallback="/"/><button className="btn sm" style={{background:'transparent',color:'#fff'}} onClick={()=>{const next=i18n.language==='en'?'ar':'en';localStorage.setItem('onemed.lang',next);void i18n.changeLanguage(next);document.documentElement.dir=next==='ar'?'rtl':'ltr';}}><Languages size={14}/></button></div>
     <div className="public-wrap">
-      <Card pad={false}><div className="card-body" style={{display:'flex',gap:14,alignItems:'center'}}><div className="avatar" style={{width:54,height:54,fontSize:18}}>{p?.name.slice(0,2).toUpperCase()}</div><div><h2>{p?.name||'…'}</h2><div style={{color:'var(--muted)'}}>DOB: {p?.dateOfBirth}</div>{s?.showBloodType && <div className="chip"><DropletIcon/> {p?.bloodGroup} {t('bloodGroup')}</div>}</div></div></Card>
-      {s?.showAllergies && <Card title={t('criticalAllergies')}><div className="alert red"><strong>{p?.allergies.join(', ')||'-'}</strong></div></Card>}
-      {s?.showConditions && <Card title={t('chronicConditions')}><ul>{p?.chronicDiseases.map(x=><li key={x}>{x}</li>)}</ul></Card>}
-      {s?.showMedications && <Card title={t('currentMedications')}>{meds.length ? <ul>{meds.map((m,i)=><li key={i}>{m}</li>)}</ul> : <p style={{color:'var(--muted)'}}>No current medications on file.</p>}</Card>}
-      {s?.showContacts && <Card title={t('emergencyContact')}><div style={{display:'flex',justifyContent:'space-between',padding:'8px 0'}}><div><strong>{p?.emergencyContact.name}</strong><div style={{color:'var(--muted)'}}>{p?.emergencyContact.relationship}</div></div><a className="btn sm danger" href={`tel:${p?.emergencyContact.phone}`}><Phone size={14}/>{t('call')}</a></div><div style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderTop:'1px solid var(--line)'}}><div><strong>{p?.primaryPhysician}</strong><div style={{color:'var(--muted)'}}>{t('primaryPhysician')}</div></div><a className="btn sm outline" href={`tel:${p?.primaryPhysicianPhone}`}><Phone size={14}/>{t('call')}</a></div></Card>}
-      {!p && <Empty message="Invalid or unknown QR token."/>}
+      <Card pad={false}><div className="card-body" style={{display:'flex',gap:14,alignItems:'center'}}><div className="avatar" style={{width:54,height:54,fontSize:18}}>{(v?.patientName||'?').slice(0,2).toUpperCase()}</div><div><h2>{v?.patientName||'…'}</h2>{v?.bloodGroup && <div className="chip"><DropletIcon/> {v.bloodGroup} {t('bloodGroup')}</div>}</div></div></Card>
+      {v?.allergies && <Card title={t('criticalAllergies')}><div className="alert red"><strong>{v.allergies.join(', ')||'-'}</strong></div></Card>}
+      {v?.chronicConditions && <Card title={t('chronicConditions')}><ul>{v.chronicConditions.map((x:string)=><li key={x}>{x}</li>)}</ul></Card>}
+      {v?.medications && <Card title={t('currentMedications')}>{v.medications.length ? <ul>{v.medications.map((m:string,i:number)=><li key={i}>{m}</li>)}</ul> : <p style={{color:'var(--muted)'}}>No current medications on file.</p>}</Card>}
+      {v?.emergencyContacts && <Card title={t('emergencyContact')}>{v.emergencyContacts.map((c:any,i:number)=><div key={i} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--line)'}}><div><strong>{c.name}</strong><div style={{color:'var(--muted)'}}>{c.relationship}</div></div>{c.phone && <a className="btn sm danger" href={`tel:${c.phone}`}><Phone size={14}/>{t('call')}</a>}</div>)}{v.primaryPhysician && <div style={{display:'flex',justifyContent:'space-between',padding:'8px 0'}}><strong>{v.primaryPhysician}</strong></div>}</Card>}
+      {!v && <Empty message="Invalid or unknown QR token."/>}
     </div>
     <div className="bottom-cta">{s?.aiChatbotEnabled && <button className="btn primary" onClick={()=>setOpenChat(true)}>{t('askAi')} <Bot size={18}/></button>}</div>
     {openChat && <div className="modal-backdrop" onClick={()=>setOpenChat(false)}><div className="modal" onClick={e=>e.stopPropagation()} style={{display:'flex',flexDirection:'column',height:'80vh'}}>
       <div className="modal-head"><h3><Bot size={18}/> {t('askAi')}</h3><button className="btn sm" onClick={()=>setOpenChat(false)}>✕</button></div>
       <div className="modal-body" style={{flex:1,overflow:'auto'}}>
         <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:10}}>
-          <span className="chip"><strong>{p?.name||'-'}</strong></span>
-          {p?.chronicDiseases.map(c=><span key={c} className="chip red">{c}</span>)}
-          {p?.bloodGroup && <span className="chip blue">{p.bloodGroup}</span>}
-          {p?.allergies.map(a=><span key={a} className="chip red">Allergy: {a}</span>)}
+          <span className="chip"><strong>{v?.patientName||'-'}</strong></span>
+          {(v?.chronicConditions||[]).map((c:string)=><span key={c} className="chip red">{c}</span>)}
+          {v?.bloodGroup && <span className="chip blue">{v.bloodGroup}</span>}
+          {(v?.allergies||[]).map((a:string)=><span key={a} className="chip red">Allergy: {a}</span>)}
         </div>
         <div className="alert blue" style={{fontSize:12}}>{t('firstAidDisclaimer')}</div>
         <div className="chat-log">{chat.map((c,i)=><div key={i} className={`msg ${c.role==='user'?'me':''}`}><div style={{whiteSpace:'pre-wrap'}}>{c.text}</div>{c.sources?.length?<div style={{fontSize:11,marginTop:8,opacity:.75}}>{c.sources.join(' · ')}</div>:null}{c.confidence && <Badge tone={c.confidence==='High'?'green':'amber'}>{c.confidence}</Badge>}</div>)}</div>

@@ -11,3 +11,21 @@ export const emergencyQrSchema = {
     lastScanAt: { type: "timestamp", readOnly: true },
   },
 };
+
+export const privacyUpdateSchema = {
+  fields: {
+    showBloodType: { type: "boolean" },
+    showAllergies: { type: "boolean" },
+    showConditions: { type: "boolean" },
+    showMedications: { type: "boolean" },
+    showContacts: { type: "boolean" },
+    aiChatbotEnabled: { type: "boolean" },
+  },
+};
+
+export const emergencyChatSchema = {
+  fields: {
+    message: { type: "string", required: true, min: 1, max: 1000 },
+    language: { type: "string", enum: ["en", "ar"] },
+  },
+};
