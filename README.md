@@ -10,12 +10,11 @@ patient history in under 5 seconds via NFC tap, QR scan, or National ID lookup.
 > Graduation Project — Alexandria University, Faculty of Computers and Data Science
 > (2025–2026)
 
-> **Prototype status:** this repository is under active implementation. The
-> credential-free API foundation, local persistence/auth adapters, the verified
-> prescription OCR slice, and five static frontend pages are in place.
-> Patient/lab/pharmacy/emergency/AI features are still being built milestone by
-> milestone; see [Status](#status) and [Roadmap](#roadmap). Nothing listed as
-> planned should be treated as implemented.
+> **Status:** an audited academic demo. All documented portals, public pages,
+> REST APIs, bilingual UI, reports, analytics and seeded demo data are
+> implemented. Aspirational NFRs (uptime, large-scale load, Egypt data-centre
+> hosting, third-party pen test) and a few deployment-dependent features are
+> listed as limitations in [docs/AUDIT.md](docs/AUDIT.md).
 
 ---
 
@@ -25,7 +24,8 @@ Requires Node.js 20.19+ (Node 22 LTS recommended).
 
 ```bash
 npm install
-npm start
+cd frontend && npm install && cd ..
+npm run dev:all     # API :3000 + frontend :5173 in API mode
 ```
 
 The API starts at `http://localhost:3000` in **local demo mode**:
@@ -45,17 +45,28 @@ curl http://localhost:3000/
 # {"status":"ok","persistence":"local","authProvider":"local","time":"..."}
 ```
 
+### Demo data
+
+```bash
+npm run seed          # idempotent: 8 accounts, 3 patients, records, QR/NFC, KB
+```
+
+Test accounts are printed by `npm run seed` and are also listed in
+[Run instructions](#phase-2-quick-start). `npm run demo` walks 12 end-to-end
+flows against a running API.
+
 ### Frontend
+
+`npm run dev:all` starts both processes. To run only the UI:
 
 ```bash
 cd frontend
-npm install
-npm run dev
+VITE_API_MODE=api npm run dev     # Linux/macOS
+# Windows PowerShell: $env:VITE_API_MODE='api'; npm run dev
 ```
 
-Opens at **http://localhost:5173**. The Vite dev server proxies `/api` to the
-backend on port 3000. The five pages are still static prototypes and are not yet
-wired to the API.
+Without `VITE_API_MODE=api` the UI runs in browser demo mode with its own
+localStorage seed data. The dev server proxies `/api` to port 3000.
 
 ---
 
