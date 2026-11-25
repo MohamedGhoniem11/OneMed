@@ -58,8 +58,8 @@ export function PatientDashboard() {
 }
 
 export function PatientRecords() {
-  const { session } = useAuth(); const { t } = useTranslation(); const [records,setRecords] = useState<MedicalRecord[]>([]); const [type,setType] = useState('all'); const [q,setQ] = useState('');
-  useEffect(()=>{ api.listRecords(session!.user.uid).then(a=>setRecords(a.sort((x,y)=>String(y.date).localeCompare(String(x.date))))); },[]);
+  const { session } = useAuth(); const { t } = useTranslation(); const {toast}=useToast(); const [records,setRecords] = useState<MedicalRecord[]>([]); const [type,setType] = useState('all'); const [q,setQ] = useState('');
+  useEffect(()=>{ api.listRecords(session!.user.uid).then(a=>setRecords(a.sort((x,y)=>String(y.date).localeCompare(String(x.date))))).catch((e:any)=>toast(e.message,true)); },[]);
   const filtered = records.filter(r=>(type==='all'||r.type===type) && (!q||`${r.title} ${r.institution}`.toLowerCase().includes(q.toLowerCase())));
   return <><PageHead title={t('records')} subtitle={t('clinicalTimeline')} actions={<button className="btn outline" onClick={()=>window.print()}><Download size={16}/> {t('printRecord')}</button>}/>
     <Card pad><div style={{padding:18,display:'flex',gap:10,flexWrap:'wrap'}}><input className="input" style={{maxWidth:260}} placeholder={t('search')} value={q} onChange={e=>setQ(e.target.value)}/><div className="tabs" style={{border:0,margin:0}}>{['all','lab','imaging','prescription','note','visit','vitals'].map(x=><button key={x} className={`tab ${type===x?'active':''}`} onClick={()=>setType(x)}>{t(x)}</button>)}</div></div>
@@ -121,7 +121,7 @@ export function PatientAnalytics() {
 
 export function PatientPrescriptions() {
   const { session } = useAuth(); const { t } = useTranslation(); const [rx,setRx] = useState<Prescription[]>([]); const {toast}=useToast();
-  useEffect(()=>{ api.list<Prescription>('prescriptions',r=>r.patientId===session!.user.uid).then(setRx); },[]);
+  useEffect(()=>{ api.list<Prescription>('prescriptions',r=>r.patientId===session!.user.uid).then(setRx).catch((e:any)=>toast(e.message,true)); },[]);
   return <><PageHead title={t('prescriptions')} subtitle={t('prescriptionsSubtitle')}/>
     <Card pad><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('date')}</th><th>{t('doctor')}</th><th>{t('extractedMedicines')}</th><th>{t('status')}</th><th>{t('action')}</th></tr></thead><tbody>
       {rx.map(r=><tr key={r.id}><td>{new Date(r.date).toLocaleDateString()}</td><td>{r.doctorName}</td><td>{(r.medicines||[]).map(m=>`${m.name} ${m.dosage}`).join(', ')}</td><td><StatusBadge status={r.orderStatus||r.status}/></td><td>{r.linkToken ? <Link className="btn sm primary" to={`/f/${r.linkToken}`}>{t('orderStatus')}</Link> : <Badge tone="gray">{t('linkPending')}</Badge>}</td></tr>)}
@@ -159,11 +159,11 @@ export function PatientEmergencyConfig() {
       nfcUid:n.nfcUid, scanCount:n.scanCount||0, activatedAt:p?.activatedAt||new Date().toISOString(),
       settings:p?.settings||{showBloodType:true,showAllergies:true,showConditions:true,showMedications:false,showContacts:true,aiChatbotEnabled:true} };
     if(!p?.token && api.API_MODE==='api'){ const r=await api.createEmergencyQr(); p={ ...(p as any), token:r.token }; }
-    setProfile(p); if(p?.token) QRCode.toDataURL(`${location.origin}/emergency/${p.token}`).then(setQr);
-  })(); },[]);
+    setProfile(p); if(p?.token) void QRCode.toDataURL(`${location.origin}/emergency/${p.token}`).then(setQr).catch(()=>{});
+  })().catch((e:any)=>toast(e.message||'Unable to load emergency settings',true)); },[]);
   const toggle = async (k:keyof EmergencyProfile['settings'])=>{
     if(!profile) return; const next={...profile,settings:{...profile.settings,[k]:!profile.settings[k]}}; setProfile(next);
-    await api.updateEmergencyPrivacy(next.settings);
+    try{ await api.updateEmergencyPrivacy(next.settings); }catch(e:any){ toast(e.message,true); }
   };
   const fields:[keyof EmergencyProfile['settings'],string][] = [['showBloodType',t('bloodGroup')],['showAllergies',t('allergies')],['showConditions',t('chronicConditions')],['showMedications',t('currentMedications')],['showContacts',t('emergencyContact')],['aiChatbotEnabled',t('askAi')]];
   return <><PageHead title={t('emergencyQr')} subtitle={t('emergencyConfigSubtitle')}/>
@@ -178,8 +178,8 @@ export function PatientEmergencyConfig() {
 export function PatientMessages() {
   const { session } = useAuth(); const { t } = useTranslation(); const {toast}=useToast();
   const [convs,setConvs]=useState<Conversation[]>([]); const [active,setActive]=useState<string|null>(null); const [msgs,setMsgs]=useState<Message[]>([]); const [text,setText]=useState('');
-  useEffect(()=>{ void api.listConversations().then(a=>{setConvs(a);setActive(a[0]?.id||null);}); },[]);
-  useEffect(()=>{ if(active) void api.listMessages(active).then(setMsgs); },[active]);
+  useEffect(()=>{ void api.listConversations().then(a=>{setConvs(a);setActive(a[0]?.id||null);}).catch((e:any)=>toast(e.message,true)); },[]);
+  useEffect(()=>{ if(active) void api.listMessages(active).then(setMsgs).catch((e:any)=>toast(e.message,true)); },[active]);
   const send=async()=>{ if(!text.trim()||!active) return; await api.sendMessage(active,text); setText(''); setMsgs(await api.listMessages(active)); };
   return <><PageHead title={t('messages')} subtitle={t('messagesSubtitle')}/>
     <div className="grid" style={{gridTemplateColumns:'minmax(0,280px) minmax(0,1fr)'}}><Card pad><div className="card-body">{convs.map(c=><button key={c.id} className={`nav-item ${active===c.id?'active':''}`} style={{color:'var(--ink)'}} onClick={()=>setActive(c.id)}><span className="avatar">{c.otherName.slice(0,2).toUpperCase()}</span><span><strong>{c.otherName}</strong><div style={{fontSize:11,color:'var(--muted)'}}>{t(c.role)}</div></span></button>)}{!convs.length&&<Empty/>}</div></Card>

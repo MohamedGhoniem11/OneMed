@@ -18,7 +18,7 @@ import { Badge, Card, CopyButton, Empty, Field, IdentityStrip, Modal, PageHead, 
 export function DoctorDashboard() {
   const { session } = useAuth(); const { t } = useTranslation(); const nav = useNavigate(); const {toast}=useToast();
   const [patients,setPatients]=useState<Patient[]>([]); const [rx,setRx]=useState<Prescription[]>([]); const [q,setQ]=useState(''); const [loading,setLoading]=useState(true);
-  useEffect(()=>{ Promise.all([api.searchPatients('').then(setPatients), api.list<Prescription>('prescriptions',x=>x.doctorId===session!.user.uid).then(setRx)]).finally(()=>setLoading(false)); },[]);
+  useEffect(()=>{ Promise.all([api.searchPatients('').then(setPatients), api.list<Prescription>('prescriptions',x=>x.doctorId===session!.user.uid).then(setRx)]).catch((e:any)=>toast(e.message,true)).finally(()=>setLoading(false)); },[]);
   const filtered = patients.filter(p=>`${p.name} ${p.nationalId} ${p.phone}`.toLowerCase().includes(q.toLowerCase()));
   return <>
     <PageHead title={t('goodMorning', {name:session!.user.name.split(' ').slice(-1)[0]})} subtitle={`${t('dashboard')} - ${new Date().toLocaleDateString()}`} actions={<span className="badge green">● {t('systemOnline')}</span>}/>
@@ -39,9 +39,9 @@ export function DoctorDashboard() {
 }
 
 export function DoctorPatients() {
-  const { t } = useTranslation(); const nav = useNavigate(); const [params] = useSearchParams();
+  const { t } = useTranslation(); const nav = useNavigate(); const [params] = useSearchParams(); const {toast}=useToast();
   const [patients,setPatients]=useState<Patient[]>([]); const [q,setQ]=useState(params.get('q')||''); const [consents,setConsents]=useState<Consent[]>([]);
-  useEffect(()=>{ api.searchPatients('').then(setPatients); api.list<Consent>('consents').then(setConsents); },[]);
+  useEffect(()=>{ api.searchPatients('').then(setPatients).catch((e:any)=>toast(e.message,true)); api.list<Consent>('consents').then(setConsents).catch(()=>{}); },[]);
   const allowed = patients.filter(p=>q===''||`${p.name} ${p.nationalId} ${p.phone}`.toLowerCase().includes(q.toLowerCase()));
   return <><PageHead title={t('patients')} subtitle={t('patientsSubtitle')}/>
     <Card pad><div className="card-body"><div style={{display:'flex',gap:8,marginBottom:12}}><input className="input" placeholder={`${t('search')} ${t('name')} / ${t('nationalId')} / ${t('phoneNumber')}`} value={q} onChange={e=>setQ(e.target.value)}/><button className="btn primary" onClick={()=>nav('/app/doctor/qr')}><ScanLine size={16}/> NFC / QR</button></div>
@@ -55,7 +55,7 @@ export function PatientViewer() {
   const [summary,setSummary]=useState<{text:string;confidence:string;sources:string[]}|null>(null);
   const [aiOpen,setAiOpen]=useState(false); const [chat,setChat]=useState<ChatTurn[]>([]); const [msg,setMsg]=useState('');
   const [override,setOverride]=useState(false); const [reason,setReason]=useState(''); const [overrideResult,setOverrideResult]=useState<any>(null);
-  useEffect(()=>{ api.getPatient(id).then(setPatient); api.listRecords(id).then(a=>setRecords(a.sort((x,y)=>String(y.date).localeCompare(String(x.date))))); api.list<any>('prescriptions',p=>p.patientId===id).then(a=>setMeds(a.flatMap(p=>p.medicines||p.items||[]))); },[id]);
+  useEffect(()=>{ api.getPatient(id).then(setPatient).catch(()=>{}); api.listRecords(id).then(a=>setRecords(a.sort((x,y)=>String(y.date).localeCompare(String(x.date))))).catch((e:any)=>toast(e.message,true)); api.list<any>('prescriptions',p=>p.patientId===id).then(a=>setMeds(a.flatMap(p=>p.medicines||p.items||[]))).catch(()=>{}); },[id]);
   const latestValue = (name:string) => [...records].reverse().flatMap(r=>r.values||[]).find(v=>v.name===name);
   const contact = () => (patient as any)?.emergencyContact || (patient as any)?.emergencyContacts?.[0] || null;
   const fmt = (v:any) => v ? new Intl.DateTimeFormat(i18n.language||'en',{dateStyle:'medium',timeStyle:'short'}).format(new Date(v)) : '-';
@@ -103,7 +103,7 @@ export function DoctorPrescriptions() {
   const [tab,setTab]=useState('list'); const [rx,setRx]=useState<Prescription[]>([]); const [patients,setPatients]=useState<Patient[]>([]);
   const [image,setImage]=useState<string|null>(null); const [items,setItems]=useState<Medicine[]>([]); const [confidence,setConfidence]=useState(0); const [patientId,setPatientId]=useState(''); const [busy,setBusy]=useState(false); const [link,setLink]=useState(''); const [draftId,setDraftId]=useState('');
   const [zoom,setZoom]=useState(1); const [rotate,setRotate]=useState(0);
-  useEffect(()=>{ api.list<Prescription>('prescriptions').then(a=>setRx(a.filter(r=>r.doctorId===session!.user.uid))); api.searchPatients('').then(a=>{setPatients(a);setPatientId(a[0]?.id||'');}); },[]);
+  useEffect(()=>{ api.list<Prescription>('prescriptions').then(a=>setRx(a.filter(r=>r.doctorId===session!.user.uid))).catch((e:any)=>toast(e.message,true)); api.searchPatients('').then(a=>{setPatients(a);setPatientId(a[0]?.id||'');}).catch(()=>{}); },[]);
   const file = async (f:File|undefined)=>{
     if(!f) return;
     const r=new FileReader(); r.onload=()=>setImage(String(r.result)); r.readAsDataURL(f);
@@ -154,7 +154,7 @@ export function DoctorQrTools() {
   const { session } = useAuth(); const { t } = useTranslation(); const {toast}=useToast(); const nav=useNavigate();
   const [tab,setTab]=useState('nfc'); const [qr,setQr]=useState(''); const [seconds,setSeconds]=useState(900); const [token,setToken]=useState('');
   const [patients,setPatients]=useState<Patient[]>([]); const [patientId,setPatientId]=useState('');
-  useEffect(()=>{ api.searchPatients('').then(a=>{setPatients(a);setPatientId(a[0]?.id||'');}); },[]);
+  useEffect(()=>{ api.searchPatients('').then(a=>{setPatients(a);setPatientId(a[0]?.id||'');}).catch(()=>{}); },[]);
   useEffect(()=>{ if(!qr) return; const t=setInterval(()=>setSeconds(s=>Math.max(0,s-1)),1000); return ()=>clearInterval(t); },[qr]);
   const generate=async()=>{
     if(!patientId) return toast(t('selectPatientFirst'),true);
@@ -193,8 +193,8 @@ export function DoctorMessages() {
   const {t}=useTranslation(); const {session}=useAuth(); const {toast}=useToast();
   const [convs,setConvs]=useState<Conversation[]>([]); const [active,setActive]=useState<string|null>(null);
   const [msgs,setMsgs]=useState<Message[]>([]); const [text,setText]=useState('');
-  useEffect(()=>{ void api.listConversations().then(a=>{setConvs(a);setActive(a[0]?.id||null);}); },[]);
-  useEffect(()=>{ if(active) void api.listMessages(active).then(setMsgs); },[active]);
+  useEffect(()=>{ void api.listConversations().then(a=>{setConvs(a);setActive(a[0]?.id||null);}).catch((e:any)=>toast(e.message,true)); },[]);
+  useEffect(()=>{ if(active) void api.listMessages(active).then(setMsgs).catch((e:any)=>toast(e.message,true)); },[active]);
   const send=async()=>{ if(!text.trim()||!active) return; await api.sendMessage(active,text); setText(''); setMsgs(await api.listMessages(active)); toast(t('saved')); };
   return <><PageHead title={t('messages')} subtitle={t('messagesSubtitleDoctor')}/>
     <div className="grid" style={{gridTemplateColumns:'minmax(0,280px) minmax(0,1fr)'}}>
@@ -208,7 +208,7 @@ export function DoctorReports() {
   const [type,setType]=useState('history'); const [patient,setPatient]=useState(''); const [patients,setPatients]=useState<Patient[]>([]);
   const [out,setOut]=useState(''); const [busy,setBusy]=useState(false);
   const isAdmin = session?.user.role==='admin' || session?.user.role==='hospital_admin';
-  useEffect(()=>{ void api.searchPatients('').then(a=>{setPatients(a);setPatient(p=>p||a[0]?.id||'');}); },[]);
+  useEffect(()=>{ void api.searchPatients('').then(a=>{setPatients(a);setPatient(p=>p||a[0]?.id||'');}).catch(()=>{}); },[]);
   const preview=async()=>{ setBusy(true); try{ setOut(await api.reportText(type,{patientId:patient})); }catch(e:any){ toast(e.message,true); } finally{ setBusy(false); } };
   const download=async(fmt:string)=>{ try{ await api.downloadReport(type,{patientId:patient,format:fmt}); toast(t('reportGenerated')); }catch(e:any){ toast(e.message,true); } };
   const needsPatient = !['audit','population'].includes(type);
@@ -241,7 +241,7 @@ export function DoctorAnalytics() {
   const { t, i18n } = useTranslation(); const {toast}=useToast();
   const [patients,setPatients]=useState<Patient[]>([]); const [pid,setPid]=useState('');
   const [data,setData]=useState<any>(null); const [summary,setSummary]=useState<any>(null); const [loading,setLoading]=useState(false);
-  useEffect(()=>{void api.searchPatients('').then(a=>{setPatients(a);setPid(a[0]?.id||'');});},[]);
+  useEffect(()=>{void api.searchPatients('').then(a=>{setPatients(a);setPid(a[0]?.id||'');}).catch(()=>{});},[]);
   useEffect(()=>{ if(!pid) return; setLoading(true);
     void Promise.all([api.patientAnalytics(pid),api.clinicalSummary(pid)]).then(([a,s])=>{setData(a);setSummary(s);setLoading(false);}).catch((e:any)=>{toast(e.message,true);setLoading(false);});
   },[pid]);
