@@ -399,3 +399,23 @@ Alexandria University — 11-member team. See the report for full task allocatio
 | Ziad Mustafa Eid | Frontend |
 | Mohamed Ahmed Mohamed | Frontend & Reporting |
 | Mina Mounir Youssef | Frontend & Backend |
+
+
+## Phase 2 quick start
+
+`ash
+# one command: API on :3000 + frontend in API mode on :5173
+npm install && (cd frontend && npm install)
+npm run dev:all
+
+# scripted end-to-end verification of 11 documented flows (requires the API running)
+npm run demo
+
+# open the demo hub in the app: /app/demos (reachable from the main navigation)
+`
+
+Other useful commands: 
+pm run seed (idempotent realistic demo data incl. emergency QR/NFC links), 
+pm run seed:guidelines, 
+pm run purge:deletions (EDP erasure job), 
+pm run set:admin -- <email>.
