@@ -155,17 +155,18 @@ export function Login() {
   const { t } = useTranslation(); const { login, verifyMfa } = useAuth(); const nav = useNavigate(); const {toast} = useToast();
   const [email,setEmail] = useState('mona.patient@example.com'); const [password,setPassword] = useState('Demo!onemed1');
   const [mfaToken,setMfaToken] = useState<string|null>(null); const [code,setCode] = useState('');
-  const [busy,setBusy] = useState(false);
-  const submit = async (e:React.FormEvent) => { e.preventDefault(); setBusy(true); try { await login(email,password); nav('/app'); } catch(err:any) { if(String(err.message).startsWith('MFA_REQUIRED:')) { setMfaToken(err.message.split(':')[1]); toast(t('mfaToast')); } else toast(err.message,true); } finally { setBusy(false); } };
+  const [busy,setBusy] = useState(false); const [error,setError]=useState('');
+  const submit = async (e:React.FormEvent) => { e.preventDefault(); setBusy(true); setError(''); try { await login(email,password); nav('/app'); } catch(err:any) { if(String(err.message).startsWith('MFA_REQUIRED:')) { setMfaToken(err.message.split(':')[1]); toast(t('mfaToast')); } else { setError(err.message||t('invalidCredentials')); toast(err.message||t('invalidCredentials'),true); } } finally { setBusy(false); } };
   return <div className="auth-wrap"><div className="auth-card">
     <div className="head"><div className="brand-mark" style={{background:'var(--navy)',color:'#fff',marginBottom:10}}>✚</div><h2>{t('welcomeBack')}</h2><p style={{color:'var(--muted)'}}><span translate="no">OneMed</span> - {t('unifiedPlatform')}</p></div>
     <form onSubmit={submit} style={{padding:24}}>
+      {error && <div className="alert red" role="alert" style={{marginBottom:12}}>{error}</div>}
       {!mfaToken?<><Field label={t('email')}><input className="input" type="email" value={email} onChange={e=>setEmail(e.target.value)} required/></Field>
       <Field label={t('password')}><input className="input" type="password" value={password} onChange={e=>setPassword(e.target.value)} required/></Field>
       <button className="btn primary" style={{width:'100%'}} disabled={busy}>{t('login')}</button></>:
       <><h3>{t('mfa')}</h3><Field label={t('mfaCode')}><input className="input" maxLength={6} inputMode="numeric" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,''))}/></Field>
       <button type="button" className="btn primary" style={{width:'100%'}} onClick={async()=>{try{await verifyMfa(mfaToken,code||'123456');nav('/app');}catch(e:any){toast(e.message,true);}}}>{t('verifyOtp')}</button></>}
-      <div className="demo-flag" style={{marginTop:16}}>{t('demoMode')} - <span translate="no">mona.patient@example.com / Demo!onemed1 · karim.doctor@example.com / Demo!onemedD1</span></div>
+      {api.API_MODE==='demo' && <div className="demo-flag" style={{marginTop:16}}>{t('demoMode')} - <span translate="no">mona.patient@example.com / Demo!onemed1 · karim.doctor@example.com / Demo!onemedD1</span></div>}
       <div className="login-links"><Link to="/register">{t('signup')}</Link>{DEMO_EMERGENCY && <Link to={DEMO_EMERGENCY}>{t('emergencyInfo')}</Link>}</div>
     </form>
   </div></div>;
