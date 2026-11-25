@@ -22,4 +22,9 @@ export const nearby = send(async (req) => {
   return { pharmacies: await listNearby({ lat: Number(lat), lng: Number(lng) }) };
 });
 
-export const update = send((req) => updateProfile(req.params.id || req.body.id, req.body));
+export const update = send(async (req) => {
+  const pharmacy = await getForUser(req.user);
+  if (!pharmacy) throw httpError(404, "Pharmacy profile not found");
+  const { id: _ignored, ...patch } = req.body || {};
+  return updateProfile(pharmacy.id, patch);
+});

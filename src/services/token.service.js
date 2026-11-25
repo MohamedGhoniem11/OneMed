@@ -91,13 +91,15 @@ export async function acceptConnection(token, { patientId }) {
   return { doctorId: payload.doctorId, doctorName: payload.doctorName, scope: payload.scope, purpose: payload.purpose, expiresAt: new Date(payload.exp * 1000) };
 }
 
-export async function createNfc({ patientId, nfcUid, issuedBy }) {
+export async function createNfc({ patientId, nfcUid, issuedBy, ttlSeconds = env.nfcTtlSeconds }) {
   const jti = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
   const token = sign({
     domain: "onemed-nfc",
     audience: "onemed-nfc",
     subject: patientId,
     jti,
+    expiresIn: ttlSeconds,
     payload: { typ: "nfc", patientId, nfcUid: nfcUid || null },
   });
   const record = await getStore().set(NFC_TOKENS, jti, {
@@ -106,6 +108,7 @@ export async function createNfc({ patientId, nfcUid, issuedBy }) {
     nfcUid: nfcUid || null,
     issuedBy: issuedBy || null,
     createdAt: new Date(),
+    expiresAt,
     scanCount: 0,
     lastScanAt: null,
     revokedAt: null,
@@ -134,13 +137,15 @@ export async function findNfcForPatient(patientId) {
   return items[0] || null;
 }
 
-export async function createEmergency({ patientId, issuedBy }) {
+export async function createEmergency({ patientId, issuedBy, ttlSeconds = env.emergencyTtlSeconds }) {
   const jti = crypto.randomUUID();
+  const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
   const token = sign({
     domain: "onemed-emergency",
     audience: "onemed-emergency",
     subject: patientId,
     jti,
+    expiresIn: ttlSeconds,
     payload: { typ: "emergency", patientId },
   });
   const record = await getStore().set(EMERGENCY, jti, {
@@ -148,6 +153,7 @@ export async function createEmergency({ patientId, issuedBy }) {
     patientId,
     issuedBy: issuedBy || null,
     createdAt: new Date(),
+    expiresAt,
     scanCount: 0,
     lastScanAt: null,
     revokedAt: null,

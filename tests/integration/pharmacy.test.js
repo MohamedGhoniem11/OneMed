@@ -26,6 +26,10 @@ beforeAll(async () => {
     phone: "01011111111", whatsapp: "01011111111", location: { lat: 31.201, lng: 29.921 },
     hours: "Open 24/7", rating: 4.7, active: true, status: "approved", verified: true, createdAt: new Date(),
   });
+  await store.set("consents", "consent_pharmacy", {
+    patientId: PATIENT, granteeType: "doctor", granteeId: DOCTOR,
+    scope: ["records", "prescriptions"], status: "active", grantedAt: new Date(), createdAt: new Date(),
+  });
   await store.set("pharmacies", "pharm_far", {
     id: "pharm_far", institutionId: "pharm_far", name: "Far Pharmacy", address: "Far street", city: "Cairo",
     phone: "01222222222", whatsapp: "01222222222", location: { lat: 30.04, lng: 31.24 },

@@ -22,19 +22,34 @@ export function isSelfOrAdmin(req, patientId) {
 export async function canReadPatient(req, patientId, { scope = "records", resourceType, resourceId } = {}) {
   void resourceType;
   void resourceId;
+  // Demographics are part of the record view for consent purposes; grants are
+  // stored with the "records" scope, so treat both scopes identically here.
+  const effectiveScope = ["demographics", "prescriptions"].includes(scope) ? "records" : scope;
   if (isSelfOrAdmin(req, patientId)) return true;
 
   if (req.user?.role === "doctor") {
-    const consent = await hasActiveConsent(patientId, "doctor", req.user.uid, scope);
+    const consent = await hasActiveConsent(patientId, "doctor", req.user.uid, effectiveScope);
     if (consent) return true;
   }
 
   if (req.user?.role === "lab_staff" || req.user?.role === "hospital_admin") {
-    const consent = await hasActiveConsent(patientId, "institution", req.affiliation?.institutionId, scope);
+    const consent = await hasActiveConsent(patientId, "institution", req.affiliation?.institutionId, effectiveScope);
     if (consent) return true;
   }
 
   if (req.emergencyOverride) return true;
+
+  if (req.user?.role === "doctor") {
+    const now = new Date();
+    const { items } = await getStore().query("emergencyOverrides", {
+      where: [
+        { field: "patientId", op: "==", value: patientId },
+        { field: "doctorId", op: "==", value: req.user.uid },
+      ],
+      limit: 10,
+    });
+    if (items.some((o) => new Date(o.expiresAt) > now)) return true;
+  }
 
   throw httpError(403, "Patient record is not available to you");
 }

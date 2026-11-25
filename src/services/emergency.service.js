@@ -111,6 +111,9 @@ function offlineAnswer(chunks, context, language) {
 export async function chat(token, message, { req, language = "en" } = {}) {
   if (!String(message || "").trim()) throw httpError(400, "A message is required");
   const { patient, record } = await resolvePatient(token, req);
+  if (privacyOf(patient).aiChatbotEnabled === false) {
+    throw httpError(403, "The patient has disabled the emergency AI chatbot");
+  }
   const context = approvedContext({ ...patient, name: await displayName(patient) });
   const mode = llmMode();
   let hits;

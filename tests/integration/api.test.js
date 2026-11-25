@@ -2,6 +2,7 @@ import request from "supertest";
 import { beforeAll, describe, expect, it } from "vitest";
 import app from "../../src/app.js";
 import { createSession } from "../../src/services/session.service.js";
+import { getStore } from "../../src/store/index.js";
 
 const PASSWORD = "secret123";
 
@@ -73,6 +74,10 @@ describe("API foundations (local mode, post-M1)", () => {
       .send({ mfaToken: login2.body.mfaToken, code })
       .expect(200);
     doctor = { token: verified.body.accessToken, uid: verified.body.user.uid };
+    await getStore().set("consents", "consent-foundations-doctor", {
+      patientId: "foundations-patient", granteeType: "doctor", granteeId: doctor.uid,
+      scope: ["records", "prescriptions"], status: "active", grantedAt: new Date(), createdAt: new Date(),
+    });
 
     const adminSession = await createSession(
       { id: "foundations-admin", role: "admin", email: "foundations-admin@example.com" },

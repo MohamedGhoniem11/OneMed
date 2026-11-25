@@ -85,9 +85,11 @@ describe("M3 connection QR, NFC and clinical access", () => {
   });
 
   it("issues and resolves an NFC token without exposing raw tokens at rest", async () => {
+    // Lab staff must not be able to mint a bearer token for another patient.
+    await api.post("/api/nfc").set(bearer(labToken)).send({ patientId: P1 }).expect(403);
     const issued = await api
       .post("/api/nfc")
-      .set(bearer(labToken))
+      .set(bearer(adminToken))
       .send({ patientId: P1, nfcUid: "NTAG424-TEST" })
       .expect(201);
     expect(issued.body.token.split(".")).toHaveLength(3);

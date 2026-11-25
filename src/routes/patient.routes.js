@@ -13,7 +13,7 @@ router.get("/:id", requirePermission("patients:read"), c.getById);
 router.post(
   "/:id/emergency-override",
   requirePermission("patients:read"),
-  requireRole("doctor", "hospital_admin", "admin"),
+  requireRole("doctor"),
   c.override,
 );
 router.get("/:id/records", requirePermission("patients:read"), requirePatientAccess("records"), c.records);

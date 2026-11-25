@@ -2,6 +2,7 @@ import * as ocr from "../services/ocr.service.js";
 import * as parser from "../services/prescription.parser.js";
 import * as service from "../services/prescription.service.js";
 import { hasActiveConsent } from "../services/consent.service.js";
+import { canReadPatient } from "../middleware/consent.js";
 import { auditRequest } from "../services/audit.service.js";
 import { generate, llmMode } from "../services/llm.service.js";
 import { httpError } from "../utils/http-error.js";
@@ -67,6 +68,8 @@ export async function extract(req, res, next) {
 
 export async function create(req, res, next) {
   try {
+    if (!req.body?.patientId) throw httpError(400, "patientId is required");
+    await canReadPatient(req, req.body.patientId, { scope: "prescriptions" });
     const prescription = await service.create(req.user.uid, req.body);
     await auditRequest(req, {
       action: "prescription_created",

@@ -41,6 +41,13 @@ export async function emergencyOverride(req, patientId, { reason, ttlMinutes = 1
   const patient = await getStore().get(COLLECTION, patientId);
   if (!patient) throw httpError(404, "Patient not found");
   const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
+  await getStore().add("emergencyOverrides", {
+    patientId,
+    doctorId: req.user.uid,
+    reason,
+    createdAt: new Date(),
+    expiresAt,
+  });
   await auditRequest(req, {
     action: "emergency_override",
     resourceType: "patient",

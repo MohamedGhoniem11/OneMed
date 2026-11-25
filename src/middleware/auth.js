@@ -42,6 +42,20 @@ export const requireRole =
       ? next()
       : res.status(403).json({ message: "Forbidden", requestId: req.id });
 
+/** Clinical writes require a verified doctor profile when one exists. */
+export const requireVerifiedDoctor = async (req, res, next) => {
+  try {
+    if (req.user?.role !== "doctor") return next();
+    const profile = await (await import("../store/index.js")).getStore().get("doctors", req.user.uid);
+    if (profile && profile.verified === false) {
+      return res.status(403).json({ message: "Doctor account is not verified", requestId: req.id });
+    }
+    next();
+  } catch {
+    res.status(500).json({ message: "Internal Server Error", requestId: req.id });
+  }
+};
+
 /** Capability-based guard; the matrix lives in constants/permissions.js. */
 export const requirePermission =
   (permission) =>

@@ -1,7 +1,8 @@
 import { getStore } from "../store/index.js";
 import { httpError } from "../utils/http-error.js";
 import { auditRequest } from "../services/audit.service.js";
-import { createNfc, findNfcForPatient, resolveNfc } from "../services/token.service.js";
+import { hasActiveConsent } from "../services/consent.service.js";
+import { createEmergency, createNfc, findNfcForPatient, resolveNfc } from "../services/token.service.js";
 
 const send = (fn, status = 200) => async (req, res, next) => {
   try { res.status(status).json(await fn(req)); } catch (error) { next(error); }
@@ -10,6 +11,9 @@ const send = (fn, status = 200) => async (req, res, next) => {
 export const issue = send(async (req) => {
   const patientId = req.body?.patientId;
   if (!patientId) throw httpError(400, "patientId is required");
+  const allowed = patientId === req.user.uid || req.user.role === "admin"
+    || (req.user.role === "doctor" && await hasActiveConsent(patientId, "doctor", req.user.uid, "records"));
+  if (!allowed) throw httpError(403, "Not allowed to issue a token for this patient");
   const patient = await getStore().get("patients", patientId);
   if (!patient) throw httpError(404, "Patient not found");
   const result = await createNfc({ patientId, nfcUid: req.body.nfcUid, issuedBy: req.user.uid });
@@ -34,7 +38,16 @@ export const resolve = send(async (req) => {
     actorId: null,
     actorRole: "public",
   });
-  return { patientId: result.patientId, valid: true };
+  // The emergency URL uses a separate, privacy-filtered capability token.
+  // Issuing it here makes the NFC "Emergency Info" button work without
+  // exposing the patient ID or full record in the public URL.
+  const emergency = await createEmergency({ patientId: result.patientId, issuedBy: null });
+  return {
+    patientId: result.patientId,
+    valid: true,
+    emergencyToken: emergency.token,
+    emergencyUrl: emergency.url,
+  };
 });
 
 export const mine = send(async (req) => {

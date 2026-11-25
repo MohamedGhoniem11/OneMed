@@ -6,12 +6,13 @@ import { auditRequest, verifyChain } from "./audit.service.js";
 import { clinicalSummary } from "./clinical.service.js";
 import { patientAnalytics, populationAnalytics } from "./analytics.service.js";
 import { createTextPdf } from "./pdf-report.service.js";
-import { env } from "../config/env.js";
 
 export const REPORT_TYPES = Object.freeze(["history", "labs", "clinical-summary", "audit", "population"]);
 
 function csvEscape(value) {
-  const text = value === null || value === undefined ? "" : String(value);
+  let text = value === null || value === undefined ? "" : String(value);
+  // Prevent spreadsheet formula execution from user-controlled clinical text.
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
@@ -91,7 +92,7 @@ async function historyReport(req, patientId) {
   const fhir = {
     resourceType: "Bundle",
     type: "collection",
-    meta: { source: env.appUrl || "onemed" },
+    meta: { source: "onemed" },
     entry: [fhirPatient(patient, user), ...fhirObservations(records)].map((resource) => ({ resource })),
   };
   return {

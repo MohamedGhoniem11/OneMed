@@ -48,6 +48,10 @@ export async function grant(patientId, data) {
   return consent;
 }
 
+export async function getById(consentId) {
+  return getStore().get(CONSENTS, consentId);
+}
+
 export async function revoke(consentId, reason = "") {
   const consent = await getStore().get(CONSENTS, consentId);
   if (!consent) throw httpError(404, "Consent not found");

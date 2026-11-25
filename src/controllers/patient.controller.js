@@ -2,6 +2,8 @@ import * as service from "../services/patient.service.js";
 import { updateMe } from "../controllers/user.controller.js";
 import { validate } from "../utils/schema.js";
 import { emergencyOverrideSchema, patientUpdateSchema } from "../schemas/patient.schema.js";
+import { canReadPatient } from "../middleware/consent.js";
+import { httpError } from "../utils/http-error.js";
 
 export const me = updateMe;
 export const updateMePatch = updateMe;
@@ -36,8 +38,10 @@ export async function override(req, res, next) {
 
 export async function getById(req, res, next) {
   try {
+    await canReadPatient(req, req.params.id, { scope: "demographics" });
     const patient = await service.getPatient(req.params.id);
-    res.json(patient ?? { message: "Patient not found", requestId: req.id });
+    if (!patient) throw httpError(404, "Patient not found");
+    res.json(patient);
   } catch (err) {
     next(err);
   }

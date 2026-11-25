@@ -8,6 +8,7 @@ const router = Router();
 // Patient-only configuration and QR issuance (static paths first).
 router.post("/qr", authenticate, c.createQr);
 router.patch("/privacy", authenticate, c.privacy);
+router.get("/mine", authenticate, c.mine);
 
 // Public surfaces: rate limited, no auth, no clinical data beyond approved fields.
 router.get("/:token", emergencyLimiter, c.profile);

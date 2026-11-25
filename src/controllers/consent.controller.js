@@ -45,6 +45,11 @@ export async function grant(req, res, next) {
 
 export async function revoke(req, res, next) {
   try {
+    const existing = await service.getById(req.params.id);
+    if (!existing) throw httpError(404, "Consent not found");
+    if (existing.patientId !== req.user.uid && req.user.role !== "admin") {
+      throw httpError(403, "Only the patient or an administrator may revoke this consent");
+    }
     const consent = await service.revoke(req.params.id, req.body?.reason ?? "");
     await auditRequest(req, {
       action: "consent_revoked",
