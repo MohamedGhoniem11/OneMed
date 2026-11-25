@@ -310,3 +310,12 @@ Remaining known gaps (not silently marked done): mobile viewport walkthrough (br
 
 ### Post-review corrections (commit 643792d)
 An independent code review of the Phase-2 diff found and we fixed: fail-open verified-doctor guard (now requires a verified profile; negative test added), emergency override silently granting full record access (now critical-scope only; verified 403 before and after override), hospital_admin /api/users 403 (institution-scoped listing), unbounded emergency tokens per NFC scan (stable jti + rate limit; verified 2 scans create 1 record), and incomplete EDP purge (messages by conversation, device tokens by userId, fulfillment/override collections added). Also removed a dead override branch and a hot-path dynamic import.
+
+
+### M7/M8 verification notes
+- Full AR/EN coverage: 336 new i18n keys per locale, RTL verified in browser (dir=rtl, lang=ar); Lighthouse accessibility/best-practices/SEO all 100/100/100 after ARIA/contrast/heading fixes.
+- PWA: service worker registers in production preview, 4 shell assets cached, manifest standalone.
+- Doctor RAG assistant implemented; real Firestore browser run returned grounded patient context with confidence/sources/disclaimer.
+- Gemini free-tier quota was exhausted during verification (20 generate requests/day). Emergency and doctor chat now degrade to deterministic, cited local answers instead of returning 500; this is a documented external limitation, not a code failure. 
+pm run demo passes 12/12 with the fallback active.
+- Mobile viewport walkthrough remains impossible with the available browser harness; code-level responsive fixes were applied and verified at desktop widths.

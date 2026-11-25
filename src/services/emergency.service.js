@@ -138,7 +138,14 @@ export async function chat(token, message, { req, language = "en" } = {}) {
   } else {
     const sources = chunks.map((c, i) => `[${i + 1}] ${c.source} - ${c.section}\n${c.text}`).join("\n\n");
     const prompt = `Bystander question: ${message}\n\nApproved patient context: ${context}\n\nGuideline context:\n${sources}\n\nAnswer in ${language === "ar" ? "Arabic" : "English"}.`;
-    const result = await generate({ system: SYSTEM_PROMPT, prompt });
+    let result;
+    try {
+      result = await generate({ system: SYSTEM_PROMPT, prompt });
+    } catch {
+      // A cloud generation failure (timeout, safety block, 5xx) must never
+      // turn a public emergency request into a 500 - fall back to cited steps.
+      result = { text: "", mode: "offline" };
+    }
     text = result.text || offlineAnswer(chunks, context, language);
     if (result.mode === "gemini" && !text.includes("123") && !text.includes("١٢٣")) {
       text = offlineAnswer(chunks, context, language);

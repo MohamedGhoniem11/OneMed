@@ -81,9 +81,15 @@ export async function doctorChat(req, patientId, message, language = "en") {
   if (gap) {
     answer = "I cannot answer from the available patient data. Please review the source records.";
   } else if (mode === "gemini") {
-    const result = await generate({ system: SYSTEM, prompt, maxOutputTokens: 600 });
-    answer = result.text || "No grounded answer was produced.";
-  } else {
+    let generated = "";
+    try {
+      generated = (await generate({ system: SYSTEM, prompt, maxOutputTokens: 600 })).text || "";
+    } catch {
+      // Cloud failure degrades to the same deterministic extractive fallback.
+    }
+    answer = generated;
+  }
+  if (!answer) {
     // Deterministic extractive answer: quote the retrieved facts, no invention.
     const notable = context.observations.flatMap((o) => o.values)
       .filter((v) => v.flag === "high" || v.flag === "low").slice(0, 4)

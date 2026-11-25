@@ -36,6 +36,13 @@ async function main() {
   await check("Patient analytics", async () => `${(await json("/analytics/patient/user_patient_1", patient)).indicators.hba1c.value} HbA1c`);
   await check("Population analytics", async () => (await json("/analytics/population", admin)).totalPatients);
   await check("Audit chain", async () => (await json("/audit/verify", admin)).valid);
+  await check("Doctor RAG assistant", async () => {
+    const answer = await json("/analytics/clinical/user_patient_1/chat", doctor, {
+      method: "POST", body: JSON.stringify({ message: "allergies and flagged results", language: "en" }),
+    });
+    if (!answer.disclaimer?.includes("responsible for clinical decisions")) throw new Error("Missing safety disclaimer");
+    return `${answer.confidence} · ${answer.sources.length} sources`;
+  });
 
   let link;
   await check("Prescription confirm + 24h link", async () => {
