@@ -230,3 +230,34 @@ export function DoctorReports() {
 }
 
 export function DoctorSettings() { const {session}=useAuth(); const {t}=useTranslation(); return <><PageHead title={t('settings')} subtitle={t('clinicalIdentity')}/><Card><dl style={{lineHeight:2}}><dt style={{color:'var(--muted)'}}>{t('name')}</dt><dd>{session!.user.name}</dd><dt style={{color:'var(--muted)'}}>{t('email')}</dt><dd>{session!.user.email}</dd><dt style={{color:'var(--muted)'}}>MFA</dt><dd>{session!.user.mfaEnabled?<Badge tone="green">Enabled</Badge>:<Badge tone="amber">Not enabled</Badge>}</dd></dl></Card></>; }
+
+/** Doctor-facing analytics: full ranges, abnormal flags and cross-test context (§3.5.4). */
+export function DoctorAnalytics() {
+  const { t, i18n } = useTranslation(); const {toast}=useToast();
+  const [patients,setPatients]=useState<Patient[]>([]); const [pid,setPid]=useState('');
+  const [data,setData]=useState<any>(null); const [summary,setSummary]=useState<any>(null); const [loading,setLoading]=useState(false);
+  useEffect(()=>{void api.searchPatients('').then(a=>{setPatients(a);setPid(a[0]?.id||'');});},[]);
+  useEffect(()=>{ if(!pid) return; setLoading(true);
+    void Promise.all([api.patientAnalytics(pid),api.clinicalSummary(pid)]).then(([a,s])=>{setData(a);setSummary(s);setLoading(false);}).catch((e:any)=>{toast(e.message,true);setLoading(false);});
+  },[pid]);
+  const ind = data?.indicators||{};
+  const labs = (data?.labTrends||[]).filter((x:any)=>x.HbA1c!=null).map((x:any)=>({date:x.date,value:x.HbA1c,low:4,high:5.6}));
+  const bp = data?.bloodPressure||[];
+  const tone=(v:any)=>v?.flag==='high'?'red':v?.flag==='low'?'amber':'green';
+  return <>
+    <PageHead title="Clinical analytics" subtitle="Full reference ranges, abnormal flags and trend analysis." actions={<Link className="btn outline" to={`/app/doctor/patients/${pid}`}>Open patient record</Link>}/>
+    <Card><Field label={t('patient')}><select className="input" value={pid} onChange={e=>setPid(e.target.value)}>{patients.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></Field></Card>
+    {loading && <SkeletonCards/>}
+    {data && <>
+      <div className="grid cols-4" style={{marginTop:16}}>{Object.entries(ind).filter(([,v])=>v).map(([name,v]:any)=><Card key={name} title={name}><div style={{fontSize:24,fontWeight:700}}>{v.value}<small style={{fontSize:12,color:'var(--muted)'}}> {v.unit||''}</small></div><div style={{fontSize:12,color:'var(--muted)'}}>Range {v.low??'-'} – {v.high??'-'}</div><Badge tone={tone(v)}>{v.flag||'normal'}</Badge></Card>)}</div>
+      <div className="grid cols-2" style={{marginTop:16}}>
+        <Card title="HbA1c trend with reference band"><ResponsiveContainer width="100%" height={220}><LineChart data={labs}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="date"/><YAxis domain={[4,9]}/><Tooltip/><ReferenceArea y1={4} y2={5.6} fill="#e7f7ef" fillOpacity={.7}/><Line type="monotone" dataKey="value" stroke="#d99219" strokeWidth={2.5}/></LineChart></ResponsiveContainer></Card>
+        <Card title="Blood pressure with threshold zones"><ResponsiveContainer width="100%" height={220}><LineChart data={bp}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="date"/><YAxis domain={[50,170]}/><Tooltip/><Legend/><ReferenceArea y1={90} y2={120} fill="#e7f6f3" fillOpacity={.5}/><Line type="monotone" dataKey="systolic" stroke="#002657" strokeWidth={2.5}/><Line type="monotone" dataKey="diastolic" stroke="#0f9d6e" strokeWidth={2.5}/></LineChart></ResponsiveContainer></Card>
+      </div>
+      <Card title="AI clinical summary" style={{marginTop:16}} action={<button className="btn sm outline" onClick={()=>void api.downloadReport('history',{patientId:pid,format:'pdf'}).catch((e:any)=>toast(e.message,true))}>Export PDF</button>}>
+        <p style={{whiteSpace:'pre-wrap'}}>{summary?.text||'-'}</p><div style={{display:'flex',gap:6,flexWrap:'wrap'}}>{summary?.sources?.map((s:string)=><Badge key={s} tone="blue">{s}</Badge>)}</div><p className="disclaimer">{t('aiDisclaimer')}</p>
+      </Card>
+      <Card title="Flagged results" style={{marginTop:16}}><div className="grid cols-3">{(data?.lipidPanel||[]).map((v:any)=><Stat key={v.name} label={`${v.name} (${v.unit||''})`} value={v.value??'-'} sub={`${v.low??'-'} – ${v.high??'-'}`}/>)}</div></Card>
+    </>}
+  </>;
+}

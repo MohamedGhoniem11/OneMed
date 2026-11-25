@@ -11,13 +11,14 @@ import {
   Landing, Register, Login, EmergencyPage, NfcLanding, FulfillmentPage,
 } from './pages/public';
 import { ConsentQrPage } from './pages/consent-qr';
+import { DemoHub } from './pages/demos';
 import {
   PatientDashboard, PatientRecords, PatientAnalytics, PatientPrescriptions, PatientConsents,
   PatientEmergencyConfig, PatientMessages, PatientNotifications, PatientSettings,
 } from './pages/patient';
 import {
   DoctorDashboard, DoctorPatients, PatientViewer, DoctorPrescriptions, DoctorQrTools,
-  DoctorMessages, DoctorReports, DoctorSettings,
+  DoctorMessages, DoctorReports, DoctorSettings, DoctorAnalytics,
 } from './pages/doctor';
 import {
   LabPortal, PharmacyPortal, PharmacyProfile, HospitalAdmin, HospitalStaff, HospitalConnections,
@@ -56,6 +57,7 @@ function Root() {
     <Route path="/qr/:token" element={<ConsentQrRoute/>}/>
 
     <Route path="/app" element={<Protected><AppRedirect/></Protected>}/>
+    <Route path="/app/demos" element={<Protected><DemoHub/></Protected>}/>
     <Route path="/app/notifications" element={<Protected><PatientNotifications/></Protected>}/>
 
     <Route path="/app/patient" element={<Protected roles={['patient']}><PatientDashboard/></Protected>}/>
@@ -75,6 +77,7 @@ function Root() {
     <Route path="/app/doctor/qr" element={<Protected roles={['doctor']}><DoctorQrTools/></Protected>}/>
     <Route path="/app/doctor/messages" element={<Protected roles={['doctor']}><DoctorMessages/></Protected>}/>
     <Route path="/app/doctor/reports" element={<Protected roles={['doctor']}><DoctorReports/></Protected>}/>
+    <Route path="/app/doctor/analytics" element={<Protected roles={['doctor']}><DoctorAnalytics/></Protected>}/>
     <Route path="/app/doctor/settings" element={<Protected roles={['doctor']}><DoctorSettings/></Protected>}/>
 
     <Route path="/app/lab" element={<Protected roles={['lab_staff']}><LabPortal/></Protected>}/>

@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   LayoutDashboard, Users, FileText, FlaskConical, Pill, MessageSquare, Bell, Settings,
-  BarChart3, ShieldCheck, Building2, Store, ClipboardList, Plug, Activity, QrCode,
+  BarChart3, ShieldCheck, Building2, Store, ClipboardList, Plug, Activity, QrCode, PlayCircle,
 } from 'lucide-react';
 import type { Role } from '../types';
 
@@ -33,6 +33,7 @@ export const navByRole: Record<Role, NavItem[]> = {
     {to:'/app/doctor/qr',label:'scannerTools',group:'navGroupTools',icon:<QrCode className="ico"/>},
     {to:'/app/doctor/messages',label:'messages',group:'navGroupTools',icon:<MessageSquare className="ico"/>},
     {to:'/app/doctor/reports',label:'reports',group:'navGroupTools',icon:<ClipboardList className="ico"/>},
+    {to:'/app/doctor/analytics',label:'analytics',group:'navGroupInsights',icon:<BarChart3 className="ico"/>},
     {to:'/app/doctor/settings',label:'settings',group:'navGroupSystem',icon:<Settings className="ico"/>},
   ],
   lab_staff: [
@@ -75,7 +76,9 @@ export function roleLabelKey(role: Role) {
 }
 
 export function navItemsFor(role: Role) {
-  return [...(navByRole[role] || []), {to:'/app/notifications',label:'notifications',icon:<Bell className="ico"/>} as NavItem];
+  return [...(navByRole[role] || []),
+    {to:'/app/notifications',label:'notifications',icon:<Bell className="ico"/>} as NavItem,
+    {to:'/app/demos',label:'demos',group:'navGroupSystem',icon:<PlayCircle className="ico"/>} as NavItem];
 }
 
 /** Destinations shown in the compact bottom tab bar (the rest live in "More"). */

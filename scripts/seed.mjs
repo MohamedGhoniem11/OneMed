@@ -1,5 +1,6 @@
 import "dotenv/config";
 import crypto from "node:crypto";
+import { createEmergency, createFulfillment, createNfc } from "../src/services/token.service.js";
 
 /**
  * Idempotent demo seed (R82, M1 acceptance).
@@ -123,7 +124,7 @@ const DEMO = {
       uid: "user_patient_1",
       nationalId: "29001011234567",
       dateOfBirth: "1990-01-10",
-      gender: "male",
+      gender: "female",
       bloodGroup: "O+",
       city: "Alexandria",
       address: "Sidi Gaber, Alexandria",
@@ -323,6 +324,36 @@ const GUIDELINES = [
     tags: ["anaphylaxis", "allergy", "emergency"],
     version: "2024",
   },
+  {
+    id: "kb_cpr_adult_ar",
+    source: "AHA CPR & First Aid 2024 (ملخص مُعاد صياغته)",
+    section: "الإنعاش القلبي الرئوي للبالغين",
+    url: "https://cpr.heart.org/",
+    language: "ar",
+    text: "إذا كان الشخص فاقدًا للوعي ولا يتنفس بشكل طبيعي، اتصل بالإسعاف أولًا. ضع كف يدك في منتصف الصدر واليد الأخرى فوقها. اضغط بقوة وسرعة بعمق ٥ إلى ٦ سنتيمترات، بمعدل ١٠٠ إلى ١٢٠ ضغطة في الدقيقة. اسمح للصدر بالعودة بالكامل بين الضغطات. استمر حتى وصول المساعدة أو بدء التنفس الطبيعي.",
+    tags: ["cpr", "adult", "cardiac", "إنعاش"],
+    version: "2024",
+  },
+  {
+    id: "kb_seizure_ar",
+    source: "Red Cross First Aid 2024 (ملخص مُعاد صياغته)",
+    section: "التشنجات",
+    url: "https://www.redcross.org/",
+    language: "ar",
+    text: "أثناء التشنج، أبعد الأشياء الحادة والصلبة عن الشخص لحمايته من الإصابة. ضع وسادة تحت رأسه ولا تمنع حركته بالقوة. لا تضع أي شيء في فمه. احسب مدة التشنج. اتصل بالإسعاف إذا استمر أكثر من خمس دقائق، أو إذا أصيب الشخص، أو كانت هذه أول نوبة له.",
+    tags: ["seizure", "first-aid", "تشنجات"],
+    version: "2024",
+  },
+  {
+    id: "kb_anaphylaxis_ar",
+    source: "WHO Basic Emergency Care (ملخص مُعاد صياغته)",
+    section: "الحساسية المفرطة",
+    url: "https://www.who.int/",
+    language: "ar",
+    text: "تشمل علامات الحساسية المفرطة تورم الوجه أو الحلق وصعوبة التنفس وطفح جلدي واسع. إذا توفر حقن الأدرينالين التلقائي استخدمه حسب التعليمات واتصل بالإسعاف فورًا. اجعل الشخص مستلقيًا مع رفع الساقين، إلا إذا كان يجد صعوبة في التنفس فيترك في وضع الجلوس.",
+    tags: ["anaphylaxis", "allergy", "emergency", "حساسية"],
+    version: "2024",
+  },
 ];
 
 function hashEmbed(text, dimensions = 64) {
@@ -349,6 +380,7 @@ async function seed() {
   const idp = getIdp();
   const now = new Date();
   const report = { institutions: 0, users: 0, patients: 0, doctors: 0, pharmacies: 0, prescriptions: 0, records: 0, consents: 0, guidelineChunks: 0, skipped: 0 };
+  const demoPatient = "user_patient_1";
 
   for (const institution of DEMO.institutions) {
     const existing = await store.get("institutions", institution.id);
@@ -429,6 +461,20 @@ async function seed() {
     });
     report.prescriptions += 1;
   }
+  const fulfilledId = "rx_demo_fulfilled";
+  if (!(await store.get("prescriptions", fulfilledId))) {
+    const link = await createFulfillment({ prescriptionId: fulfilledId, patientId: demoPatient });
+    await store.set("prescriptions", fulfilledId, {
+      id: fulfilledId, doctorId: "user_doctor_1", patientId: demoPatient,
+      doctorName: "Dr. Karim Hassan", patientName: "Mona Ali Hassan",
+      diagnosis: "Routine follow-up", status: "confirmed", extractionStatus: "confirmed",
+      items: [{ name: "Metformin", dosage: "500mg", frequency: "BID", duration: "30 days" }],
+      linkToken: link.token, linkExpiresAt: link.expiresAt, pharmacyId: "pharm_medica",
+      pharmacyName: "MediCare Plus Pharmacy", orderStatus: "completed",
+      whatsappUrl: "https://wa.me/01098765432", createdAt: now, updatedAt: now,
+    });
+    report.prescriptions += 1;
+  }
 
   for (const record of DEMO.records) {
     const existing = await store.get("records", record.id);
@@ -462,7 +508,37 @@ async function seed() {
     report.guidelineChunks += 1;
   }
 
+  // Signed demo artifacts: an emergency QR, an NFC wristband and a notification.
+  // Tokens are returned once here so the demo hub can link to them; only hashes
+  // are stored by the token service.
+  const existingQr = await store.get("emergencyQr", "demo_emergency_qr");
+  if (!existingQr) {
+    const emergency = await createEmergency({ patientId: demoPatient, issuedBy: "system" });
+    await store.set("emergencyQr", "demo_emergency_qr", { ...(await store.get("emergencyQr", emergency.record.id)), demoToken: emergency.token });
+    console.log(`Demo emergency page: ${emergency.url}`);
+    report.emergencyQr = 1;
+  }
+  const nfc = await findOrCreateNfc(store, demoPatient);
+  if (nfc) report.nfc = 1;
+  const noteId = "demo_notification_1";
+  if (!(await store.get("notifications", noteId))) {
+    await store.set("notifications", noteId, {
+      id: noteId, userId: demoPatient, title: "New lab result available", body: "HbA1c and lipid panel", type: "lab",
+      read: false, createdAt: now,
+    });
+    report.notifications = 1;
+  }
+
   return report;
+}
+
+async function findOrCreateNfc(store, patientId) {
+  const existing = await store.get("nfcTokens", "demo_nfc");
+  if (existing) return existing;
+  const created = await createNfc({ patientId, nfcUid: "NTAG424-DEMO", issuedBy: "system" });
+  await store.set("nfcTokens", "demo_nfc", { ...(await store.get("nfcTokens", created.record.id)), demoToken: created.token });
+  console.log(`Demo NFC landing: ${created.url}`);
+  return created.record;
 }
 
 function printCredentials() {

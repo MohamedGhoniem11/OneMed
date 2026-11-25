@@ -19,6 +19,8 @@
     "test:ocr:accuracy": "node scripts/ocr-accuracy.mjs",
     "seed": "node scripts/seed.mjs",
     "seed:guidelines": "node scripts/seed-guidelines.mjs",
+    "dev:all": "node scripts/dev-all.mjs",
+    "demo": "node scripts/demo-walkthrough.mjs",
     "purge:deletions": "node scripts/purge-deletions.mjs",
     "set:admin": "node scripts/setAdmin.js"
   },
