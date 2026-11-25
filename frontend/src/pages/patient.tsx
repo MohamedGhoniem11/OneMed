@@ -96,7 +96,7 @@ export function PatientAnalytics() {
     <div className="grid cols-4">
       <MetricCard label={t('healthScore')} value={`${analytics?.healthScore??'-'}${analytics?'%':''}`} trend={t('flagged', {count:analytics?.abnormalCount??0})} tone={(analytics?.healthScore||0)>=80?'green':'amber'} bar={analytics?.healthScore||0} sub={t('indicatorsInRange')} icon={<Activity size={16}/>}/>
       <MetricCard label="HbA1c" value={ind.hba1c?.value??'-'} unit={ind.hba1c?.unit||'%'} tone={toneOf(ind.hba1c)} bar={Math.min(100,(ind.hba1c?.value||0)*12)} icon={<HeartPulse size={16}/>}/>
-      <MetricCard label="Blood pressure" value={ind.systolic?.value?`${ind.systolic.value}/${ind.diastolic?.value??'-'}`:'-'} unit="mmHg" tone={toneOf(ind.systolic)} bar={Math.min(100,(ind.systolic?.value||0)/1.8)} icon={<Activity size={16}/>}/>
+      <MetricCard label={t('bloodPressure')} value={ind.systolic?.value?`${ind.systolic.value}/${ind.diastolic?.value??'-'}`:'-'} unit="mmHg" tone={toneOf(ind.systolic)} bar={Math.min(100,(ind.systolic?.value||0)/1.8)} icon={<Activity size={16}/>}/>
       <MetricCard label="LDL" value={ind.ldl?.value??'-'} unit={ind.ldl?.unit||'mg/dL'} tone={toneOf(ind.ldl)} bar={Math.min(100,(ind.ldl?.value||0)/2)} sub={t('ldlDescription')} icon={<AlertTriangle size={16}/>}/>
     </div>
     {view==='overview' ? <Card title={t('atAGlance')} style={{marginTop:16}}>
@@ -132,7 +132,7 @@ export function PatientConsents() {
   const { session } = useAuth(); const { t } = useTranslation(); const [list,setList] = useState<Consent[]>([]); const [confirmDelete,setConfirmDelete]=useState(false); const {toast}=useToast();
   const load = ()=>api.list<Consent>('consents',c=>c.patientId===session!.user.uid).then(setList); useEffect(()=>{void load();},[]);
   const toggle = async (c:Consent)=>{
-    if(c.active) await api.revokeConsentApi(c.id, 'Patient request');
+    if(c.active) await api.revokeConsentApi(c.id, t('patientRequest'));
     else await api.grantConsent({granteeType:c.granteeType, granteeId:c.granteeId, scope:c.scope.split(','), purpose:c.purpose});
     toast(c.active?t('revoke'):t('grant')); void load();
   };
@@ -143,7 +143,7 @@ export function PatientConsents() {
     <Card title={t('yourDataRights')} style={{marginTop:16}}><p style={{color:'var(--muted)'}}>{t('dataRightsText')}</p><div style={{display:'flex',gap:8}}>
       <button className="btn outline" onClick={()=>void api.downloadReport('history',{patientId:session!.user.uid,format:'fhir'}).then(()=>toast(t('saved'))).catch((e:any)=>toast(e.message,true))}><Download size={16}/> {t('download')} JSON</button>
       <button className="btn danger" onClick={()=>setConfirmDelete(true)}><Trash2 size={16}/> {t('requestDeletion')}</button></div></Card>
-    {confirmDelete && <Modal title={t('requestDataDeletion')} onClose={()=>setConfirmDelete(false)} footer={<><button className="btn outline" onClick={()=>setConfirmDelete(false)}>{t('cancel')}</button><button className="btn danger" onClick={()=>void (async()=>{try{await api.requestDeletion(session!.user.uid,'Patient request');toast(t('deletionRecorded'));setConfirmDelete(false);}catch(e:any){toast(e.message,true);}})()}>{t('confirmDeletion')}</button></>}><p>{t('deletionConfirmText')}</p></Modal>}
+    {confirmDelete && <Modal title={t('requestDataDeletion')} onClose={()=>setConfirmDelete(false)} footer={<><button className="btn outline" onClick={()=>setConfirmDelete(false)}>{t('cancel')}</button><button className="btn danger" onClick={()=>void (async()=>{try{await api.requestDeletion(session!.user.uid,t('patientRequest'));toast(t('deletionRecorded'));setConfirmDelete(false);}catch(e:any){toast(e.message,true);}})()}>{t('confirmDeletion')}</button></>}><p>{t('deletionConfirmText')}</p></Modal>}
   </>;
 }
 
@@ -193,7 +193,7 @@ export function PatientNotifications({ userId }: { userId?: string }) {
   const load = ()=>api.listNotifications().then(a=>setList(a.sort((x:any,y:any)=>String(y.createdAt).localeCompare(String(x.createdAt)))));
   useEffect(()=>{ void load(); },[target]);
   return <><PageHead title={t('notifications')} subtitle={t('notificationsSubtitle')} actions={<button className="btn sm outline" onClick={async()=>{await api.markNotificationsRead();toast(t('saved'));void load();}}>{t('markAllRead')}</button>}/>
-    <Card pad><div className="card-body">{list.map(n=><div key={n.id} style={{display:'flex',gap:12,padding:'12px 0',borderBottom:'1px solid var(--line)'}}><span className="avatar"><Bell size={16}/></span><div style={{flex:1}}><strong>{n.title}</strong><div>{n.body}</div><div style={{fontSize:11,color:'var(--muted)'}}>{new Date(n.createdAt).toLocaleString()}</div></div>{!n.read&&<Badge tone="blue">new</Badge>}</div>)}{!list.length&&<Empty/>}</div></Card></>;
+    <Card pad><div className="card-body">{list.map(n=><div key={n.id} style={{display:'flex',gap:12,padding:'12px 0',borderBottom:'1px solid var(--line)'}}><span className="avatar"><Bell size={16}/></span><div style={{flex:1}}><strong>{n.title}</strong><div>{n.body}</div><div style={{fontSize:11,color:'var(--muted)'}}>{new Date(n.createdAt).toLocaleString()}</div></div>{!n.read&&<Badge tone="blue">{t('new')}</Badge>}</div>)}{!list.length&&<Empty/>}</div></Card></>;
 }
 
 export function PatientSettings() {
@@ -203,9 +203,9 @@ export function PatientSettings() {
     <div className="grid cols-2"><Card title={t('personalInformation')}><Field label={t('name')}><input className="input" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></Field><Field label={t('phoneNumber')}><input className="input" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})}/></Field><Field label={t('email')}><input className="input" value={form.email} disabled/></Field><button className="btn navy" onClick={async()=>{try{await api.updateMyProfile({name:form.name,phone:form.phone});setUser({...form,name:form.name,phone:form.phone});toast(t('saved'));}catch(e:any){toast(e.message,true);}}}>{t('save')}</button></Card>
       <Card title={t('emergencyContact')}><Field label={t('name')}><input className="input" dir="rtl" value={form.emergencyContact?.name||''} onChange={e=>setForm({...form,emergencyContact:{...form.emergencyContact,name:e.target.value}})}/></Field><Field label={t('phoneNumber')}><input className="input" type="tel" value={form.emergencyContact?.phone||''} onChange={e=>setForm({...form,emergencyContact:{...form.emergencyContact,phone:e.target.value}})}/></Field><Field label={t('relationship')}><input className="input" value={form.emergencyContact?.relationship||''} onChange={e=>setForm({...form,emergencyContact:{...form.emergencyContact,relationship:e.target.value}})}/></Field><button className="btn navy" onClick={async()=>{try{await api.updateEmergencyContact(form.emergencyContact);toast(t('saved'));}catch(e:any){toast(e.message,true);}}}>{t('save')}</button></Card></div>
     <div className="grid cols-3" style={{marginTop:16}}>
-      <Card title={t('dataPrivacy')}><p style={{color:'var(--muted)',fontSize:13}}>{t('consentsDesc')}</p><Link className="btn sm outline" to="/app/patient/consents">{t('consents')} →</Link></Card>
-      <Card title={t('notificationPreferences')}><p style={{color:'var(--muted)',fontSize:13}}>{t('notificationsDesc')}</p><Link className="btn sm outline" to="/app/patient/notifications">{t('notifications')} →</Link></Card>
-      <Card title={t('emergencyQr')}><p style={{color:'var(--muted)',fontSize:13}}>{t('badgeDesc')}</p><Link className="btn sm outline" to="/app/patient/emergency">{t('configure')} →</Link></Card>
+      <Card title={t('dataPrivacy')}><p style={{color:'var(--muted)',fontSize:13}}>{t('consentsDesc')}</p><Link className="btn sm outline" to="/app/patient/consents">{t('consents')} <ForwardArrow/></Link></Card>
+      <Card title={t('notificationPreferences')}><p style={{color:'var(--muted)',fontSize:13}}>{t('notificationsDesc')}</p><Link className="btn sm outline" to="/app/patient/notifications">{t('notifications')} <ForwardArrow/></Link></Card>
+      <Card title={t('emergencyQr')}><p style={{color:'var(--muted)',fontSize:13}}>{t('badgeDesc')}</p><Link className="btn sm outline" to="/app/patient/emergency">{t('configure')} <ForwardArrow/></Link></Card>
     </div>
   </>;
 }
