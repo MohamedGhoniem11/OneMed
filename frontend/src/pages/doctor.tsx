@@ -16,14 +16,14 @@ import type { Patient, MedicalRecord, Prescription, Medicine, Consent, AuditEntr
 import { Badge, Card, CopyButton, Empty, Field, IdentityStrip, Modal, PageHead, SectionTabs, SkeletonCards, Stat, StatusBadge, Tabs, useToast } from '../components/ui';
 
 export function DoctorDashboard() {
-  const { session } = useAuth(); const { t } = useTranslation(); const nav = useNavigate();
+  const { session } = useAuth(); const { t } = useTranslation(); const nav = useNavigate(); const {toast}=useToast();
   const [patients,setPatients]=useState<Patient[]>([]); const [rx,setRx]=useState<Prescription[]>([]); const [q,setQ]=useState(''); const [loading,setLoading]=useState(true);
   useEffect(()=>{ Promise.all([api.searchPatients('').then(setPatients), api.list<Prescription>('prescriptions',x=>x.doctorId===session!.user.uid).then(setRx)]).finally(()=>setLoading(false)); },[]);
   const filtered = patients.filter(p=>`${p.name} ${p.nationalId} ${p.phone}`.toLowerCase().includes(q.toLowerCase()));
   return <>
     <PageHead title={`Good Morning, ${session!.user.name.split(' ').slice(-1)[0]}`} subtitle={`${t('dashboard')} - ${new Date().toLocaleDateString()}`} actions={<span className="badge green">● {t('systemOnline')}</span>}/>
     <div style={{display:'flex',gap:10,marginBottom:16,flexWrap:'wrap'}}><input className="input" style={{maxWidth:400}} placeholder={`Search Patient by ${t('nationalId')}, NFC, or QR…`} value={q} onChange={e=>setQ(e.target.value)}/>
-      <button className="btn danger" onClick={()=>window.open('/emergency/em-demo-mona','_blank')}>✚ {t('emergencyShortcut')}</button>
+      <button className="btn danger" onClick={()=>void api.myEmergencyLink().then(p=>{if(p)window.open(p,'_blank');else toast('No emergency wearable is linked to this account',true);})}>✚ {t('emergencyShortcut')}</button>
       <button className="btn outline" onClick={()=>nav('/app/doctor/qr')}><ScanLine size={16}/> {t('nfcScanner')}</button>
       <button className="btn outline" onClick={()=>nav('/app/doctor/qr')}><QrCode size={16}/> {t('qrGenerator')}</button>
       <Link className="btn navy" to="/app/doctor/prescriptions"><Plus size={16}/> {t('newConsultation')}</Link></div>
@@ -33,7 +33,7 @@ export function DoctorDashboard() {
       </tbody></table>{!filtered.length&&<Empty/>}</div></Card>
       <div className="grid" style={{gap:16}}><Card title={t('quickStats')}><div className="grid cols-2"><Stat label={t('patients')} value={patients.length}/><Stat label={t('pending')} value={rx.filter(r=>r.extractionStatus!=='confirmed').length}/></div></Card>
       <Card title={t('pending')} pad={false}><div className="card-body">{rx.filter(r=>r.extractionStatus!=='confirmed').map(r=><div key={r.id} style={{padding:'8px 0',borderBottom:'1px solid var(--line)'}}><strong>{(r.medicines||[]).map(m=>m.name).join(', ')}</strong><div style={{fontSize:12,color:'var(--muted)'}}>{r.patientName} · Review & sign</div><Link className="btn sm primary" to="/app/doctor/prescriptions">Review</Link></div>)}{rx.every(r=>r.extractionStatus==='confirmed')&&<Empty message="Nothing pending"/>}</div></Card>
-      <Card title={t('aiAssistant')}><p style={{color:'var(--muted)'}}>{t('clinicalSummary')} with confidence and citations.</p><Link className="btn primary" to="/app/doctor/patients/user_patient_1"><Sparkles size={16}/> Open patient</Link></Card></div>
+      <Card title={t('aiAssistant')}><p style={{color:'var(--muted)'}}>{t('clinicalSummary')} with confidence and citations.</p>{patients[0] ? <Link className="btn primary" to={`/app/doctor/patients/${patients[0].id}`}><Sparkles size={16}/> {t('view')}</Link> : <Empty message="No patient available"/>}</Card></div>
     </div>}
   </>;
 }
@@ -51,32 +51,35 @@ export function DoctorPatients() {
 
 export function PatientViewer() {
   const { id='' } = useParams(); const { t, i18n } = useTranslation(); const { session } = useAuth(); const {toast}=useToast();
-  const [patient,setPatient]=useState<Patient|null>(null); const [records,setRecords]=useState<MedicalRecord[]>([]); const [type,setType]=useState('all');
+  const [patient,setPatient]=useState<Patient|null>(null); const [records,setRecords]=useState<MedicalRecord[]>([]); const [meds,setMeds]=useState<any[]>([]); const [type,setType]=useState('all');
   const [summary,setSummary]=useState<{text:string;confidence:string;sources:string[]}|null>(null);
   const [aiOpen,setAiOpen]=useState(false); const [chat,setChat]=useState<ChatTurn[]>([]); const [msg,setMsg]=useState('');
   const [override,setOverride]=useState(false); const [reason,setReason]=useState(''); const [overrideResult,setOverrideResult]=useState<any>(null);
-  useEffect(()=>{ api.getPatient(id).then(setPatient); api.listRecords(id).then(a=>setRecords(a.sort((x,y)=>String(y.date).localeCompare(String(x.date))))); },[id]);
+  useEffect(()=>{ api.getPatient(id).then(setPatient); api.listRecords(id).then(a=>setRecords(a.sort((x,y)=>String(y.date).localeCompare(String(x.date))))); api.list<any>('prescriptions',p=>p.patientId===id).then(a=>setMeds(a.flatMap(p=>p.medicines||p.items||[]))); },[id]);
+  const latestValue = (name:string) => [...records].reverse().flatMap(r=>r.values||[]).find(v=>v.name===name);
+  const contact = () => (patient as any)?.emergencyContact || (patient as any)?.emergencyContacts?.[0] || null;
+  const fmt = (v:any) => v ? new Intl.DateTimeFormat(i18n.language||'en',{dateStyle:'medium',timeStyle:'short'}).format(new Date(v)) : '-';
   const filtered = records.filter(r=>type==='all'||r.type===type);
   const send = async () => { if(!msg.trim()) return; setChat(c=>[...c,{role:'user',text:msg}]); setMsg(''); const r=await api.chatbot(msg,patient||undefined); setChat(c=>[...c,r]); };
-  const series = records.filter(r=>r.values?.some(v=>v.name==='HbA1c')).map(r=>({date:new Date(r.date).toLocaleDateString('en',{month:'short'}),value:r.values!.find(v=>v.name==='HbA1c')!.value}));
+  const series = records.filter(r=>r.values?.some(v=>v.name==='HbA1c')).map(r=>({date:new Intl.DateTimeFormat(i18n.language||'en',{month:'short'}).format(new Date(r.date)),value:r.values!.find(v=>v.name==='HbA1c')!.value}));
   return <>
-    <div className="page-head no-print"><div><IdentityStrip name={patient?.name||'…'} id={patient?.nationalId} blood={patient?.bloodGroup} allergies={patient?.allergies} meta={<>{patient?.dateOfBirth} · {patient?.gender==='male'?'Male':'Female'} · 45 yrs · 82 kg / 178 cm</>}/></div>
+    <div className="page-head no-print"><div><IdentityStrip name={patient?.name||'…'} id={patient?.nationalId} blood={patient?.bloodGroup} allergies={patient?.allergies} meta={<>{patient?.dateOfBirth||'-'} · {patient?.gender==='male'?'Male':'Female'}</>}/></div>
       <div className="no-print"><button className="btn outline" onClick={()=>window.print()}><Printer size={16}/> {t('printRecord')}</button><Link className="btn primary" to="/app/doctor/prescriptions"><Plus size={16}/> {t('newConsultation')}</Link></div></div>
     <div className="print-only"><h1>{patient?.name}</h1><p>ID: {patient?.nationalId} · Blood: {patient?.bloodGroup}</p></div>
-    {patient?.allergies.length ? <div className="alert red"><AlertTriangle size={18}/> <strong>{t('criticalAllergies')}:</strong> {patient.allergies.join(', ')} <Badge tone="red">CRITICAL</Badge></div> : null}
+    {patient?.allergies?.length ? <div className="alert red"><AlertTriangle size={18}/> <strong>{t('criticalAllergies')}:</strong> {patient.allergies.join(', ')} <Badge tone="red">CRITICAL</Badge></div> : null}
     {override && <div className="alert amber"><strong>Emergency override active.</strong> Reason: {reason}. Access is logged and time-limited.</div>}
     <div className="grid cols-2">
       <Card title={t('clinicalTimeline')} action={<div className="tabs" style={{border:0,margin:0}}>{['all','lab','prescription','imaging','note','vitals'].map(x=><button key={x} className={`tab ${type===x?'active':''}`} onClick={()=>setType(x)}>{t(x)}</button>)}</div>} pad={false}>
         <div className="card-body"><div className="timeline">{filtered.map(r=><div className="timeline-item" key={r.id}><Badge tone={r.type==='lab'?'blue':r.type==='imaging'?'blue':r.type==='prescription'?'green':'gray'}>{t(r.type)}</Badge> <strong>{r.title}</strong>
-          <div style={{fontSize:12,color:'var(--muted)'}}>{r.institution} · {new Date(r.date).toLocaleString()}</div>
+          <div style={{fontSize:12,color:'var(--muted)'}}>{r.institution} · {fmt(r.date)}</div>
           {r.values?.map(v=><div key={v.name} style={{fontSize:13,marginTop:4}}>{v.name}: <strong style={{color:v.flag==='high'?'var(--red)':'inherit'}}>{v.value} {v.unit}</strong> <span style={{color:'var(--muted)'}}>({v.referenceLow}-{v.referenceHigh})</span></div>)}
           {r.summary && <p style={{fontSize:13,margin:'4px 0'}}>{r.summary}</p>}</div>)}</div>{!filtered.length&&<Empty/>}
           {filtered.length>0 && <p style={{color:'var(--muted)',fontSize:12,textAlign:'center',paddingTop:8}}>- {t('historyFooter')} -</p>}</div>
       </Card>
       <div className="grid" style={{gap:16}}>
-        <Card title={t('activeMedications')}><p>Metformin 500mg - PO BID with meals<br/>Lisinopril 10mg - PO QD<br/>Atorvastatin 20mg - PO QHS (refill needed)</p></Card>
-        <Card title={t('latestVitals')}><div className="grid cols-2"><Stat label="Blood Pressure" value="128/82 mmHg"/><Stat label={t('heartRate')} value="74 bpm"/><Stat label={t('temperature')} value="37.1 °C"/><Stat label={t('spo2')} value="98 %"/></div></Card>
-        <Card title={t('emergencyContact')}><div style={{display:'flex',justifyContent:'space-between'}}><div><strong>{patient?.emergencyContact?.name||'Not recorded'}</strong><div style={{color:'var(--muted)'}}>{patient?.emergencyContact?.relationship||'-'}</div></div>{patient?.emergencyContact?.phone && <a className="btn sm outline" href={`tel:${patient.emergencyContact.phone}`}>{t('call')}</a>}</div></Card>
+        <Card title={t('activeMedications')}>{(meds.length ? meds : (((patient as any)?.activeMedications||[]) as string[]).map((name:string)=>({name}))).length ? (meds.length ? meds : (((patient as any)?.activeMedications||[]) as string[]).map((name:string)=>({name}))).map((m:any,i:number)=><div key={i} style={{fontSize:13,padding:'4px 0'}}>{m.name}{m.dosage?` ${m.dosage}`:''}{m.frequency?` · ${m.frequency}`:''}</div>) : <Empty message="No medications recorded."/>}</Card>
+        <Card title={t('latestVitals')}><div className="grid cols-2"><Stat label="Blood Pressure" value={latestValue('Systolic')?`${latestValue('Systolic')?.value}/${latestValue('Diastolic')?.value||'-'}`:'-'} /><Stat label={t('heartRate')} value={latestValue('Heart Rate')?`${latestValue('Heart Rate')?.value}`:'-'} /><Stat label={t('temperature')} value={latestValue('Temperature')?`${latestValue('Temperature')?.value}`:'-'} /><Stat label={t('spo2')} value={latestValue('SpO2')?`${latestValue('SpO2')?.value}`:'-'} /></div></Card>
+        <Card title={t('emergencyContact')}><div style={{display:'flex',justifyContent:'space-between'}}><div><strong>{contact()?.name||'Not recorded'}</strong><div style={{color:'var(--muted)'}}>{contact()?.relationship||'-'}</div></div>{contact()?.phone && <a className="btn sm outline" href={`tel:${contact().phone}`}>{t('call')}</a>}</div></Card>
         <Card title={t('clinicalSummary')} action={<button className="btn sm primary" onClick={async()=>{const s=await api.clinicalSummary(id);setSummary(s);toast(t('saved'));}}><Sparkles size={14}/> {t('generate')}</button>}>
           {summary?<><p style={{whiteSpace:'pre-wrap'}}>{summary.text}</p><div style={{display:'flex',gap:6,flexWrap:'wrap'}}><Badge tone={summary.confidence==='High'?'green':'amber'}>{summary.confidence}</Badge>{summary.sources.map(s=><Badge key={s} tone="blue">{s}</Badge>)}</div><p className="disclaimer" style={{marginTop:10}}>{t('aiDisclaimer')}</p></>:<p style={{color:'var(--muted)'}}>{t('generate')} {t('clinicalSummary').toLowerCase()}…</p>}
         </Card>

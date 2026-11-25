@@ -18,7 +18,9 @@
     "test:ocr": "node scripts/ocr-smoke.mjs",
     "test:ocr:accuracy": "node scripts/ocr-accuracy.mjs",
     "seed": "node scripts/seed.mjs",
-    "seed:guidelines": "node scripts/seed-guidelines.mjs"
+    "seed:guidelines": "node scripts/seed-guidelines.mjs",
+    "purge:deletions": "node scripts/purge-deletions.mjs",
+    "set:admin": "node scripts/setAdmin.js"
   },
   "license": "ISC",
   "dependencies": {

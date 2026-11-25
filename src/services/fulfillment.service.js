@@ -32,8 +32,14 @@ export async function publicPrescription(token, req) {
   if (!prescription) throw httpError(404, "Prescription not found");
   if (prescription.status !== "confirmed") throw httpError(409, "Prescription is not confirmed yet");
   if (new Date(prescription.linkExpiresAt || resolved.record.expiresAt) <= new Date()) throw httpError(400, "Fulfillment link has expired");
-  const origin = await patientLocation(prescription.patientId);
-  const pharmacies = await listNearby(origin || { lat: 31.2, lng: 29.92 });
+  const stored = await patientLocation(prescription.patientId);
+  const queryLat = Number(req?.query?.lat);
+  const queryLng = Number(req?.query?.lng);
+  const browserLocation = Number.isFinite(queryLat) && Number.isFinite(queryLng)
+    && queryLat >= -90 && queryLat <= 90 && queryLng >= -180 && queryLng <= 180
+    ? { lat: queryLat, lng: queryLng } : null;
+  const origin = browserLocation || stored || { lat: 31.2, lng: 29.92 };
+  const pharmacies = await listNearby(origin);
   if (req) {
     await auditRequest(req, {
       action: "fulfillment_link_opened",

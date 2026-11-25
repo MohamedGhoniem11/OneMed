@@ -1,11 +1,12 @@
 import { getStore } from "../store/index.js";
 import { httpError } from "../utils/http-error.js";
+import { sendToUser } from "./fcm.service.js";
 
 const COLLECTION = "notifications";
 
 export async function notify({ userId, title, body = "", type = "system" }) {
   if (!userId) return null;
-  return getStore().add(COLLECTION, {
+  const saved = await getStore().add(COLLECTION, {
     userId,
     title,
     body,
@@ -13,6 +14,8 @@ export async function notify({ userId, title, body = "", type = "system" }) {
     read: false,
     createdAt: new Date(),
   });
+  await sendToUser(userId, { title, body }).catch(() => {});
+  return saved;
 }
 
 export async function listForUser(userId, { limit = 100 } = {}) {

@@ -36,6 +36,20 @@ export async function searchPatients(req, query, limit = 20) {
   return visible.slice(0, parseLimit(limit));
 }
 
+/** Records an EDP deletion request; the purge job completes it within 30 days. */
+export async function requestDeletion(patientId, reason = "") {
+  const now = new Date();
+  const dueAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+  return getStore().add("deletionRequests", {
+    patientId,
+    reason: String(reason).slice(0, 1000),
+    status: "pending",
+    requestedAt: now,
+    dueAt,
+    createdAt: now,
+  });
+}
+
 /** Emergency override: written justification, bounded TTL, fully audited. */
 export async function emergencyOverride(req, patientId, { reason, ttlMinutes = 15 }) {
   const patient = await getStore().get(COLLECTION, patientId);

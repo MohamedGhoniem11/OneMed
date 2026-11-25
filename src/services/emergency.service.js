@@ -66,6 +66,7 @@ export async function publicProfile(token, req) {
   if (privacy.showContacts) {
     visible.emergencyContacts = patient.emergencyContacts || (patient.emergencyContact ? [patient.emergencyContact] : []);
     visible.primaryPhysician = patient.primaryPhysician || null;
+    visible.primaryPhysicianPhone = patient.primaryPhysicianPhone || null;
   }
   return { visible, settings: privacy, language: "en" };
 }

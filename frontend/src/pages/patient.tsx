@@ -20,20 +20,20 @@ const RECORD_COLORS:Record<string,string> = { lab:'blue', imaging:'purple', pres
 
 export function PatientDashboard() {
   const { session } = useAuth(); const { t } = useTranslation(); const nav = useNavigate();
-  const [patient,setPatient] = useState<Patient|null>(null); const [records,setRecords] = useState<MedicalRecord[]>([]); const [rx,setRx] = useState<Prescription[]>([]); const [loading,setLoading]=useState(true);
+  const [patient,setPatient] = useState<Patient|null>(null); const [records,setRecords] = useState<MedicalRecord[]>([]); const [rx,setRx] = useState<Prescription[]>([]); const [score,setScore]=useState<number|null>(null); const [loading,setLoading]=useState(true);
   useEffect(()=>{ Promise.all([
     api.getPatient(session!.user.uid).then(setPatient),
     api.listRecords(session!.user.uid).then(a=>setRecords(a.sort((x,y)=>String(y.date).localeCompare(String(x.date))))),
     api.list<Prescription>('prescriptions',r=>r.patientId===session!.user.uid).then(setRx),
+    api.patientAnalytics(session!.user.uid).then(a=>setScore(a.healthScore)).catch(()=>{}),
   ]).finally(()=>setLoading(false)); },[]);
-  const abnormal = records.flatMap(r=>r.values||[]).filter(v=>v.flag && v.flag!=='normal');
   return <>
     <PageHead title={`${t('welcomeBack')}, ${patient?.name.split(' ')[0]||session?.user.name.split(' ')[0]}`} subtitle={`${t('dashboard')} - ${new Date().toLocaleDateString()}`} actions={<Link className="btn primary" to="/app/patient/analytics"><BarChart3 size={16}/> {t('analytics')}</Link>}/>
     {loading ? <SkeletonCards/> : <><div className="grid cols-4">
       <Stat label={t('records')} value={records.length} sub={`${records.filter(r=>r.type==='lab').length} ${t('lab')}`}/>
       <Stat label={t('activeMedications')} value={rx.reduce((a,r)=>a+(r.medicines||[]).length,0)}/>
       <Stat label="Blood Group" value={patient?.bloodGroup||'-'}/>
-      <Stat label={t('healthScore')} value={<span style={{color:'var(--green)'}}>{Math.max(60,100-abnormal.length*4)}%</span>} sub={t('comprehensiveHealth')}/>
+      <Stat label={t('healthScore')} value={<span style={{color:'var(--green)'}}>{score===null?'-':`${score}%`}</span>} sub={t('comprehensiveHealth')}/>
     </div>
     <div className="grid cols-2" style={{marginTop:16}}>
       <Card title={t('clinicalTimeline')} action={<Link className="btn sm outline" to="/app/patient/records">{t('viewAll')}</Link>} pad={false}>
@@ -42,8 +42,8 @@ export function PatientDashboard() {
         </div>)}</div>{!records.length && <Empty/>}</div>
       </Card>
       <div className="grid" style={{gap:16}}>
-        <Card title={t('criticalAllergies')}><div className="alert red"><AlertTriangle size={16}/> {patient?.allergies.join(', ')||'-'}</div>
-          <div style={{marginTop:10,fontSize:13}}><strong>{t('chronicConditions')}:</strong> {patient?.chronicDiseases.join(', ')||'-'}</div></Card>
+        <Card title={t('criticalAllergies')}><div className="alert red"><AlertTriangle size={16}/> {(patient?.allergies||[]).join(', ')||'-'}</div>
+          <div style={{marginTop:10,fontSize:13}}><strong>{t('chronicConditions')}:</strong> {(patient?.chronicDiseases||[]).join(', ')||'-'}</div></Card>
         <Card title={t('prescriptions')}>{rx.map(r=><div key={r.id} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--line)'}}><div><strong>{(r.medicines||[]).map(m=>m.name).join(', ')}</strong><div style={{fontSize:12,color:'var(--muted)'}}>{r.doctorName} · {new Date(r.date).toLocaleDateString()}</div></div><StatusBadge status={r.orderStatus||r.status}/></div>)}{!rx.length&&<Empty/>}</Card>
         <Card title={t('emergencyQr')}><p style={{color:'var(--muted)'}}>Your QR wearable gives bystanders instant access to approved critical information.</p><Link className="btn primary" to="/app/patient/emergency"><QrCode size={16}/> {t('configure')}</Link></Card>
       </div>
@@ -123,7 +123,7 @@ export function PatientPrescriptions() {
 }
 
 export function PatientConsents() {
-  const { session } = useAuth(); const { t } = useTranslation(); const [list,setList] = useState<Consent[]>([]); const {toast}=useToast();
+  const { session } = useAuth(); const { t } = useTranslation(); const [list,setList] = useState<Consent[]>([]); const [confirmDelete,setConfirmDelete]=useState(false); const {toast}=useToast();
   const load = ()=>api.list<Consent>('consents',c=>c.patientId===session!.user.uid).then(setList); useEffect(()=>{void load();},[]);
   const toggle = async (c:Consent)=>{
     if(c.active) await api.revokeConsentApi(c.id, 'Patient request');
@@ -134,7 +134,10 @@ export function PatientConsents() {
     <Card pad><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('name')}</th><th>{t('role')}</th><th>Scope</th><th>Purpose</th><th>{t('status')}</th><th>{t('action')}</th></tr></thead><tbody>
       {list.map(c=><tr key={c.id}><td>{c.granteeName}</td><td>{t(c.granteeType)}</td><td>{c.scope}</td><td>{c.purpose}</td><td><StatusBadge status={c.active?'active':'revoked'}/></td><td><button className="btn sm outline" onClick={()=>void toggle(c)}>{c.active?t('revoke'):t('grant')}</button></td></tr>)}
     </tbody></table>{!list.length&&<Empty/>}</div></Card>
-    <Card title="Your data rights" style={{marginTop:16}}><p style={{color:'var(--muted)'}}>You may download all your data or request complete deletion within 30 days (EDP compliance).</p><div style={{display:'flex',gap:8}}><button className="btn outline" onClick={()=>toast('Data export queued (demo)')}><Download size={16}/> {t('download')} JSON</button><button className="btn danger" onClick={()=>{ api.mutate(db=>{db.deletionRequests.push({id:`del_${Date.now()}`,patientId:session!.user.uid,requestedAt:new Date().toISOString(),status:'pending'});}); toast('Deletion request recorded - completed within 30 days'); }}><Trash2 size={16}/> Request deletion</button></div></Card>
+    <Card title="Your data rights" style={{marginTop:16}}><p style={{color:'var(--muted)'}}>You may download all your data or request complete deletion within 30 days (EDP compliance).</p><div style={{display:'flex',gap:8}}>
+      <button className="btn outline" onClick={()=>void api.downloadReport('history',{patientId:session!.user.uid,format:'fhir'}).then(()=>toast(t('saved'))).catch((e:any)=>toast(e.message,true))}><Download size={16}/> {t('download')} JSON</button>
+      <button className="btn danger" onClick={()=>setConfirmDelete(true)}><Trash2 size={16}/> Request deletion</button></div></Card>
+    {confirmDelete && <Modal title="Request data deletion" onClose={()=>setConfirmDelete(false)} footer={<><button className="btn outline" onClick={()=>setConfirmDelete(false)}>{t('cancel')}</button><button className="btn danger" onClick={()=>void (async()=>{try{await api.requestDeletion(session!.user.uid,'Patient request');toast('Deletion request recorded - completed within 30 days');setConfirmDelete(false);}catch(e:any){toast(e.message,true);}})()}>Confirm deletion request</button></>}><p>This schedules removal of your clinical records within 30 days. The request is logged for compliance. Continue?</p></Modal>}
   </>;
 }
 
@@ -191,8 +194,8 @@ export function PatientSettings() {
   const { session } = useAuth(); const { t } = useTranslation(); const {setUser}=useAuth(); const {toast}=useToast();
   const [form,setForm]=useState<any>({...session!.user});
   return <><PageHead title={t('profile')} subtitle={t('clinicalIdentity')}/>
-    <div className="grid cols-2"><Card title={t('personalInformation')}><Field label={t('name')}><input className="input" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></Field><Field label={t('phoneNumber')}><input className="input" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})}/></Field><Field label={t('email')}><input className="input" value={form.email} disabled/></Field><button className="btn navy" onClick={async()=>{await api.mutate(db=>{const u=db.users.find(x=>x.uid===form.uid); if(u){u.name=form.name;u.phone=form.phone;}});setUser(form);toast(t('saved'));}}>{t('save')}</button></Card>
-      <Card title={t('emergencyContact')}><Field label={t('name')}><input className="input" dir="rtl" value={form.emergencyContact?.name||''} onChange={e=>setForm({...form,emergencyContact:{...form.emergencyContact,name:e.target.value}})}/></Field><Field label={t('phoneNumber')}><input className="input" value={form.emergencyContact?.phone||''} onChange={e=>setForm({...form,emergencyContact:{...form.emergencyContact,phone:e.target.value}})}/></Field><Field label={t('relationship')}><input className="input" value={form.emergencyContact?.relationship||''} onChange={e=>setForm({...form,emergencyContact:{...form.emergencyContact,relationship:e.target.value}})}/></Field><button className="btn navy" onClick={()=>toast(t('saved'))}>{t('save')}</button></Card></div>
+    <div className="grid cols-2"><Card title={t('personalInformation')}><Field label={t('name')}><input className="input" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></Field><Field label={t('phoneNumber')}><input className="input" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})}/></Field><Field label={t('email')}><input className="input" value={form.email} disabled/></Field><button className="btn navy" onClick={async()=>{try{await api.updateMyProfile({name:form.name,phone:form.phone});setUser({...form,name:form.name,phone:form.phone});toast(t('saved'));}catch(e:any){toast(e.message,true);}}}>{t('save')}</button></Card>
+      <Card title={t('emergencyContact')}><Field label={t('name')}><input className="input" dir="rtl" value={form.emergencyContact?.name||''} onChange={e=>setForm({...form,emergencyContact:{...form.emergencyContact,name:e.target.value}})}/></Field><Field label={t('phoneNumber')}><input className="input" type="tel" value={form.emergencyContact?.phone||''} onChange={e=>setForm({...form,emergencyContact:{...form.emergencyContact,phone:e.target.value}})}/></Field><Field label={t('relationship')}><input className="input" value={form.emergencyContact?.relationship||''} onChange={e=>setForm({...form,emergencyContact:{...form.emergencyContact,relationship:e.target.value}})}/></Field><button className="btn navy" onClick={async()=>{try{await api.updateEmergencyContact(form.emergencyContact);toast(t('saved'));}catch(e:any){toast(e.message,true);}}}>{t('save')}</button></Card></div>
     <div className="grid cols-3" style={{marginTop:16}}>
       <Card title={t('dataPrivacy')}><p style={{color:'var(--muted)',fontSize:13}}>{t('consentsDesc')}</p><Link className="btn sm outline" to="/app/patient/consents">{t('consents')} →</Link></Card>
       <Card title={t('notificationPreferences')}><p style={{color:'var(--muted)',fontSize:13}}>{t('notificationsDesc')}</p><Link className="btn sm outline" to="/app/patient/notifications">{t('notifications')} →</Link></Card>

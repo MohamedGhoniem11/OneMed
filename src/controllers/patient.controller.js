@@ -4,6 +4,7 @@ import { validate } from "../utils/schema.js";
 import { emergencyOverrideSchema, patientUpdateSchema } from "../schemas/patient.schema.js";
 import { canReadPatient } from "../middleware/consent.js";
 import { httpError } from "../utils/http-error.js";
+import { auditRequest } from "../services/audit.service.js";
 
 export const me = updateMe;
 export const updateMePatch = updateMe;
@@ -45,6 +46,16 @@ export async function getById(req, res, next) {
   } catch (err) {
     next(err);
   }
+}
+
+export async function requestDeletion(req, res, next) {
+  try {
+    const patientId = req.params.id;
+    if (patientId !== req.user.uid && req.user.role !== "admin") throw httpError(403, "Forbidden");
+    const request = await service.requestDeletion(patientId, req.body?.reason || "");
+    await auditRequest(req, { action: "deletion_requested", resourceType: "patient", resourceId: patientId, patientId });
+    res.status(201).json(request);
+  } catch (err) { next(err); }
 }
 
 export async function records(req, res, next) {

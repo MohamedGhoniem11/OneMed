@@ -10,6 +10,7 @@ import { normalizeCsv, normalizeDicom, normalizeJson, normalizeOcrText, normaliz
 import { saveEncrypted, sha256 } from "./file-storage.service.js";
 import { canReadPatient } from "../middleware/consent.js";
 import { awardForUpload } from "./credit.service.js";
+import { notify } from "./notification.service.js";
 
 const RECORDS = "records";
 const PATIENTS = "patients";
@@ -83,7 +84,11 @@ async function persistNormalized({ req, patientId, normalized, meta = {} }) {
     createdAt: new Date(),
     updatedAt: new Date(),
   });
-  if (!normalized.needsReview) await awardForUpload(req.user, { resourceId: record.id });
+  if (!normalized.needsReview) {
+    await awardForUpload(req.user, { resourceId: record.id });
+    await notify({ userId: patientId, title: "New lab result available", body: record.title || "A new result was added to your record", type: "lab" });
+    if (req.user?.uid) await notify({ userId: req.user.uid, title: "Upload linked to patient", body: record.title || "Your upload was linked successfully", type: "upload" });
+  }
   await auditRequest(req, {
     action: "record_ingested",
     resourceType: "record",

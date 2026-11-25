@@ -16,6 +16,8 @@ import messagingRoutes from "./messaging.routes.js";
 import notificationRoutes from "./notification.routes.js";
 import analyticsRoutes from "./analytics.routes.js";
 import reportRoutes from "./report.routes.js";
+import adminRoutes from "./admin.routes.js";
+import aiRoutes from "./ai.routes.js";
 import auditRoutes from "./audit.routes.js";
 
 const router = Router();
@@ -37,6 +39,8 @@ router.use("/messages", messagingRoutes);
 router.use("/notifications", notificationRoutes);
 router.use("/analytics", analyticsRoutes);
 router.use("/reports", reportRoutes);
+router.use("/admin", adminRoutes);
+router.use("/ai", aiRoutes);
 router.use("/audit", auditRoutes);
 
 export default router;

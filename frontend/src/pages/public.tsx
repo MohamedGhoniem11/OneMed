@@ -11,6 +11,10 @@ import * as api from '../api/client';
 import type { ChatTurn, EmergencySettings, Patient, Prescription, Pharmacy, Role } from '../types';
 import { BackButton, Badge, Card, CopyButton, Empty, Field, Modal, PageHead, StatusBadge, useToast } from '../components/ui';
 
+// The demo emergency token only exists in the browser demo dataset. In API mode
+// a patient-specific signed token must be issued instead, so no generic link.
+const DEMO_EMERGENCY = api.API_MODE === 'demo' ? '/emergency/em-demo-mona' : null;
+
 export function Landing() {
   const { t, i18n } = useTranslation(); const navigate = useNavigate();
   const { session } = useAuth();
@@ -32,7 +36,7 @@ export function Landing() {
           <p>{t('unifiedDesc')}</p>
           <div className="hero-actions">
             <Link className="btn primary" to="/register">{t('signup')} <ArrowRight size={16}/></Link>
-            <Link className="btn ghost-light" to="/emergency/em-demo-mona">{t('emergencyInfo')}</Link>
+            {DEMO_EMERGENCY && <Link className="btn ghost-light" to={DEMO_EMERGENCY}>{t('emergencyInfo')}</Link>}
           </div>
         </div>
         {/* Image slot: replace .brand-panel with <img src="/images/landing-hero.png"> when a licensed clinical photo is supplied. */}
@@ -71,7 +75,7 @@ export function Landing() {
       </div>
     </section>
 
-    <footer className="site-footer"><span>{t('footerRights')}</span><Link to="/register" style={{color:'#cfe0fb'}}>{t('privacyPolicy')}</Link><Link to="/register" style={{color:'#cfe0fb'}}>{t('termsOfService')}</Link><Link to="/emergency/em-demo-mona" style={{color:'#cfe0fb'}}>{t('clinicalSupport')}</Link></footer>
+    <footer className="site-footer"><span>{t('footerRights')}</span><Link to="/register" style={{color:'#cfe0fb'}}>{t('privacyPolicy')}</Link><Link to="/register" style={{color:'#cfe0fb'}}>{t('termsOfService')}</Link>{DEMO_EMERGENCY && <Link to={DEMO_EMERGENCY} style={{color:'#cfe0fb'}}>{t('clinicalSupport')}</Link>}</footer>
   </div>;
 }
 
@@ -155,16 +159,16 @@ export function Login() {
       <><h3>{t('mfa')}</h3><Field label="Authenticator code"><input className="input" maxLength={6} inputMode="numeric" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,''))}/></Field>
       <button type="button" className="btn primary" style={{width:'100%'}} onClick={async()=>{try{await verifyMfa(mfaToken,code||'123456');nav('/app');}catch(e:any){toast(e.message,true);}}}>{t('verifyOtp')}</button></>}
       <div className="demo-flag" style={{marginTop:16}}>{t('demoMode')} - mona.patient@example.com / Demo!onemed1 · karim.doctor@example.com / Demo!onemedD1</div>
-      <div className="login-links"><Link to="/register">{t('signup')}</Link><Link to="/emergency/em-demo-mona">{t('emergencyInfo')}</Link></div>
+      <div className="login-links"><Link to="/register">{t('signup')}</Link>{DEMO_EMERGENCY && <Link to={DEMO_EMERGENCY}>{t('emergencyInfo')}</Link>}</div>
     </form>
   </div></div>;
 }
 
 export function EmergencyPage() {
-  const { token = '' } = useParams(); const { t, i18n } = useTranslation();
-  const [data,setData] = useState<any>(null);
+  const { token = '' } = useParams(); const { t, i18n } = useTranslation(); const {toast}=useToast();
+  const [data,setData] = useState<any>(null); const [error,setError]=useState(''); const [loading,setLoading]=useState(true);
   const [chat,setChat] = useState<ChatTurn[]>([]); const [msg,setMsg] = useState(''); const [openChat,setOpenChat] = useState(false);
-  useEffect(()=>{ void api.emergencyProfile(token).then(setData); },[token]);
+  useEffect(()=>{ let live=true; setLoading(true); void api.emergencyProfile(token).then(r=>{if(live){setData(r);setLoading(false);}}).catch((e:any)=>{if(live){setError(e.message||'Invalid or unknown QR token.');setLoading(false);}}); return ()=>{live=false;}; },[token]);
   const send = async (text:string) => {
     if(!text.trim()) return;
     setChat(p=>[...p,{role:'user',text}]); setMsg('');
@@ -177,12 +181,14 @@ export function EmergencyPage() {
   return <div className="public-shell">
     <div className="public-top"><span className="logo">OneMed</span><span style={{fontSize:12}}>{t('noLogin')}</span><div style={{flex:1}}/><BackButton fallback="/"/><button className="btn sm" style={{background:'transparent',color:'#fff'}} onClick={()=>{const next=i18n.language==='en'?'ar':'en';localStorage.setItem('onemed.lang',next);void i18n.changeLanguage(next);document.documentElement.dir=next==='ar'?'rtl':'ltr';}}><Languages size={14}/></button></div>
     <div className="public-wrap">
-      <Card pad={false}><div className="card-body" style={{display:'flex',gap:14,alignItems:'center'}}><div className="avatar" style={{width:54,height:54,fontSize:18}}>{(v?.patientName||'?').slice(0,2).toUpperCase()}</div><div><h2>{v?.patientName||'…'}</h2>{v?.bloodGroup && <div className="chip"><DropletIcon/> {v.bloodGroup} {t('bloodGroup')}</div>}</div></div></Card>
+      <Card pad={false}><div className="card-body" style={{display:'flex',gap:14,alignItems:'center'}}><div className="avatar" style={{width:54,height:54,fontSize:18}}>{(v?.patientName||'?').slice(0,2).toUpperCase()}</div><div><h2>{v?.patientName||'…'}</h2>{v?.bloodGroup && <div className="alert red" style={{display:'inline-flex',alignItems:'center',gap:8,padding:'10px 16px',fontSize:20,fontWeight:700}}><DropletIcon/> {v.bloodGroup} · {t('bloodGroup')}</div>}</div></div></Card>
       {v?.allergies && <Card title={t('criticalAllergies')}><div className="alert red"><strong>{v.allergies.join(', ')||'-'}</strong></div></Card>}
       {v?.chronicConditions && <Card title={t('chronicConditions')}><ul>{v.chronicConditions.map((x:string)=><li key={x}>{x}</li>)}</ul></Card>}
       {v?.medications && <Card title={t('currentMedications')}>{v.medications.length ? <ul>{v.medications.map((m:string,i:number)=><li key={i}>{m}</li>)}</ul> : <p style={{color:'var(--muted)'}}>No current medications on file.</p>}</Card>}
-      {v?.emergencyContacts && <Card title={t('emergencyContact')}>{v.emergencyContacts.map((c:any,i:number)=><div key={i} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--line)'}}><div><strong>{c.name}</strong><div style={{color:'var(--muted)'}}>{c.relationship}</div></div>{c.phone && <a className="btn sm danger" href={`tel:${c.phone}`}><Phone size={14}/>{t('call')}</a>}</div>)}{v.primaryPhysician && <div style={{display:'flex',justifyContent:'space-between',padding:'8px 0'}}><strong>{v.primaryPhysician}</strong></div>}</Card>}
-      {!v && <Empty message="Invalid or unknown QR token."/>}
+      {v?.emergencyContacts && <Card title={t('emergencyContact')}>{v.emergencyContacts.map((c:any,i:number)=><div key={i} style={{display:'flex',justifyContent:'space-between',padding:'8px 0',borderBottom:'1px solid var(--line)'}}><div><strong>{c.name}</strong><div style={{color:'var(--muted)'}}>{c.relationship}</div></div>{c.phone && <a className="btn sm danger" href={`tel:${c.phone}`}><Phone size={14}/>{t('call')}</a>}</div>)}{v.primaryPhysician && <div style={{display:'flex',justifyContent:'space-between',padding:'8px 0'}}><strong>{v.primaryPhysician}</strong>{v.primaryPhysicianPhone && <a className="btn sm danger" href={`tel:${v.primaryPhysicianPhone}`}><Phone size={14}/>{t('call')}</a>}</div>}</Card>}
+      {loading && <Card><p>{t('loading')||'Loading emergency information…'}</p></Card>}
+      {error && <div className="alert red">{error}</div>}
+      {!loading && !error && !v && <Empty message="Invalid or unknown QR token."/>}
     </div>
     <div className="bottom-cta">{s?.aiChatbotEnabled && <button className="btn primary" onClick={()=>setOpenChat(true)}>{t('askAi')} <Bot size={18}/></button>}</div>
     {openChat && <div className="modal-backdrop" onClick={()=>setOpenChat(false)}><div className="modal" onClick={e=>e.stopPropagation()} style={{display:'flex',flexDirection:'column',height:'80vh'}}>
@@ -195,7 +201,7 @@ export function EmergencyPage() {
           {(v?.allergies||[]).map((a:string)=><span key={a} className="chip red">Allergy: {a}</span>)}
         </div>
         <div className="alert blue" style={{fontSize:12}}>{t('firstAidDisclaimer')}</div>
-        <div className="chat-log">{chat.map((c,i)=><div key={i} className={`msg ${c.role==='user'?'me':''}`}><div style={{whiteSpace:'pre-wrap'}}>{c.text}</div>{c.sources?.length?<div style={{fontSize:11,marginTop:8,opacity:.75}}>{c.sources.join(' · ')}</div>:null}{c.confidence && <Badge tone={c.confidence==='High'?'green':'amber'}>{c.confidence}</Badge>}</div>)}</div>
+        <div className="chat-log">{chat.map((c,i)=><div key={i} className={`msg ${c.role==='user'?'me':''}`}><div style={{whiteSpace:'pre-wrap'}}>{c.text}</div>{c.sources?.length?<div style={{fontSize:11,marginTop:8,opacity:.75}}>{c.sources.join(' · ')}</div>:null}{c.confidence && <Badge tone={c.confidence==='High'?'green':'amber'}>{c.confidence}</Badge>}{c.role==='assistant' && <button className="btn sm outline" style={{marginTop:8}} onClick={()=>void api.reportIssue({kind:'emergency_chat',message:'Incorrect or harmful first-aid guidance',source:c.sources?.join(', ')||'emergency-chat'}).then(()=>toast('Thank you - the issue was logged')).catch((e:any)=>toast(e.message,true))}>Report Issue</button>}</div>)}</div>
       </div>
       <div style={{padding:12,borderTop:'1px solid var(--line)',display:'flex',gap:8}}>
         <input className="input" placeholder={i18n.language==='ar'?'صف حالة المريض…':'Describe the emergency…'} value={msg} onChange={e=>setMsg(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')void send(msg);}}/>
@@ -209,13 +215,13 @@ function DropletIcon(){ return <span style={{fontSize:14}}>🩸</span>; }
 
 export function NfcLanding() {
   const { token='' } = useParams(); const { t } = useTranslation(); const nav = useNavigate();
-  const [resolved,setResolved] = useState<{patientId:string}|null>(null); const [error,setError]=useState('');
+  const [resolved,setResolved] = useState<{patientId:string;emergencyToken?:string}|null>(null); const [error,setError]=useState('');
   useEffect(()=>{ void api.resolveNfc(token).then(setResolved).catch(e=>setError(e.message||'Invalid NFC token')); },[token]);
   return <div className="public-shell"><div className="public-top"><span className="logo">OneMed</span><span style={{fontSize:12}}>NFC / QR</span><div style={{flex:1}}/><BackButton fallback="/"/></div>
     <div className="public-wrap" style={{paddingTop:50}}><Card title="OneMed Patient ID" pad><p style={{color:'var(--muted)'}}>This wristband links to a verified OneMed patient profile.</p>
       {error ? <div className="alert red">{error}</div> : <div className="alert green">{resolved?`Patient ${resolved.patientId} verified`:'Verifying wristband...'}</div>}
       <button className="btn navy" style={{width:'100%',marginBottom:10}} onClick={()=>nav('/login')}><Stethoscope size={16}/> {t('patientDashboard')} ({t('login')})</button>
-      <button className="btn outline" style={{width:'100%'}} onClick={()=>nav(`/emergency/${resolved?.patientId||token}`)}><HeartPulseIcon size={16}/> {t('emergencyInfo')}</button>
+      <button className="btn outline" style={{width:'100%'}} disabled={!resolved?.emergencyToken} onClick={()=>nav(`/emergency/${resolved!.emergencyToken}`)}><HeartPulseIcon size={16}/> {t('emergencyInfo')}</button>
       <div className="disclaimer" style={{marginTop:14}}>Web NFC is available in Chrome on Android; QR scanning works on any phone.</div>
     </Card></div></div>;
 }
@@ -223,11 +229,20 @@ export function NfcLanding() {
 export function FulfillmentPage() {
   const { token='' } = useParams(); const { t } = useTranslation(); const {toast} = useToast();
   const [rx,setRx] = useState<Prescription|null>(null); const [pharmacies,setPharmacies] = useState<Pharmacy[]>([]); const [selected,setSelected] = useState<string|null>(null);
+  const [loadError,setLoadError]=useState(''); const [loading,setLoading]=useState(true);
   useEffect(()=>{
-    void api.fulfillmentProfile(token).then(result=>{
-      setRx(result.prescription);
-      setPharmacies(result.pharmacies.map((p:any)=>({...p,lat:p.lat??31.2,lng:p.lng??29.92,location:{lat:p.lat??31.2,lng:p.lng??29.92}})));
-    }).catch(()=>toast('Invalid or expired fulfillment link',true));
+    let cancelled=false;
+    const load = (coords?:{lat:number;lng:number}) => {
+      void api.fulfillmentProfile(token,coords).then(result=>{
+        if(cancelled) return;
+        setRx(result.prescription);
+        setPharmacies(result.pharmacies.map((p:any)=>({...p,lat:p.lat??31.2,lng:p.lng??29.92,location:{lat:p.lat??31.2,lng:p.lng??29.92}})));
+        setLoading(false);
+      }).catch((e:any)=>{ if(cancelled)return; setLoadError(e.message||'Invalid or expired fulfillment link'); setLoading(false); });
+    };
+    if(navigator.geolocation) navigator.geolocation.getCurrentPosition(pos=>load({lat:pos.coords.latitude,lng:pos.coords.longitude}),()=>load(),{timeout:3000});
+    else load();
+    return ()=>{cancelled=true;};
   },[token]);
   const choose = async (p:Pharmacy) => {
     if(!rx) return; setSelected(p.id);
@@ -237,6 +252,8 @@ export function FulfillmentPage() {
   return <div className="public-shell"><div className="public-top"><span className="logo">OneMed</span><span style={{fontSize:12}}>{t('prescriptions')}</span><div style={{flex:1}}/><BackButton fallback="/"/></div>
     <div className="public-wrap" style={{maxWidth:680}}>
       <PageHead title={t('selectPharmacy')} subtitle={rx?`${rx.patientName} - ${rx.medicines.length} ${t('extractedMedicines').toLowerCase()}`:''}/>
+      {loading && <Card><p>{t('loading')||'Loading…'}</p></Card>}
+      {loadError && <div className="alert red">{loadError}</div>}
       {rx && <Card title={t('extractedMedicines')}><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('medicine')}</th><th>{t('dosage')}</th><th>{t('frequency')}</th><th>{t('duration')}</th></tr></thead><tbody>{rx.medicines.map((m,i)=><tr key={i}><td>{m.name}</td><td>{m.dosage}</td><td>{m.frequency}</td><td>{m.duration}</td></tr>)}</tbody></table></div><div className="disclaimer" style={{marginTop:10}}>{rx.linkExpiresAt && `${t('expires')}: ${new Date(rx.linkExpiresAt).toLocaleString()}`}</div></Card>}
       <Card title={t('nearbyPharmacies')} style={{marginTop:16}}><div className="grid">{pharmacies.map(p=><div key={p.id} className="card" style={{boxShadow:'none',borderColor:selected===p.id?'var(--teal)':'var(--line)'}}><div style={{display:'flex',justifyContent:'space-between'}}><strong><StoreIcon size={16}/> {p.name}</strong><Badge tone="green">{p.hours}</Badge></div><div style={{color:'var(--muted)',fontSize:13}}><MapPin size={13}/> {p.address} · ★ {p.rating}</div><button className="btn primary sm" style={{marginTop:8}} onClick={()=>choose(p)}>{selected===p.id?<><CheckCircle2 size={14}/> {t('sendWhatsapp')}</>:<><MessageCircle size={14}/> {t('selectPharmacy')}</>}</button></div>)}</div></Card>
     </div></div>;

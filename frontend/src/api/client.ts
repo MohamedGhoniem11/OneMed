@@ -6,19 +6,62 @@ const BASE = (import.meta.env.VITE_API_URL as string) || '/api';
 
 export class ApiError extends Error { constructor(public status: number, msg: string) { super(msg); } }
 
-async function http<T>(path: string, opts: RequestInit = {}, token?: string): Promise<T> {
+let refreshInFlight: Promise<boolean> | null = null;
+async function refreshAccess(): Promise<boolean> {
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      try {
+        const res = await fetch(`${BASE}/auth/refresh`, { method: 'POST', credentials: 'include' });
+        if (!res.ok) return false;
+        const data = await res.json();
+        const session = getSession();
+        if (!data.accessToken || !session) return false;
+        saveSession({ ...session, token: data.accessToken, expiresAt: data.refreshExpiresAt || session.expiresAt });
+        return true;
+      } catch { return false; }
+      finally { refreshInFlight = null; }
+    })();
+  }
+  return refreshInFlight;
+}
+
+async function http<T>(path: string, opts: RequestInit = {}, token?: string, retried = false): Promise<T> {
   const isForm = opts.body instanceof FormData;
   const headers: Record<string,string> = { ...(opts.headers as Record<string,string> || {}) };
   if (!isForm) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${BASE}${path}`, { ...opts, headers, credentials:'include' });
   const body = await res.json().catch(() => ({}));
+  if (res.status === 401 && token && !retried && await refreshAccess()) {
+    const next = getSession()?.token;
+    return http<T>(path, opts, next, true);
+  }
   if (!res.ok) throw new ApiError(res.status, body.message || body.error || `Request failed (${res.status})`);
   return body as T;
 }
 
 const wait = (ms = 220) => new Promise(r => setTimeout(r, ms));
 const uid = (prefix: string) => `${prefix}_${Math.random().toString(36).slice(2,10)}`;
+
+// The REST API stores clinical values as `data` and timestamps as `observedAt`,
+// while the UI/demo model uses `values`/`date`. Normalise at the boundary only.
+export function normalizeRecord(r: any): any {
+  if (!r) return r;
+  const raw = r.values ?? r.data?.values;
+  const values = Array.isArray(raw) ? raw : (r.data && typeof r.data === 'object'
+    ? Object.entries(r.data).map(([name, value]: any) => ({ name, value, unit: '', flag: '' }))
+    : []);
+  return { ...r, date: r.date || r.observedAt || r.createdAt, institution: r.institution || r.institutionId || '', values };
+}
+export function normalizePatient(p: any): any {
+  if (!p) return p;
+  return { ...p, name: p.name || p.fullName || p.id, date: p.date || p.createdAt };
+}
+export function normalizePharmacy(p: any): any {
+  if (!p) return p;
+  return { ...p, lat: p.lat ?? p.location?.lat, lng: p.lng ?? p.location?.lng,
+    whatsapp: p.whatsapp || p.whatsappPhone || p.whatsapp_number || '' };
+}
 const sessionKey = 'onemed.session';
 
 export function getSession(): Session | null {
@@ -108,20 +151,17 @@ export async function logout(): Promise<void> {
 // ---------------- Generic data access ----------------
 export async function list<T>(collection: keyof ReturnType<typeof loadDB>, filter?: (x:any)=>boolean): Promise<T[]> {
   if (API_MODE === 'api') {
-    const map: Record<string,string> = { patients:'/patients', prescriptions:'/prescriptions', pharmacies:'/pharmacies', institutions:'/institutions', consents:'/consents', users:'/users' };
+    const map: Record<string,string> = { patients:'/patients', prescriptions:'/prescriptions', pharmacies:'/admin/pharmacies', institutions:'/institutions', consents:'/consents', users:'/users' };
     const path = map[collection as string];
-    if (!path) { const db = loadDB(); return (db[collection] as unknown as T[]).filter(filter || (()=>true)); }
-    try {
-      const r = await http<any>(path, {}, getSession()?.token);
-      const arr = Array.isArray(r) ? r : (r.patients || r.prescriptions || r.consents || r.users || r.institutions || r.pharmacies || []);
-      if (collection === 'prescriptions') {
-        return (arr as any[]).map(p => ({
-          ...p,
-          medicines: (p.medicines || p.items || []).map((m:any) => ({ ...m, dosage: m.dosage || m.dose || '' })),
-        })) as T[];
-      }
-      return arr as T[];
-    } catch { const db = loadDB(); return (db[collection] as unknown as T[]).filter(filter || (()=>true)); }
+    if (!path) return [] as T[];
+    const r = await http<any>(path, {}, getSession()?.token);
+    const arr = Array.isArray(r) ? r : (r.patients || r.prescriptions || r.consents || r.users || r.institutions || r.pharmacies || r.auditLog || []);
+    let items = arr as any[];
+    if (collection === 'prescriptions') items = items.map(normMeds);
+    if (collection === 'patients') items = items.map(normalizePatient);
+    if (collection === 'pharmacies') items = items.map(normalizePharmacy);
+    if (collection === 'records') items = items.map(normalizeRecord);
+    return (filter ? items.filter(filter) : items) as T[];
   }
   await wait(80); const db = loadDB(); return (db[collection] as unknown as T[]).filter(filter || (()=>true));
 }
@@ -131,20 +171,28 @@ export async function getById<T>(collection: keyof ReturnType<typeof loadDB>, id
 }
 export async function getPatient(id: string): Promise<Patient | null> {
   if (API_MODE === 'api') {
-    try {
-      const p = await http<any>(`/patients/${id}`, {}, token());
-      return { ...p, name: p.name || p.fullName || p.id } as Patient;
-    } catch { return null; }
+    const p = await http<any>(`/patients/${id}`, {}, token());
+    return normalizePatient(p) as Patient;
   }
   return (await getById<Patient>('patients', id)) ?? null;
 }
 export async function mutate<T>(fn: (db: ReturnType<typeof loadDB>) => T): Promise<T> {
   const db = loadDB(); const result = fn(db); saveDB(db); await wait(100); return result;
 }
+/** A fresh link to the current patient's own public emergency page. */
+export async function myEmergencyLink(): Promise<string | null> {
+  if (API_MODE === 'api') {
+    try { const r = await http<any>('/emergency/mine', {}, token()); return r.token ? `/emergency/${r.token}` : null; }
+    catch { return null; }
+  }
+  const p = loadDB().emergencyProfiles.find(x => x.patientId === getSession()?.user.uid);
+  return p?.token ? `/emergency/${p.token}` : null;
+}
+
 // ---------------- M4 emergency helpers (demo + REST) ----------------
 export async function emergencyProfile(tokenValue: string) {
   if (API_MODE === 'api') {
-    try { return await http<any>(`/emergency/${tokenValue}`); } catch { return null; }
+    return http<any>(`/emergency/${tokenValue}`);
   }
   const db = loadDB();
   const profile = db.emergencyProfiles.find(p => p.token === tokenValue || p.nfcUid === tokenValue);
@@ -216,8 +264,11 @@ export async function confirmPrescription(id: string, items: any[]) {
       fulfillmentLink:`/f/${tk}`,linkExpiresAt:new Date(Date.now()+86400000).toISOString(),date:new Date().toISOString()}); return normMeds(r); });
 }
 
-export async function fulfillmentProfile(linkToken: string) {
-  if (API_MODE === 'api') return http<any>(`/fulfillment/${linkToken}`);
+export async function fulfillmentProfile(linkToken: string, coords?: {lat:number;lng:number}) {
+  if (API_MODE === 'api') {
+    const q = coords ? `?lat=${coords.lat}&lng=${coords.lng}` : '';
+    return http<any>(`/fulfillment/${linkToken}${q}`);
+  }
   const db=loadDB(); const rx:any=db.prescriptions.find(x=>x.linkToken===linkToken);
   if(!rx) throw new ApiError(404,'Invalid fulfillment link');
   const pharmacies=db.pharmacies.filter(p=>p.active&&p.status==='approved');
@@ -243,7 +294,7 @@ export async function advanceOrder(id: string) {
     if(r){const i=flow.indexOf(r.orderStatus||'received');r.orderStatus=flow[Math.min(flow.length-1,i+1)];} return normMeds(r); });
 }
 export async function pharmacyProfile() {
-  if (API_MODE === 'api') { try { return await http<any>('/pharmacy/profile',{},token()); } catch { return null; } }
+  if (API_MODE === 'api') { return normalizePharmacy(await http<any>('/pharmacy/profile',{},token())); }
   return loadDB().pharmacies[0]||null;
 }
 export async function updatePharmacyProfile(id: string, patch: any) {
@@ -280,10 +331,8 @@ export async function listRecords(patientId?: string, type?: string): Promise<Me
     const params = new URLSearchParams();
     if (patientId) params.set('patientId', patientId);
     if (type) params.set('type', type);
-    try {
-      const r = await http<{items:MedicalRecord[]}>(`/records${params.size?`?${params}`:''}`, {}, token());
-      return r.items;
-    } catch { return []; }
+    const r = await http<{items:any[]}>(`/records${params.size?`?${params}`:''}`, {}, token());
+    return r.items.map(normalizeRecord);
   }
   const db = loadDB();
   return db.records.filter(r => (!patientId || r.patientId === patientId) && (!type || r.type === type));
@@ -291,8 +340,8 @@ export async function listRecords(patientId?: string, type?: string): Promise<Me
 
 export async function searchPatients(q: string): Promise<Patient[]> {
   if (API_MODE === 'api') {
-    try { return (await http<{patients:Patient[]}>(`/patients/search?q=${encodeURIComponent(q)}`, {}, token())).patients; }
-    catch { return []; }
+    const r = await http<{patients:any[]}>(`/patients/search?q=${encodeURIComponent(q)}`, {}, token());
+    return r.patients.map(normalizePatient);
   }
   const db = loadDB(); const needle = q.trim().toLowerCase();
   return db.patients.filter(p => !needle || [p.name,p.nationalId,p.phone,p.id].some(v=>String(v||'').toLowerCase().includes(needle)));
@@ -330,7 +379,8 @@ export async function reviewRecord(id: string, values: any[], note = '') {
 
 export async function pendingRecords(): Promise<MedicalRecord[]> {
   if (API_MODE === 'api') {
-    try { return (await http<{items:MedicalRecord[]}>('/records/pending', {}, token())).items; } catch { return []; }
+    const r = await http<{items:any[]}>('/records/pending', {}, token());
+    return r.items.map(normalizeRecord);
   }
   return loadDB().records.filter(r => r.status === 'needs_review' || r.confidence === undefined || (r.confidence ?? 100) < 80);
 }
@@ -368,17 +418,17 @@ export async function issueNfc(patientId: string, nfcUid?: string) {
   });
 }
 
-export async function resolveNfc(tokenValue: string) {
-  if (API_MODE === 'api') return http<{patientId:string;valid:boolean}>(`/nfc/${tokenValue}`);
+export async function resolveNfc(tokenValue: string): Promise<{patientId:string;valid:boolean;emergencyToken?:string;emergencyUrl?:string}> {
+  if (API_MODE === 'api') return http<any>(`/nfc/${tokenValue}`);
   const db = loadDB();
   const direct = db.emergencyProfiles.find(x=>x.token===tokenValue || x.nfcUid===tokenValue);
   if (!direct) throw new ApiError(404,'NFC token not found');
-  return { patientId:direct.patientId, valid:true };
+  return { patientId:direct.patientId, valid:true, emergencyToken:direct.token };
 }
 
 export async function myNfc() {
   if (API_MODE === 'api') {
-    try { return await http<any>('/nfc/mine', {}, token()); } catch { return { issued:false }; }
+    return http<any>('/nfc/mine', {}, token());
   }
   const p = loadDB().emergencyProfiles.find(x=>x.patientId===getSession()?.user.uid);
   return p ? { issued:p.nfcIssued, nfcUid:p.nfcUid, scanCount:p.scanCount, lastScanAt:null, createdAt:p.activatedAt } : { issued:false };
@@ -465,8 +515,47 @@ export async function verifyAuditChain(): Promise<any> {
   return { valid:true, count:loadDB().audit.length };
 }
 
+// ---------------- Admin / institution management (REST) ----------------
+export async function updateMyProfile(patch: any) {
+  if (API_MODE === 'api') return http<any>('/users/me', { method:'PATCH', body:JSON.stringify(patch) }, token());
+  return mutate(db => { const u:any=db.users.find(x=>x.uid===getSession()?.user.uid); if(u) Object.assign(u,patch); return u; });
+}
+export async function updateEmergencyContact(contact: any) {
+  if (API_MODE === 'api') return http<any>('/patients/me', { method:'PATCH', body:JSON.stringify({ emergencyContacts:[contact] }) }, token());
+  return mutate(db => { const p:any=db.patients.find(x=>x.id===getSession()?.user.uid); if(p) p.emergencyContact=contact; return p; });
+}
+
+export async function createStaffAccount(data: any) {
+  if (API_MODE === 'api') return http<any>('/auth/staff', { method:'POST', body:JSON.stringify(data) }, token());
+  return mutate(db => { const uidValue=uid('user'); db.users.push({ uid:uidValue, ...data, status:'active' }); return { user:{ uid:uidValue, ...data } }; });
+}
+export async function verifyInstitution(id: string) {
+  if (API_MODE === 'api') return http<any>(`/institutions/${id}/verify`, { method:'PATCH' }, token());
+  return mutate(db => { const i:any=db.institutions.find(x=>x.id===id); if(i){i.verified=true;i.active=true;} return i; });
+}
+export async function verifyDoctorAccount(id: string) {
+  if (API_MODE === 'api') return http<any>(`/doctors/${id}/verify`, { method:'PATCH' }, token());
+  return mutate(db => { const d:any=(db.doctors as any[]).find(x=>x.uid===id||x.id===id); if(d)d.verified=true; return d; });
+}
+export async function approvePharmacy(id: string) {
+  if (API_MODE === 'api') return http<any>(`/admin/pharmacies/${id}/approve`, { method:'PATCH' }, token());
+  return mutate(db => { const p:any=db.pharmacies.find(x=>x.id===id); if(p)p.status='approved'; return p; });
+}
+export async function createInstitution(data: any) {
+  if (API_MODE === 'api') return http<any>('/institutions', { method:'POST', body:JSON.stringify(data) }, token());
+  return mutate(db => { const i:any={ id:uid('inst'), ...data, verified:false, active:true }; db.institutions.push(i); return i; });
+}
+export async function requestDeletion(patientId: string, reason = '') {
+  if (API_MODE === 'api') return http<any>(`/patients/${patientId}/deletion`, { method:'POST', body:JSON.stringify({ reason }) }, token());
+  return mutate(db => { (db.deletionRequests as any[]).push({ id:uid('del'), patientId, reason, status:'pending', requestedAt:new Date().toISOString(), dueAt:new Date(Date.now()+30*86400000).toISOString() }); return true; });
+}
+export async function reportIssue(payload: any) {
+  if (API_MODE === 'api') return http<any>('/ai/report-issue', { method:'POST', body:JSON.stringify(payload) }, token());
+  return true;
+}
+
 export async function creditBalance(): Promise<any> {
-  if (API_MODE === 'api') { try { return await http<any>('/analytics/credits',{},token()); } catch { return { balance:0 }; } }
+  if (API_MODE === 'api') { return http<any>('/analytics/credits',{},token()); }
   return { institutionId:'demo', balance:120 };
 }
 

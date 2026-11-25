@@ -102,3 +102,7 @@ function Root() {
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><BrowserRouter><AuthProvider><ToastProvider><Root/></ToastProvider></AuthProvider></BrowserRouter></React.StrictMode>,
 );
+
+if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator && import.meta.env.PROD) {
+  window.addEventListener('load', () => { void navigator.serviceWorker.register('/sw.js').catch(() => {}); });
+}

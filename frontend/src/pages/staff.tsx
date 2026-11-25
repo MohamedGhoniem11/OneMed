@@ -12,48 +12,60 @@ import type { MedicalRecord, Patient, Prescription, Pharmacy, Institution, User,
 import { Badge, Card, Chip, Empty, Field, MetricCard, Modal, PageHead, SectionTabs, Stat, StatusBadge, Tabs, useToast, VerificationRow } from '../components/ui';
 
 export function LabPortal({ initialTab = 'upload' }: { initialTab?: string }) {
-  const { t } = useTranslation(); const {toast}=useToast(); const {session}=useAuth();
+  const { t, i18n } = useTranslation(); const {toast}=useToast(); const {session}=useAuth();
   const [tab,setTab]=useState(initialTab); const [patientId,setPatientId]=useState(''); const [patients,setPatients]=useState<Patient[]>([]);
-  const [rows,setRows] = useState([{test:'Hemoglobin (Hb)',value:'14.2',unit:'g/dL',ref:'13.8 - 17.2',confidence:98},{test:'White Blood Cell (WBC)',value:'6.8',unit:'x10^3/uL',ref:'4.5 - 11.0',confidence:98},{test:'Platelet Count',value:'150',unit:'x10^3/uL',ref:'150 - 450',confidence:64},{test:'Glucose, Fasting',value:'92',unit:'mg/dL',ref:'70 - 99',confidence:58}]);
+  const [rows,setRows] = useState<{test:string;value:string;unit:string;ref:string;confidence:number}[]>([]);
   const [history,setHistory]=useState<MedicalRecord[]>([]); const [file,setFile]=useState<File|null>(null);
-  useEffect(()=>{ api.searchPatients('').then(a=>{setPatients(a);setPatientId(a[0]?.id||'');}); api.listRecords(undefined,'lab').then(setHistory); },[]);
+  const [batch,setBatch]=useState(''); const [manual,setManual]=useState({test:'',value:'',unit:'',ref:''});
+  const [pending,setPending]=useState<MedicalRecord[]>([]); const [busy,setBusy]=useState(false);
+  const load=()=>Promise.all([api.listRecords(undefined,'lab').then(setHistory), api.pendingRecords().then(setPending)]);
+  useEffect(()=>{ void api.searchPatients('').then(a=>{setPatients(a);setPatientId(a[0]?.id||'');}); void load(); },[]);
+  const toValues=(items:typeof rows)=>items.map(r=>{
+    const [lo,hi] = r.ref.split(/[-–]/).map(s=>Number(s.trim())); const value=Number(r.value);
+    return {name:r.test,value,unit:r.unit,referenceLow:Number.isFinite(lo)?lo:0,referenceHigh:Number.isFinite(hi)?hi:999,
+      flag:(value<lo?'low':value>hi?'high':'normal') as 'low'|'high'|'normal'};
+  });
+  const savePanel=async(title:string,items:typeof rows)=>{
+    await api.createManualRecord({patientId, institutionId:session!.user.institutionId, type:'lab', title,
+      observedAt:new Date().toISOString(), data:{values:toValues(items)}});
+  };
   const confirm=async()=>{
     if(!patientId) return toast(t('fieldRequired'),true);
-    const unverified = rows.filter(r=>r.confidence<80).length;
-    if(!file && unverified) return toast(`${unverified} field(s) below 80% confidence. Confirm each value before linking.`,true);
+    setBusy(true);
     try {
-      if(file) {
-        const result = await api.ingestRecord(file, patientId, session!.user.institutionId);
-        if(result.record?.status==='needs_review') toast('Upload stored - low confidence, awaiting manual review');
-        else toast(t('saved'));
-      } else {
-        const values = rows.map(r=>{
-          const [lo,hi] = r.ref.split(/[-–]/).map(s=>Number(s.trim()));
-          const value = Number(r.value);
-          return {name:r.test,value,unit:r.unit,referenceLow:Number.isFinite(lo)?lo:0,referenceHigh:Number.isFinite(hi)?hi:999,
-            flag:(value<lo?'low':value>hi?'high':'normal') as 'low'|'high'|'normal'};
-        });
-        await api.createManualRecord({patientId, institutionId:session!.user.institutionId, type:'lab',
-          title:'Uploaded Lab Panel', observedAt:new Date().toISOString(), data:{values}});
-        toast(t('saved'));
-      }
-      setFile(null); api.listRecords(undefined,'lab').then(setHistory); setTab('history');
-    } catch(e:any) { toast(e.message,true); }
+      if(file) { const result=await api.ingestRecord(file,patientId,session!.user.institutionId); toast(result.record?.status==='needs_review'?'Upload stored - low confidence, awaiting manual review':t('saved')); }
+      else if(rows.length) { await savePanel('Uploaded Lab Panel',rows); toast(t('saved')); }
+      else return toast('Add values or choose a file first',true);
+      setFile(null); setRows([]); await load(); setTab('history');
+    } catch(e:any) { toast(e.message,true); } finally { setBusy(false); }
   };
+  const importBatch=async()=>{ if(!patientId) return toast(t('fieldRequired'),true); try{
+    const lines=batch.trim().split(/\r?\n/).filter(Boolean); const data=lines[0]?.toLowerCase().startsWith('patientid')?lines.slice(1):lines;
+    const parsed=data.map(l=>{const [name,value,unit,ref='']=l.split(',').map(s=>s.trim());return {test:name,value,unit,ref,confidence:100};}).filter(r=>r.test&&r.value);
+    if(!parsed.length) return toast('No valid rows found',true);
+    await savePanel('Batch Import',parsed); setBatch(''); toast(`${parsed.length} rows imported`); await load(); setTab('history');
+  }catch(e:any){toast(e.message,true);} };
+  const saveManual=async()=>{ if(!manual.test||!manual.value) return toast(t('fieldRequired'),true); try{ await savePanel(manual.test,[{...manual,confidence:100}]);setManual({test:'',value:'',unit:'',ref:''});toast(t('saved'));await load();setTab('history'); }catch(e:any){toast(e.message,true);} };
+  const review=async(rec:MedicalRecord)=>{ try{ await api.reviewRecord(rec.id,rec.values||[],'Verified by lab staff');toast(t('saved'));await load(); }catch(e:any){toast(e.message,true);} };
+  const date=(v:any)=>v?new Intl.DateTimeFormat(i18n.language||'en',{dateStyle:'medium'}).format(new Date(v)):'-';
   return <><PageHead title="Lab Data Ingestion" subtitle="Upload physical lab reports or import batch datasets. Low-confidence fields require confirmation."/>
     <Tabs tabs={[{id:'upload',label:t('upload')},{id:'batch',label:t('batchImport')},{id:'manual',label:t('manualEntry')},{id:'history',label:t('records')}]} active={tab} onChange={setTab}/>
-    <div className="grid" style={{gridTemplateColumns:'340px 1fr',gap:16}}>
+    <div className="grid" style={{gridTemplateColumns:'repeat(auto-fit,minmax(280px,1fr))',gap:16}}>
       <div className="grid" style={{gap:16,alignContent:'start'}}>
-        <Card title="Target Patient Context"><Field label="Search Patient ID, Name, or DOB"><select className="input" value={patientId} onChange={e=>setPatientId(e.target.value)}>{patients.map(p=><option key={p.id} value={p.id}>{p.name} - {p.nationalId}</option>)}</select></Field><p style={{fontSize:12,color:'var(--muted)'}}>{patientId?'Patient linked. Data will be appended to their unified record.':'No patient selected.'}</p></Card>
+        <Card title="Target Patient Context"><Field label={t('patient')}><select className="input" value={patientId} onChange={e=>setPatientId(e.target.value)}>{patients.map(p=><option key={p.id} value={p.id}>{p.name} - {p.nationalId}</option>)}</select></Field><p style={{fontSize:12,color:'var(--muted)'}}>{patientId?'Patient linked. Data will be appended to their unified record.':'No patient selected.'}</p></Card>
         <Card title={tab==='batch'?t('batchImport'):tab==='manual'?t('manualEntry'):'File Upload'}>
-          {tab==='upload' && <><div style={{border:'2px dashed var(--line)',borderRadius:10,padding:24,textAlign:'center'}}><Upload size={28}/><p><strong>{t('dragDrop')}</strong></p><p style={{fontSize:12,color:'var(--muted)'}}>{t('uploadHint')}</p><label className="btn navy"><Browse/> Browse Files<input type="file" hidden accept=".pdf,.png,.jpg,.jpeg,.csv,.json" onChange={e=>{const f=e.target.files?.[0]; if(f){setFile(f);toast(`Selected ${f.name} - ready to link`);}}}/></label></div>{file && <div className="alert green" style={{marginTop:10,padding:8,fontSize:12}}>✓ {file.name} · {(file.size/1024).toFixed(1)} KB · {t('processingComplete')}</div>}</>}
-          {tab==='batch' && <><Field label="Paste CSV / JSON batch"><textarea className="input" rows={7} placeholder={'patientId,test,value,unit\nuser_patient_1,Hemoglobin,14.2,g/dL'} defaultValue={'patientId,test,value,unit\nuser_patient_1,Hemoglobin,14.2,g/dL\nuser_patient_1,WBC,6.8,x10^3/uL'}/></Field><button className="btn navy" style={{width:'100%'}} onClick={()=>toast('2 rows imported · linked to selected patient (demo)')}>{t('importBatch')}</button></>}
-          {tab==='manual' && <><Field label="Test name"><input className="input" defaultValue="Glucose, Fasting"/></Field><Field label={t('value')}><input className="input" defaultValue="92"/></Field><Field label={t('unit')}><input className="input" defaultValue="mg/dL"/></Field><Field label={t('referenceRange')}><input className="input" defaultValue="70 - 99"/></Field><button className="btn navy" style={{width:'100%'}} onClick={()=>toast('Manual entry saved (demo)')}>{t('saveEntry')}</button></>}
+          {tab==='upload' && <div onDragOver={e=>e.preventDefault()} onDrop={e=>{e.preventDefault();const f=e.dataTransfer.files?.[0];if(f){setFile(f);toast(`Selected ${f.name}`);}}} style={{border:'2px dashed var(--line)',borderRadius:10,padding:24,textAlign:'center'}}><Upload size={28}/><p><strong>{t('dragDrop')}</strong></p><p style={{fontSize:12,color:'var(--muted)'}}>{t('uploadHint')}</p><label className="btn navy"><Browse/> Browse Files<input type="file" hidden accept=".pdf,.png,.jpg,.jpeg,.csv,.json" onChange={e=>{const f=e.target.files?.[0];if(f)setFile(f);}}/></label>{file && <div className="alert green" style={{marginTop:10,padding:8,fontSize:12}}>{file.name} · {(file.size/1024).toFixed(1)} KB</div>}</div>}
+          {tab==='batch' && <><Field label="Paste CSV / JSON batch"><textarea className="input" rows={7} value={batch} onChange={e=>setBatch(e.target.value)} placeholder={'test,value,unit,reference\nHemoglobin,14.2,g/dL,13.8-17.2'}/></Field><button className="btn navy" style={{width:'100%'}} disabled={busy} onClick={()=>void importBatch()}>{t('importBatch')}</button></>}
+          {tab==='manual' && <><Field label="Test name"><input className="input" value={manual.test} onChange={e=>setManual({...manual,test:e.target.value})}/></Field><Field label={t('value')}><input className="input" value={manual.value} onChange={e=>setManual({...manual,value:e.target.value})}/></Field><Field label={t('unit')}><input className="input" value={manual.unit} onChange={e=>setManual({...manual,unit:e.target.value})}/></Field><Field label={t('referenceRange')}><input className="input" value={manual.ref} onChange={e=>setManual({...manual,ref:e.target.value})}/></Field><button className="btn navy" style={{width:'100%'}} disabled={busy} onClick={()=>void saveManual()}>{t('saveEntry')}</button></>}
         </Card>
       </div>
-      <Card title="Data Verification" action={<Chip tone="amber">2 {t('unverified')}</Chip>} pad={false}><div className="card-body"><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('name')}</th><th>{t('value')}</th><th>{t('unit')}</th><th>{t('referenceRange')}</th><th>{t('confidenceLabel')}</th></tr></thead><tbody>{rows.map((r,i)=><VerificationRow key={i} test={r.test} value={r.value} unit={r.unit} reference={r.ref} confidence={r.confidence} onChange={(v)=>setRows(a=>a.map((x,j)=>j===i?{...x,value:v,confidence:100}:x))}/>)}</tbody></table></div><div style={{display:'flex',gap:8,marginTop:12}}><button className="btn outline" onClick={()=>toast('Cleared')}>Clear Data</button><button className="btn primary" onClick={()=>void confirm()}><CheckCircle2 size={16}/> {t('confirmLinkPatient')}</button></div></div></Card>
+      <Card title="Data Verification" action={<Chip tone="amber">{rows.filter(r=>r.confidence<80).length} {t('unverified')}</Chip>} pad={false}><div className="card-body">
+        {rows.length ? <div className="table-wrap"><table className="tbl"><thead><tr><th>{t('name')}</th><th>{t('value')}</th><th>{t('unit')}</th><th>{t('referenceRange')}</th><th>{t('confidenceLabel')}</th></tr></thead><tbody>{rows.map((r,i)=><VerificationRow key={i} test={r.test} value={r.value} unit={r.unit} reference={r.ref} confidence={r.confidence} onChange={(v)=>setRows(a=>a.map((x,j)=>j===i?{...x,value:v,confidence:100}:x))}/>)}</tbody></table></div> : <Empty message="Extracted values from an upload will appear here for verification."/>}
+        <div style={{display:'flex',gap:8,marginTop:12}}><button className="btn outline" onClick={()=>setRows([])}>Clear Data</button><button className="btn primary" disabled={busy||!file&&!rows.length} onClick={()=>void confirm()}><CheckCircle2 size={16}/> {t('confirmLinkPatient')}</button></div>
+        {pending.length>0 && <div style={{marginTop:16}}><strong>Pending review</strong>{pending.slice(0,5).map(r=><div key={r.id} style={{display:'flex',justifyContent:'space-between',gap:8,padding:'8px 0',borderBottom:'1px solid var(--line)'}}><span>{r.title||r.type}</span><button className="btn sm outline" onClick={()=>void review(r)}>Review &amp; verify</button></div>)}</div>}
+      </div></Card>
     </div>
-    {tab==='history' && <Card title="Upload History" style={{marginTop:16}} pad={false}><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('name')}</th><th>{t('patient')}</th><th>{t('date')}</th><th>{t('confidenceLabel')}</th><th>{t('status')}</th></tr></thead><tbody>{history.slice(0,10).map(r=><tr key={r.id}><td>{r.title}</td><td>{patients.find(p=>p.id===r.patientId)?.name||r.patientId}</td><td>{new Date(r.date).toLocaleDateString()}</td><td>{r.confidence}%</td><td><StatusBadge status={r.status||'accessible'}/></td></tr>)}</tbody></table></div></Card>}
+    {tab==='history' && <Card title="Upload History" style={{marginTop:16}} pad={false}><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('name')}</th><th>{t('patient')}</th><th>{t('date')}</th><th>{t('confidenceLabel')}</th><th>{t('status')}</th></tr></thead><tbody>{history.slice(0,10).map(r=><tr key={r.id}><td>{r.title}</td><td>{patients.find(p=>p.id===r.patientId)?.name||r.patientId}</td><td>{date(r.date)}</td><td>{r.confidence}%</td><td><StatusBadge status={r.status||'accessible'}/></td></tr>)}</tbody></table>{!history.length&&<Empty/>}</div></Card>}
   </>;
 }
 function Browse(){return <span/>;}
@@ -124,17 +136,17 @@ export function AdminOverview() {
       <div className="card" style={{boxShadow:'none'}}><div style={{display:'flex',justifyContent:'space-between'}}><strong>Legacy Lab Drop (CSV)</strong><StatusBadge status="warning"/></div><p style={{color:'var(--muted)',fontSize:12}}>Sync failed 1h ago - review inbound results</p><button className="btn sm outline" onClick={()=>toast('Reviewing connection (demo)')}>Review</button></div>
     </div></div></Card></>;
 }
-export function AdminUsers() { const {t}=useTranslation(); const {toast}=useToast(); const [users,setUsers]=useState<User[]>([]); const [open,setOpen]=useState(false); const [form,setForm]=useState({name:'',email:'',role:'lab_staff' as any,phone:''});
+export function AdminUsers() { const {t}=useTranslation(); const {toast}=useToast(); const [users,setUsers]=useState<User[]>([]); const [open,setOpen]=useState(false); const [busy,setBusy]=useState(false); const [form,setForm]=useState({name:'',email:'',password:'',role:'lab_staff' as any,phone:''});
   useEffect(()=>{api.list<User>('users').then(setUsers);},[]);
-  const create=async()=>{ await api.mutate(db=>{const uid=`user_${Date.now()}`;db.users.push({uid,name:form.name,email:form.email,role:form.role,phone:form.phone,emergencyContact:{name:'-',relationship:'-',phone:'0100000000'}});});setOpen(false);api.list<User>('users').then(setUsers);toast('Staff account created');};
+  const create=async()=>{ if(!form.password) return toast('A temporary password is required',true); setBusy(true); try{ await api.createStaffAccount({name:form.name,email:form.email,password:form.password,role:form.role,phone:form.phone,emergencyContact:{name:'-',relationship:'-',phone:'0100000000'}});setOpen(false);setForm({name:'',email:'',password:'',role:'lab_staff' as any,phone:''});api.list<User>('users').then(setUsers);toast('Staff account created'); }catch(e:any){toast(e.message,true);} finally{setBusy(false);} };
   return <><PageHead title={t('staffManagement')} subtitle={t('systemConfig')} actions={<button className="btn primary" onClick={()=>setOpen(true)}><Plus size={16}/> {t('addUser')}</button>}/><Card pad><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('name')}</th><th>{t('email')}</th><th>{t('role')}</th><th>{t('status')}</th><th>{t('action')}</th></tr></thead><tbody>{users.map(u=><tr key={u.uid}><td>{u.name}</td><td>{u.email}</td><td><Badge>{t(u.role==='lab_staff'?'labStaff':u.role)}</Badge></td><td><StatusBadge status={u.status||'active'}/></td><td><button className="btn sm outline" onClick={()=>toast('Role management opened')}>{t('edit')}</button></td></tr>)}</tbody></table></div></Card>
-    {open && <Modal title={t('addUser')} onClose={()=>setOpen(false)} footer={<><button className="btn outline" onClick={()=>setOpen(false)}>{t('cancel')}</button><button className="btn primary" onClick={()=>void create()}>{t('submit')}</button></>}><Field label={t('name')}><input className="input" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></Field><Field label={t('email')}><input className="input" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/></Field><Field label={t('phoneNumber')}><input className="input" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})}/></Field><Field label={t('role')}><select className="input" value={form.role} onChange={e=>setForm({...form,role:e.target.value as any})}>{['lab_staff','pharmacy','hospital_admin','admin'].map(r=><option key={r}>{r}</option>)}</select></Field></Modal>}
+    {open && <Modal title={t('addUser')} onClose={()=>setOpen(false)} footer={<><button className="btn outline" onClick={()=>setOpen(false)}>{t('cancel')}</button><button className="btn primary" disabled={busy} onClick={()=>void create()}>{busy?'Creating…':t('submit')}</button></>}><Field label={t('name')}><input className="input" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></Field><Field label={t('email')}><input className="input" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/></Field><Field label={t('phoneNumber')}><input className="input" value={form.phone} onChange={e=>setForm({...form,phone:e.target.value})}/></Field><Field label={t('password')}><input className="input" type="password" autoComplete="new-password" value={form.password} onChange={e=>setForm({...form,password:e.target.value})}/></Field><Field label={t('role')}><select className="input" value={form.role} onChange={e=>setForm({...form,role:e.target.value as any})}>{['lab_staff','pharmacy','hospital_admin','admin'].map(r=><option key={r}>{r}</option>)}</select></Field></Modal>}
   </>; }
 export function AdminInstitutions(){ const {t}=useTranslation(); const {toast}=useToast(); const [list,setList]=useState<Institution[]>([]); useEffect(()=>{api.list<Institution>('institutions').then(setList);},[]);
-  const verify=(x:Institution)=>{api.mutate(db=>{const i=db.institutions.find(y=>y.id===x.id);if(i){i.verified=true;i.active=true;}}).then(()=>{api.list<Institution>('institutions').then(setList);toast(t('verifyLicense'));});};
+  const verify=(x:Institution)=>{void api.verifyInstitution(x.id).then(()=>{api.list<Institution>('institutions').then(setList);toast(t('verifyLicense'));}).catch((e:any)=>toast(e.message,true));};
   return <><PageHead title={t('institutions')} subtitle="Register and verify hospitals, labs and clinics."/><Card pad><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('name')}</th><th>{t('type')}</th><th>License</th><th>{t('city')}</th><th>{t('status')}</th><th>{t('action')}</th></tr></thead><tbody>{list.map(x=><tr key={x.id}><td>{x.name}</td><td>{x.type}</td><td style={{fontFamily:'monospace'}}>{x.licenseNumber}</td><td>{x.city}</td><td><StatusBadge status={x.verified?'verified':'pending_verification'}/></td><td>{!x.verified&&<button className="btn sm primary" onClick={()=>verify(x)}><ShieldCheck size={14}/> {t('verifyLicense')}</button>}</td></tr>)}</tbody></table></div></Card></>; }
 export function AdminPharmacies(){ const {t}=useTranslation(); const {toast}=useToast(); const [list,setList]=useState<Pharmacy[]>([]); useEffect(()=>{api.list<Pharmacy>('pharmacies').then(setList);},[]);
-  const approve=(x:Pharmacy)=>{api.mutate(db=>{const p=db.pharmacies.find(y=>y.id===x.id);if(p)p.status='approved';}).then(()=>{api.list<Pharmacy>('pharmacies').then(setList);toast('Pharmacy approved');});};
+  const approve=(x:Pharmacy)=>{void api.approvePharmacy(x.id).then(()=>{api.list<Pharmacy>('pharmacies').then(setList);toast('Pharmacy approved');}).catch((e:any)=>toast(e.message,true));};
   return <><PageHead title={t('pharmacies')} subtitle="Partnership approvals and commission settings."/><Card pad><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('name')}</th><th>{t('city')}</th><th>WhatsApp</th><th>{t('status')}</th><th>Fee</th><th>{t('action')}</th></tr></thead><tbody>{list.map(x=><tr key={x.id}><td><Store size={14}/> {x.name}</td><td>{x.city}</td><td>{x.whatsapp}</td><td><StatusBadge status={x.status}/></td><td>{x.monthlyFee} EGP</td><td>{x.status==='pending'&&<button className="btn sm primary" onClick={()=>approve(x)}>Approve</button>}</td></tr>)}</tbody></table></div></Card></>; }
 export function AdminAudit(){ const {t}=useTranslation(); const {toast}=useToast(); const [list,setList]=useState<any[]>([]); const [check,setCheck]=useState<any>(null);
   useEffect(()=>{void api.auditEntries().then(setList);},[]);

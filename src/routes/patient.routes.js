@@ -7,6 +7,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get("/me", c.me);
+router.post("/:id/deletion", authenticate, c.requestDeletion);
 router.patch("/me", c.updatePatientMe);
 router.get("/search", requirePermission("patients:read"), c.search);
 router.get("/:id", requirePermission("patients:read"), c.getById);
