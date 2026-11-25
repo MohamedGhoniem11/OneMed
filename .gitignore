@@ -11,7 +11,7 @@ serviceAccountKey.json
 *serviceAccountKey*.json
 
 # runtime data (local persistence adapter + generated dev secrets)
-data/
+/data/
 tests/.tmp-data/
 
 # build output
