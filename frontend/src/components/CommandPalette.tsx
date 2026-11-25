@@ -33,7 +33,7 @@ export function CommandPalette({role,onClose}:{role:Role;onClose:()=>void}) {
           els[next]?.focus();
         }
       }}/></div>
-    <div className="palette-list" aria-label={t('searchResults')}>{results.map((item,i)=><button key={item.to} type="button" className="palette-item" onClick={()=>go(item.to)}>
+    <div className="palette-list" role="listbox" aria-label={t('searchResults')}>{results.map((item,i)=><button key={item.to} type="button" className="palette-item" onClick={()=>go(item.to)}>
       {item.icon}<span>{t(item.label)}</span><small>{item.to}</small>{i===0 && <CornerDownLeft size={13} aria-hidden="true"/>}
     </button>)}{!results.length && <div className="empty">{t('noSearchResults')}</div>}</div>
   </Modal>;

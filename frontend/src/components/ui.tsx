@@ -25,7 +25,7 @@ export function ToastProvider({children}:{children:React.ReactNode}) {
 export const useToast = () => useContext(ToastCtx);
 
 export function Card({title, action, children, className='', pad=true, style}:{title?:string;action?:React.ReactNode;children:React.ReactNode;className?:string;pad?:boolean;style?:React.CSSProperties}) {
-  return <section style={style} className={`card ${className} ${pad?'':'pad0'}`}>{title && <div className="card-head"><h3>{title}</h3>{action}</div>}<div className={pad?'':'card-body'}>{children}</div></section>;
+  return <section style={style} className={`card ${className} ${pad?'':'pad0'}`}>{title && <div className="card-head"><h2>{title}</h2>{action}</div>}<div className={pad?'':'card-body'}>{children}</div></section>;
 }
 export function Badge({children,tone='blue'}:{children:React.ReactNode;tone?:'blue'|'green'|'red'|'amber'|'gray'}) { return <span className={`badge ${tone}`}>{children}</span>; }
 
@@ -183,7 +183,7 @@ export function SectionTabs({tabs,active,onChange,children}:{tabs:TabDef[];activ
 export function PageHead({title,subtitle,actions}:{title:string;subtitle?:string;actions?:React.ReactNode}) {
   return <div className="page-head"><div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div><div className="no-print">{actions}</div></div>;
 }
-export function Stat({label,value,sub}:{label:string;value:React.ReactNode;sub?:string}) { return <div className="card stat"><span className="value">{value}</span><span className="label">{label}</span>{sub && <span className="hint">{sub}</span>}</div>; }
+export function Stat({label,value,sub}:{label:string;value:React.ReactNode;sub?:string}) { return <div className="card stat"><span className="value"><bdi dir="ltr">{value}</bdi></span><span className="label">{label}</span>{sub && <span className="hint">{sub}</span>}</div>; }
 
 /** One shared status vocabulary (G10) - tones and localized human labels. */
 const STATUS: Record<string,{tone:'green'|'amber'|'red'|'gray'|'blue';labelKey?:string}> = {
@@ -213,7 +213,7 @@ export function IdentityStrip({name,initials,id,meta,blood,allergies,extra}:{nam
   return <div className="identity-strip">
     <span className="avatar identity-avatar">{initials || name.slice(0,2).toUpperCase()}</span>
     <div className="identity-main"><h2>{name}</h2><div className="identity-meta">{meta}{id && <span className="identity-id">{t('idLabel')} {id}</span>}</div></div>
-    <div className="identity-flags">{blood && <span className="identity-blood">🩸 {blood}</span>}{allergies?.length ? <span className="identity-allergy">⚠ {allergies.join(', ')}</span> : null}{extra}</div>
+    <div className="identity-flags">{blood && <span className="identity-blood">🩸 <bdi dir="ltr">{blood}</bdi></span>}{allergies?.length ? <span className="identity-allergy">⚠ {allergies.join(', ')}</span> : null}{extra}</div>
   </div>;
 }
 /** Compact metric card with optional trend and a threshold micro-bar (G4). */

@@ -188,7 +188,7 @@ export function EmergencyPage() {
   return <div className="public-shell">
     <div className="public-top"><span className="logo" translate="no">OneMed</span><span style={{fontSize:12}}>{t('noLogin')}</span><div style={{flex:1}}/><BackButton fallback="/"/><button className="btn sm" style={{background:'transparent',color:'#fff'}} aria-label={t('language')} onClick={()=>setLang(i18n.language==='en'?'ar':'en')}><Languages size={14}/></button></div>
     <div className="public-wrap">
-      <Card pad={false}><div className="card-body" style={{display:'flex',gap:14,alignItems:'center'}}><div className="avatar" style={{width:54,height:54,fontSize:18}}>{(v?.patientName||'?').slice(0,2).toUpperCase()}</div><div><h2>{v?.patientName||'…'}</h2>{v?.bloodGroup && <div className="alert red" style={{display:'inline-flex',alignItems:'center',gap:8,padding:'10px 16px',fontSize:20,fontWeight:700}}><DropletIcon/> {v.bloodGroup} · {t('bloodGroup')}</div>}</div></div></Card>
+      <Card pad={false}><div className="card-body" style={{display:'flex',gap:14,alignItems:'center'}}><div className="avatar" style={{width:54,height:54,fontSize:18}}>{(v?.patientName||'?').slice(0,2).toUpperCase()}</div><div><h2>{v?.patientName||'…'}</h2>{v?.bloodGroup && <div className="alert red" style={{display:'inline-flex',alignItems:'center',gap:8,padding:'10px 16px',fontSize:20,fontWeight:700}}><DropletIcon/> <bdi dir="ltr">{v.bloodGroup}</bdi> · {t('bloodGroup')}</div>}</div></div></Card>
       {v?.allergies && <Card title={t('criticalAllergies')}><div className="alert red"><strong>{v.allergies.join(', ')||'-'}</strong></div></Card>}
       {v?.chronicConditions && <Card title={t('chronicConditions')}><ul>{v.chronicConditions.map((x:string)=><li key={x}>{x}</li>)}</ul></Card>}
       {v?.medications && <Card title={t('currentMedications')}>{v.medications.length ? <ul>{v.medications.map((m:string,i:number)=><li key={i}>{m}</li>)}</ul> : <p style={{color:'var(--muted)'}}>{t('noMedicationsFile')}</p>}</Card>}
@@ -204,7 +204,7 @@ export function EmergencyPage() {
         <div style={{display:'flex',gap:5,flexWrap:'wrap',marginBottom:10}}>
           <span className="chip"><strong>{v?.patientName||'-'}</strong></span>
           {(v?.chronicConditions||[]).map((c:string)=><span key={c} className="chip red">{c}</span>)}
-          {v?.bloodGroup && <span className="chip blue">{v.bloodGroup}</span>}
+          {v?.bloodGroup && <span className="chip blue"><bdi dir="ltr">{v.bloodGroup}</bdi></span>}
           {(v?.allergies||[]).map((a:string)=><span key={a} className="chip red">{t('allergyLabel')} {a}</span>)}
         </div>
         <div className="alert blue" style={{fontSize:12}}>{t('firstAidDisclaimer')}</div>

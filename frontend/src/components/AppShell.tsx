@@ -144,7 +144,7 @@ export function AppShell({children}:{children:React.ReactNode}) {
         <div className="searchbox" ref={searchBoxRef} role="search">
           <Search size={16} className="search-icon" aria-hidden="true"/>
           <input ref={searchRef} className="input" type="text" placeholder={t('searchScreens')}
-            value={q} aria-label={t('search')} aria-expanded={searchOpen} aria-controls="shell-search-results"
+            role="combobox" value={q} aria-label={t('search')} aria-expanded={searchOpen} aria-controls="shell-search-results"
             onFocus={()=>setSearchOpen(true)}
             onChange={e=>{ setQ(e.target.value,{replace:true}); setSearchOpen(true); }}
             onKeyDown={e=>{
@@ -154,7 +154,7 @@ export function AppShell({children}:{children:React.ReactNode}) {
           {q ? <button type="button" className="icon-btn search-clear" aria-label={t('clearSearch')} onClick={clearSearch}>
             <X size={14} aria-hidden="true"/>
           </button> : <Kbd>/</Kbd>}
-          {searchOpen && <div className="search-results" id="shell-search-results" aria-label={t('searchResults')}>
+          {searchOpen && <div className="search-results" id="shell-search-results" role="listbox" aria-label={t('searchResults')}>
             {suggestions.length ? suggestions.map((s,idx)=><button key={`${s.to}-${idx}`} type="button"
               className="search-result" onClick={()=>goTo(s.to)}>
               {s.icon}<span>{t(s.label)}</span><small>{s.to}</small>
@@ -175,12 +175,12 @@ export function AppShell({children}:{children:React.ReactNode}) {
           {API_MODE==='demo' && <button type="button" className="demo-flag" onClick={()=>setResetOpen(true)} title={t('resetDemo')}>
             <RotateCcw size={13} aria-hidden="true"/><span className="demo-label">{t('demoMode')}</span>
           </button>}
-          <NavLink to={notificationsPath(role)} className="icon-btn bell-btn" aria-label={bellLabel} title={bellLabel}>
+          <NavLink to={notificationsPath(role)} className="icon-btn bell-btn" aria-label={`${bellLabel} · ${unread>9?'9+':unread} · ${unread}`} title={bellLabel}>
             <Bell size={17} aria-hidden="true"/>
             {unread > 0 && <span className="notif-count" aria-hidden="true">{unread>9?'9+':unread}</span>}
           </NavLink>
           <button type="button" className="avatar-btn" aria-haspopup="dialog" aria-expanded={accountOpen}
-            aria-label={t('accountMenu')} onClick={()=>setAccountOpen(true)}>
+            aria-label={`${session.user.name} · ${t('accountMenu')}`} onClick={()=>setAccountOpen(true)}>
             <span className="avatar" aria-hidden="true">{initials}</span>
             <span className="account-name">{session.user.name}</span>
             <ChevronDown size={14} aria-hidden="true"/>

@@ -4,7 +4,7 @@
   color-scheme: light;
   --navy:#002657; --navy-900:#001a3d; --navy-800:#00306e; --navy-700:#063f86;
   --teal:#006a61; --teal-600:#008278; --green:#0f9d6e; --red:#d64545;
-  --amber:#d99219; --ink:#10203a; --muted:#6b7a90; --line:#e2e9f2;
+  --amber:#b8760c; --ink:#10203a; --muted:#4c5b72; --line:#e2e9f2;
   --bg:#f5f8fc; --card:#ffffff; --soft:#eef5ff; --soft-teal:#e7f6f3;
   /* Strict 8px-derived spacing scale (4 = ½ step, then 8/16/24/32/40/48/64). */
   --space-1:4px; --space-2:8px; --space-3:16px; --space-4:24px;
