@@ -468,6 +468,14 @@ export async function chatbot(message: string, patient?: Patient): Promise<ChatT
   const text = `${ar?'اتصل بالإسعاف (١٢٣) فوراً إن لم تكن قد فعلت ذلك.':'Call emergency services (123) immediately if you have not already.'}\n\n${conditionContext}${ar?'الإرشادات: ':'Guidance: '}${best.text}`;
   return { role:'assistant', text, confidence:'High', sources:[`${best.source} §${best.section}`], disclaimer:ar?'إرشادات إسعافات أولية فقط - ليست بديلاً عن الرعاية الطبية.':'First-aid guidance only - not a substitute for professional medical care.' };
 }
+/** Patient-scoped, grounded doctor assistant. Never diagnoses or prescribes. */
+export async function doctorChat(patientId: string, message: string, language = 'en'): Promise<any> {
+  if (API_MODE === 'api') return http<any>(`/analytics/clinical/${patientId}/chat`, { method:'POST', body:JSON.stringify({ message, language }) }, token());
+  const p = await getPatient(patientId);
+  const reply = await chatbot(message, p || undefined);
+  return { ...reply, mode:'demo', isKnowledgeGap: reply.confidence === 'Knowledge Gap' };
+}
+
 // ---------------- M6 clinical AI / analytics / reports (demo + REST) ----------------
 export type ClinicalSummary = { text:string; confidence:'High'|'Moderate'|'Low'|'Knowledge Gap'; sources:string[]; disclaimer?:string; mode?:string };
 
