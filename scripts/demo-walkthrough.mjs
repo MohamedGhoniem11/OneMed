@@ -15,7 +15,7 @@ async function check(name, fn) {
   catch (error) { results.push({ name, status: "FAIL", detail: error.message }); }
 }
 async function json(path, token, init = {}) {
-  const res = await fetch(`${BASE}${path}`, { ...init, headers: { ...(init.headers || {}), ...(token ? H(token) : {}) } });
+  const res = await fetch(`${BASE}${path}`, { ...init, headers: { "content-type": "application/json", ...(init.headers || {}), ...(token ? H(token) : {}) } });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`${path} → ${res.status}: ${body.message || ""}`);
   return body;

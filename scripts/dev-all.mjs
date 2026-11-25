@@ -7,12 +7,13 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-const root = path.dirname(fileURLToPath(new URL("..", import.meta.url)));
+const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const frontend = path.join(root, "frontend");
 const children = [];
 
 function start(name, command, args, cwd, env = {}) {
-  const child = spawn(command, args, { cwd, env: { ...process.env, ...env }, stdio: "inherit", shell: process.platform === "win32" });
+  const child = spawn(command, args, { cwd, env: { ...process.env, ...env }, stdio: "inherit" });
+  child.on("error", (error) => { console.error(`[${name}] failed to start: ${error.message}`); stop(); process.exitCode = 1; });
   child.on("exit", (code) => {
     if (!stopping) {
       console.log(`[${name}] exited (${code}); stopping other processes`);
@@ -33,6 +34,8 @@ process.on("SIGTERM", () => { stop(); process.exit(0); });
 
 console.log("Starting OneMed API on http://localhost:3000 and frontend on http://localhost:5173");
 start("api", process.execPath, ["src/server.js"], root);
-start("web", process.platform === "win32" ? "npm.cmd" : "npm", ["run", "dev", "--", "--host", "127.0.0.1"], frontend, {
+// Spawn Vite directly so the command works in restricted shells and CI.
+const viteEntry = path.join(frontend, "node_modules", "vite", "bin", "vite.js");
+start("web", process.execPath, [viteEntry, "--host", "127.0.0.1"], frontend, {
   VITE_API_MODE: "api", VITE_API_URL: "/api",
 });

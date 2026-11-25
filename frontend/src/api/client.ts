@@ -530,11 +530,11 @@ export async function createStaffAccount(data: any) {
   return mutate(db => { const uidValue=uid('user'); db.users.push({ uid:uidValue, ...data, status:'active' }); return { user:{ uid:uidValue, ...data } }; });
 }
 export async function verifyInstitution(id: string) {
-  if (API_MODE === 'api') return http<any>(`/institutions/${id}/verify`, { method:'PATCH' }, token());
+  if (API_MODE === 'api') return http<any>(`/institutions/${id}/verify`, { method:'PATCH', body:JSON.stringify({ verified:true }) }, token());
   return mutate(db => { const i:any=db.institutions.find(x=>x.id===id); if(i){i.verified=true;i.active=true;} return i; });
 }
 export async function verifyDoctorAccount(id: string) {
-  if (API_MODE === 'api') return http<any>(`/doctors/${id}/verify`, { method:'PATCH' }, token());
+  if (API_MODE === 'api') return http<any>(`/doctors/${id}/verify`, { method:'PATCH', body:JSON.stringify({ verified:true }) }, token());
   return mutate(db => { const d:any=(db.doctors as any[]).find(x=>x.uid===id||x.id===id); if(d)d.verified=true; return d; });
 }
 export async function approvePharmacy(id: string) {

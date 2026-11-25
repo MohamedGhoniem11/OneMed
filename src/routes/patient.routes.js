@@ -10,7 +10,8 @@ router.get("/me", c.me);
 router.post("/:id/deletion", authenticate, c.requestDeletion);
 router.patch("/me", c.updatePatientMe);
 router.get("/search", requirePermission("patients:read"), c.search);
-router.get("/:id", requirePermission("patients:read"), c.getById);
+// Self-access is allowed here; consent/ownership is enforced in the controller.
+router.get("/:id", c.getById);
 router.post(
   "/:id/emergency-override",
   requirePermission("patients:read"),

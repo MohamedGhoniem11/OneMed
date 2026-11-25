@@ -8,7 +8,16 @@ const COLLECTION = "patients";
 const RECORDS = "records";
 const PRESCRIPTIONS = "prescriptions";
 
-export const getPatient = (id) => getStore().get(COLLECTION, id);
+export async function getPatient(id) {
+  const patient = await getStore().get(COLLECTION, id);
+  if (!patient) return null;
+  const user = await getStore().get("users", id);
+  return {
+    ...patient,
+    name: patient.name || user?.name || id,
+    emergencyContact: patient.emergencyContact || patient.emergencyContacts?.[0] || user?.emergencyContact || null,
+  };
+}
 
 /** Search patients by name, National ID, phone or UID, filtered by consent. */
 export async function searchPatients(req, query, limit = 20) {
