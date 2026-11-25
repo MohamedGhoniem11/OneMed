@@ -35,6 +35,10 @@ export default [
     },
   },
   {
+    files: ["frontend/public/sw.js"],
+    languageOptions: { globals: { ...globals.serviceworker } },
+  },
+  {
     files: ["frontend/src/**/*.{js,jsx}"],
     languageOptions: {
       parserOptions: { ecmaFeatures: { jsx: true } },
