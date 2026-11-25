@@ -29,7 +29,10 @@ export default async function auditMiddleware(req, res, next) {
       patientId: req.body?.patientId ?? req.query?.patientId ?? req.params?.patientId ?? null,
       metadata: {
         method: req.method,
-        path: req.originalUrl,
+        // Never persist raw bearer tokens: use the route pattern when available.
+        path: `${req.baseUrl || ""}${req.route?.path || req.path || ""}`
+          .replace(/\?.*$/, "")
+          .replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, "[redacted-token]"),
         status: res.statusCode,
       },
     };

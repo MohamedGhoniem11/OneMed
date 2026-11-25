@@ -113,6 +113,8 @@ describe("M2 medical ingestion API", () => {
 
     const pending = await api.get("/api/records/pending").set(bearer(labToken)).expect(200);
     expect(pending.body.items.some((r) => r.id === ingest.body.record.id)).toBe(true);
+    await api.get(`/api/records/${ingest.body.record.id}`).set(bearer(patientToken)).expect(404);
+    await api.get(`/api/records/${ingest.body.record.id}/original`).set(bearer(patientToken)).expect(404);
 
     const reviewed = await api
       .patch(`/api/records/${ingest.body.record.id}/review`)
@@ -125,6 +127,7 @@ describe("M2 medical ingestion API", () => {
 
     const after = await api.get(`/api/records?patientId=${PATIENT}`).set(bearer(patientToken)).expect(200);
     expect(after.body.items.some((r) => r.id === ingest.body.record.id)).toBe(true);
+    await api.get(`/api/records/${ingest.body.record.id}`).set(bearer(patientToken)).expect(200);
   });
 
   it("supports manual entry by a doctor and blocks patient writes", async () => {

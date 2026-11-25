@@ -51,6 +51,9 @@ export const updateMe = async (req, res, next) => {
 
 export const getAll = async (req, res, next) => {
   try {
+    if (req.user.role === "hospital_admin" && !req.user.institutionId) {
+      throw httpError(403, "No institution is linked to this account");
+    }
     res.json(
       await service.getAll({
         limit: parseLimit(req.query.limit),

@@ -89,9 +89,11 @@ describe("M5 prescription fulfillment and pharmacy workflow", () => {
       .send({ confirmed: true, items: [{ name: "Amoxicillin", dosage: "500mg", frequency: "BID", duration: "5 days" }] }).expect(200);
 
     const selected = await api.post(`/api/fulfillment/${confirmed.body.linkToken}/select`).send({ pharmacyId: "pharm_near" }).expect(200);
-    expect(selected.body.whatsappUrl).toContain("https://wa.me/01011111111");
+    expect(selected.body.whatsappUrl).toContain("https://wa.me/201011111111");
     expect(decodeURIComponent(selected.body.whatsappUrl)).toContain("Amoxicillin");
     expect(selected.body.prescription.orderStatus).toBe("received");
+    const audit = await getStore().query("accessLog", { limit: 500 });
+    expect(audit.items.some((entry) => JSON.stringify(entry.metadata || {}).includes(confirmed.body.linkToken))).toBe(false);
 
     const orders = await api.get("/api/pharmacy/orders").set(bearer(pharmacyToken)).expect(200);
     expect(orders.body.orders.some((o) => o.id === created.body.id)).toBe(true);

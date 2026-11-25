@@ -80,6 +80,13 @@ describe("Authorization matrix and security regressions", () => {
       .send({ patientId: P, items: [{ name: "Aspirin" }] }).expect(403);
   });
 
+  it("unaffiliated staff cannot fall back to another tenant", async () => {
+    const hospital = await createSession({ id: "authz_hospital", role: "hospital_admin", email: "h@authz.test" }, { mfa: true });
+    await api.get("/api/users").set(bearer(hospital.accessToken)).expect(403);
+    const pharmacy = await createSession({ id: "authz_pharmacy_unlinked", role: "pharmacy", email: "ph2@authz.test" }, { mfa: true });
+    await api.get("/api/pharmacy/profile").set(bearer(pharmacy.accessToken)).expect(404);
+  });
+
   it("lab staff cannot mint an NFC token for a patient", async () => {
     await api.post("/api/nfc").set(bearer(lab)).send({ patientId: P }).expect(403);
   });

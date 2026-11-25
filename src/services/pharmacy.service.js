@@ -33,16 +33,15 @@ export async function getById(id) {
 
 export async function getForUser(user) {
   const institutionId = user?.institutionId || user?.affiliation?.institutionId;
-  if (!institutionId) {
-    const { items } = await getStore().query(COLLECTION, { limit: 1 });
-    return items[0] || null;
-  }
+  if (!institutionId) return null;
   const byInstitution = await getStore().query(COLLECTION, {
     where: [{ field: "institutionId", op: "==", value: institutionId }],
     limit: 1,
   });
   if (byInstitution.items[0]) return byInstitution.items[0];
-  return getStore().get(COLLECTION, institutionId);
+  // Never silently fall back to another pharmacy: that enables cross-tenant
+  // order reading and WhatsApp-number takeover.
+  return null;
 }
 
 export async function updateProfile(id, body) {
@@ -53,8 +52,11 @@ export async function updateProfile(id, body) {
 }
 
 export function whatsappDeepLink(pharmacy, medicines, { patientName = "", doctorName = "" } = {}) {
-  const phone = String(pharmacy.whatsapp || pharmacy.whatsappNumber || "").replace(/\D/g, "");
+  let phone = String(pharmacy.whatsapp || pharmacy.whatsappNumber || "").replace(/\D/g, "");
   if (!phone) throw httpError(400, "Pharmacy has no WhatsApp number");
+  // Egyptian mobile numbers are stored locally as 01xxxxxxxxx; wa.me expects
+  // the full international number (20 + 9 digits).
+  if (phone.startsWith("0") && phone.length === 11) phone = `20${phone.slice(1)}`;
   const lines = (medicines || []).map((m, i) => `${i + 1}. ${m.name || ""} ${m.dose || m.dosage || ""} - ${m.frequency || ""} - ${m.duration || ""}`.trim());
   const text = [
     `Hello ${pharmacy.name},`,

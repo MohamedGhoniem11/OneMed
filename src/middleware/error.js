@@ -5,9 +5,13 @@
  * - 5xx errors are logged with the request id and returned as a generic message,
  *   so internal details (tokens, stack traces, provider errors) never leak.
  */
+const redact = (value) => String(value || "")
+  .replace(/([\w-]*(?:token|code|secret|password|otp)[\w-]*=)[^&\s]+/gi, "$1[redacted]")
+  .replace(/eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g, "[redacted-token]");
+
 export const notFound = (req, res) =>
   res.status(404).json({
-    message: `Route ${req.method} ${req.originalUrl} not found`,
+    message: `Route ${req.method} ${redact(req.originalUrl)} not found`,
     requestId: req.id,
   });
 
@@ -26,7 +30,7 @@ export function errorHandler(err, req, res, next) {
   }
 
   if (status >= 500) {
-    console.error(`[${req.id}] ${req.method} ${req.originalUrl}`, err);
+    console.error(`[${req.id}] ${req.method} ${redact(req.originalUrl)}`, err);
     message = "Internal Server Error";
   }
 
