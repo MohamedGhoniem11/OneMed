@@ -38,6 +38,7 @@ beforeAll(async () => {
     id: "rec_m6_2", patientId: PATIENT, type: "vital", title: "Blood pressure", institutionId: "inst_m6",
     data: { systolic: 138, diastolic: 88 }, status: "abnormal", observedAt: "2026-02-15T09:00:00Z", reviewed: true, createdAt: new Date(),
   });
+  await store.set("doctors", DOCTOR, { id: DOCTOR, verified: true });
   await store.set("consents", "consent_m6", {
     patientId: PATIENT, granteeType: "doctor", granteeId: DOCTOR,
     scope: ["records"], status: "active", grantedAt: new Date(), createdAt: new Date(),

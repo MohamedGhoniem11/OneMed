@@ -5,8 +5,10 @@ const COLLECTION = "users";
 
 export const getById = (id) => getStore().get(COLLECTION, id);
 
-export const getAll = async ({ limit = 20, startAfter } = {}) => {
+export const getAll = async ({ limit = 20, startAfter, institutionId } = {}) => {
+  const where = institutionId ? [{ field: "institutionId", op: "==", value: institutionId }] : [];
   const { items, nextCursor } = await getStore().query(COLLECTION, {
+    where,
     orderBy: [{ field: "createdAt", direction: "desc" }],
     limit,
     startAfter,

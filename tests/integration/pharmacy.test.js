@@ -26,6 +26,7 @@ beforeAll(async () => {
     phone: "01011111111", whatsapp: "01011111111", location: { lat: 31.201, lng: 29.921 },
     hours: "Open 24/7", rating: 4.7, active: true, status: "approved", verified: true, createdAt: new Date(),
   });
+  await store.set("doctors", DOCTOR, { id: DOCTOR, verified: true });
   await store.set("consents", "consent_pharmacy", {
     patientId: PATIENT, granteeType: "doctor", granteeId: DOCTOR,
     scope: ["records", "prescriptions"], status: "active", grantedAt: new Date(), createdAt: new Date(),

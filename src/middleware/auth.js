@@ -1,6 +1,7 @@
 import { verifyAccessToken, touchSession } from "../services/session.service.js";
 import { loadAffiliation } from "./consent.js";
 import { can } from "../constants/permissions.js";
+import { getStore } from "../store/index.js";
 
 /**
  * Authenticate a OneMed access token and confirm its server-side session is
@@ -46,9 +47,9 @@ export const requireRole =
 export const requireVerifiedDoctor = async (req, res, next) => {
   try {
     if (req.user?.role !== "doctor") return next();
-    const profile = await (await import("../store/index.js")).getStore().get("doctors", req.user.uid);
-    if (profile && profile.verified === false) {
-      return res.status(403).json({ message: "Doctor account is not verified", requestId: req.id });
+    const profile = await getStore().get("doctors", req.user.uid);
+    if (!profile || profile.verified !== true) {
+      return res.status(403).json({ message: "A verified doctor profile is required", requestId: req.id });
     }
     next();
   } catch {

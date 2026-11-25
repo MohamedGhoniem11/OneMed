@@ -73,6 +73,13 @@ describe("Authorization matrix and security regressions", () => {
     await api.get(`/api/patients/${P}`).set(bearer(doctor)).expect(200);
   });
 
+  it("a doctor without a verified profile cannot write clinical data", async () => {
+    const unverifiedSession = await createSession({ id: "authz_unverified", role: "doctor", email: "u@authz.test" }, { mfa: true });
+    await getStore().set("users", "authz_unverified", { id: "authz_unverified", role: "doctor", email: "u@authz.test", status: "active" });
+    await api.post("/api/prescriptions").set(bearer(unverifiedSession.accessToken))
+      .send({ patientId: P, items: [{ name: "Aspirin" }] }).expect(403);
+  });
+
   it("lab staff cannot mint an NFC token for a patient", async () => {
     await api.post("/api/nfc").set(bearer(lab)).send({ patientId: P }).expect(403);
   });

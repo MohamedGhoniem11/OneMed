@@ -74,6 +74,7 @@ describe("API foundations (local mode, post-M1)", () => {
       .send({ mfaToken: login2.body.mfaToken, code })
       .expect(200);
     doctor = { token: verified.body.accessToken, uid: verified.body.user.uid };
+    await getStore().set("doctors", doctor.uid, { id: doctor.uid, verified: true, specialty: "Cardiology" });
     await getStore().set("consents", "consent-foundations-doctor", {
       patientId: "foundations-patient", granteeType: "doctor", granteeId: doctor.uid,
       scope: ["records", "prescriptions"], status: "active", grantedAt: new Date(), createdAt: new Date(),

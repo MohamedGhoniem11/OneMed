@@ -55,6 +55,7 @@ export const getAll = async (req, res, next) => {
       await service.getAll({
         limit: parseLimit(req.query.limit),
         startAfter: req.query.startAfter,
+        institutionId: req.user.role === "hospital_admin" ? req.user.institutionId : undefined,
       }),
     );
   } catch (e) {

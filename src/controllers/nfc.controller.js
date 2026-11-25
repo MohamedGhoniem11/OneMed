@@ -41,7 +41,7 @@ export const resolve = send(async (req) => {
   // The emergency URL uses a separate, privacy-filtered capability token.
   // Issuing it here makes the NFC "Emergency Info" button work without
   // exposing the patient ID or full record in the public URL.
-  const emergency = await createEmergency({ patientId: result.patientId, issuedBy: null });
+  const emergency = await createEmergency({ patientId: result.patientId, issuedBy: null, stable: true });
   return {
     patientId: result.patientId,
     valid: true,

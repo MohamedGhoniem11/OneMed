@@ -68,6 +68,7 @@ export async function emergencyOverride(req, patientId, { reason, ttlMinutes = 1
     patientId,
     doctorId: req.user.uid,
     reason,
+    scope: "critical",
     createdAt: new Date(),
     expiresAt,
   });

@@ -8,7 +8,7 @@ import { getStore } from "../src/store/index.js";
 import { appendAudit } from "../src/services/audit.service.js";
 
 const store = getStore();
-const COLLECTIONS = ["records", "prescriptions", "consents", "notifications", "conversations", "messages", "emergencyQr", "nfcTokens", "connectionTokens", "uploads"];
+const COLLECTIONS = ["records", "prescriptions", "consents", "notifications", "conversations", "emergencyQr", "nfcTokens", "connectionTokens", "fulfillmentLinks", "emergencyOverrides", "uploads", "deviceTokens"];
 
 async function main() {
   const now = new Date();
@@ -16,8 +16,18 @@ async function main() {
   let purged = 0;
   for (const request of items.filter((r) => r.status === "pending" && new Date(r.dueAt) <= now)) {
     for (const collection of COLLECTIONS) {
-      const rows = await store.query(collection, { where: [{ field: "patientId", op: "==", value: request.patientId }], limit: 500 });
+      const field = collection === "deviceTokens" ? "userId" : "patientId";
+      const rows = await store.query(collection, { where: [{ field, op: "==", value: request.patientId }], limit: 500 });
       await Promise.all(rows.items.map((row) => store.delete(collection, row.id)));
+    }
+    const conversations = await store.query("conversations", {
+      where: [{ field: "patientId", op: "==", value: request.patientId }], limit: 500,
+    });
+    for (const conversation of conversations.items) {
+      const messages = await store.query("messages", {
+        where: [{ field: "conversationId", op: "==", value: conversation.id }], limit: 500,
+      });
+      await Promise.all(messages.items.map((message) => store.delete("messages", message.id)));
     }
     await store.update("deletionRequests", request.id, { status: "completed", completedAt: now });
     await appendAudit({ action: "deletion_completed", resourceType: "patient", resourceId: request.patientId, patientId: request.patientId, actorRole: "system" });

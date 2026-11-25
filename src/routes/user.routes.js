@@ -8,10 +8,11 @@ const router = Router();
 router.get("/me", authenticate, c.me);
 router.patch("/me", authenticate, c.updateMe);
 
-// الأدمن فقط
-router.use(authenticate, requireRole("admin"));
+// Hospital admins may list their own institution's staff; other user operations
+// remain admin-only.
+router.get("/", authenticate, requireRole("admin", "hospital_admin"), c.getAll);
 
-router.get("/", c.getAll);
+router.use(authenticate, requireRole("admin"));
 router.route("/:id").get(c.getOne).patch(c.updateOne).delete(c.remove);
 router.patch("/:id/role", c.setRole);
 

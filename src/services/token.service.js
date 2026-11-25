@@ -137,8 +137,13 @@ export async function findNfcForPatient(patientId) {
   return items[0] || null;
 }
 
-export async function createEmergency({ patientId, issuedBy, ttlSeconds = env.emergencyTtlSeconds }) {
-  const jti = crypto.randomUUID();
+export async function createEmergency({ patientId, issuedBy, ttlSeconds = env.emergencyTtlSeconds, stable = false }) {
+  // A wearable must resolve to the same emergency URL on every tap. A stable
+  // jti avoids minting an unbounded number of long-lived bearer tokens on each
+  // anonymous NFC scan; the token is still domain-separated and revocable.
+  const jti = stable
+    ? crypto.createHmac("sha256", getJwtSecret()).update(`emergency:${patientId}`).digest("hex").slice(0, 36)
+    : crypto.randomUUID();
   const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
   const token = sign({
     domain: "onemed-emergency",

@@ -37,9 +37,9 @@ export async function canReadPatient(req, patientId, { scope = "records", resour
     if (consent) return true;
   }
 
-  if (req.emergencyOverride) return true;
-
-  if (req.user?.role === "doctor") {
+  // An emergency override grants only the critical field set returned by the
+  // override endpoint. It must never become blanket consent to full records.
+  if (req.user?.role === "doctor" && effectiveScope === "critical") {
     const now = new Date();
     const { items } = await getStore().query("emergencyOverrides", {
       where: [
@@ -48,7 +48,7 @@ export async function canReadPatient(req, patientId, { scope = "records", resour
       ],
       limit: 10,
     });
-    if (items.some((o) => new Date(o.expiresAt) > now)) return true;
+    if (items.some((o) => o.scope === "critical" && new Date(o.expiresAt) > now)) return true;
   }
 
   throw httpError(403, "Patient record is not available to you");
