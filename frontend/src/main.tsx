@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { Suspense, lazy, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import './i18n';
 import './index.css';
 import { AuthProvider, useAuth } from './auth/AuthContext';
@@ -8,24 +8,50 @@ import { ToastProvider } from './components/ui';
 import { logout } from './api/client';
 import { AppShell } from './components/AppShell';
 import type { Role } from './types';
-import {
-  Landing, Register, Login, EmergencyPage, NfcLanding, FulfillmentPage,
-} from './pages/public';
-import { ConsentQrPage } from './pages/consent-qr';
-import { PrivacyPage, TermsPage } from './pages/legal';
-import {
-  PatientDashboard, PatientRecords, PatientAnalytics, PatientPrescriptions, PatientConsents,
-  PatientEmergencyConfig, PatientMessages, PatientNotifications, PatientSettings,
-} from './pages/patient';
-import {
-  DoctorDashboard, DoctorPatients, PatientViewer, DoctorPrescriptions, DoctorQrTools,
-  DoctorMessages, DoctorReports, DoctorSettings, DoctorAnalytics,
-} from './pages/doctor';
-import {
-  LabPortal, PharmacyPortal, PharmacyProfile, HospitalAdmin, HospitalStaff, HospitalConnections,
-  HospitalAnalytics, AdminOverview, AdminUsers, AdminInstitutions, AdminPharmacies, AdminAudit,
-  AdminReports, AdminPopulation,
-} from './pages/staff';
+
+// Route-level code splitting: heavy chart, QR and translation code loads only
+// for the pages that need it instead of shipping in the initial bundle.
+const Landing = lazy(() => import('./pages/public').then((m) => ({ default: m.Landing })));
+const Register = lazy(() => import('./pages/public').then((m) => ({ default: m.Register })));
+const Login = lazy(() => import('./pages/public').then((m) => ({ default: m.Login })));
+const EmergencyPage = lazy(() => import('./pages/public').then((m) => ({ default: m.EmergencyPage })));
+const NfcLanding = lazy(() => import('./pages/public').then((m) => ({ default: m.NfcLanding })));
+const FulfillmentPage = lazy(() => import('./pages/public').then((m) => ({ default: m.FulfillmentPage })));
+const ConsentQrPage = lazy(() => import('./pages/consent-qr').then((m) => ({ default: m.ConsentQrPage })));
+const PrivacyPage = lazy(() => import('./pages/legal').then((m) => ({ default: m.PrivacyPage })));
+const TermsPage = lazy(() => import('./pages/legal').then((m) => ({ default: m.TermsPage })));
+const PatientDashboard = lazy(() => import('./pages/patient').then((m) => ({ default: m.PatientDashboard })));
+const PatientRecords = lazy(() => import('./pages/patient').then((m) => ({ default: m.PatientRecords })));
+const PatientAnalytics = lazy(() => import('./pages/patient').then((m) => ({ default: m.PatientAnalytics })));
+const PatientPrescriptions = lazy(() => import('./pages/patient').then((m) => ({ default: m.PatientPrescriptions })));
+const PatientConsents = lazy(() => import('./pages/patient').then((m) => ({ default: m.PatientConsents })));
+const PatientEmergencyConfig = lazy(() => import('./pages/patient').then((m) => ({ default: m.PatientEmergencyConfig })));
+const PatientMessages = lazy(() => import('./pages/patient').then((m) => ({ default: m.PatientMessages })));
+const PatientNotifications = lazy(() => import('./pages/patient').then((m) => ({ default: m.PatientNotifications })));
+const PatientSettings = lazy(() => import('./pages/patient').then((m) => ({ default: m.PatientSettings })));
+const DoctorDashboard = lazy(() => import('./pages/doctor').then((m) => ({ default: m.DoctorDashboard })));
+const DoctorPatients = lazy(() => import('./pages/doctor').then((m) => ({ default: m.DoctorPatients })));
+const PatientViewer = lazy(() => import('./pages/doctor').then((m) => ({ default: m.PatientViewer })));
+const DoctorPrescriptions = lazy(() => import('./pages/doctor').then((m) => ({ default: m.DoctorPrescriptions })));
+const DoctorQrTools = lazy(() => import('./pages/doctor').then((m) => ({ default: m.DoctorQrTools })));
+const DoctorMessages = lazy(() => import('./pages/doctor').then((m) => ({ default: m.DoctorMessages })));
+const DoctorReports = lazy(() => import('./pages/doctor').then((m) => ({ default: m.DoctorReports })));
+const DoctorSettings = lazy(() => import('./pages/doctor').then((m) => ({ default: m.DoctorSettings })));
+const DoctorAnalytics = lazy(() => import('./pages/doctor').then((m) => ({ default: m.DoctorAnalytics })));
+const LabPortal = lazy(() => import('./pages/staff').then((m) => ({ default: m.LabPortal })));
+const PharmacyPortal = lazy(() => import('./pages/staff').then((m) => ({ default: m.PharmacyPortal })));
+const PharmacyProfile = lazy(() => import('./pages/staff').then((m) => ({ default: m.PharmacyProfile })));
+const HospitalAdmin = lazy(() => import('./pages/staff').then((m) => ({ default: m.HospitalAdmin })));
+const HospitalStaff = lazy(() => import('./pages/staff').then((m) => ({ default: m.HospitalStaff })));
+const HospitalConnections = lazy(() => import('./pages/staff').then((m) => ({ default: m.HospitalConnections })));
+const HospitalAnalytics = lazy(() => import('./pages/staff').then((m) => ({ default: m.HospitalAnalytics })));
+const AdminOverview = lazy(() => import('./pages/staff').then((m) => ({ default: m.AdminOverview })));
+const AdminUsers = lazy(() => import('./pages/staff').then((m) => ({ default: m.AdminUsers })));
+const AdminInstitutions = lazy(() => import('./pages/staff').then((m) => ({ default: m.AdminInstitutions })));
+const AdminPharmacies = lazy(() => import('./pages/staff').then((m) => ({ default: m.AdminPharmacies })));
+const AdminAudit = lazy(() => import('./pages/staff').then((m) => ({ default: m.AdminAudit })));
+const AdminReports = lazy(() => import('./pages/staff').then((m) => ({ default: m.AdminReports })));
+const AdminPopulation = lazy(() => import('./pages/staff').then((m) => ({ default: m.AdminPopulation })));
 
 function Guard({ roles, children }: { roles?: Role[]; children: React.ReactNode }) {
   const { session } = useAuth();
@@ -48,11 +74,15 @@ function AppRedirect() {
   }, [session]);
   return <Navigate to={target} replace/>;
 }
-import { useParams } from 'react-router-dom';
 function ConsentQrRoute() { const { token='' } = useParams(); return <ConsentQrPage token={token}/>; }
+
+function RouteFallback() {
+  return <div className="auth-wrap"><div className="card" role="status" aria-busy="true"><p>Loading…</p></div></div>;
+}
+
 function Root() {
   const { session } = useAuth();
-  return <Routes>
+  return <Suspense fallback={<RouteFallback/>}><Routes>
     {/* Public surfaces: intentionally OUTSIDE AppShell, so a logged-in bystander
         never sees the authenticated navigation on an emergency page. */}
     <Route path="/" element={session ? <Navigate to="/app" replace/> : <Landing/>}/>
@@ -108,7 +138,7 @@ function Root() {
     <Route path="/app/admin/population" element={<Protected roles={['admin']}><AdminPopulation/></Protected>}/>
 
     <Route path="*" element={<div className="auth-wrap"><div className="card"><h1>404</h1><p>Page not found</p><a className="btn primary" href="/">Home</a></div></div>}/>
-  </Routes>;
+  </Routes></Suspense>;
 }
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode><BrowserRouter><AuthProvider><ToastProvider><Root/></ToastProvider></AuthProvider></BrowserRouter></React.StrictMode>,
