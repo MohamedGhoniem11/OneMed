@@ -13,7 +13,7 @@ export default async function auditMiddleware(req, res, next) {
     if (req.method === "OPTIONS" || req.method === "HEAD") return;
     if (req.path === "/" || req.path === "/health") return;
     if (res.statusCode >= 500) return;
-    if (req.path.startsWith("/auth")) return; // richer auth-service audit
+    if (req.originalUrl?.startsWith("/api/auth/")) return; // richer auth-service audit
 
     const action = `${req.method.toLowerCase()}_${req.baseUrl}${req.path}`
       .replace(/[^a-z0-9]+/gi, "_")
