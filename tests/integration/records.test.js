@@ -97,6 +97,21 @@ describe("M2 medical ingestion API", () => {
     expect(res.body.record.status).toBe("abnormal");
   });
 
+  it("OCRs a scanned PDF with no embedded text layer", async () => {
+    const res = await api
+      .post("/api/records/ingest")
+      .set(bearer(labToken))
+      .field("patientId", PATIENT)
+      .attach("file", path.join(here, "..", "fixtures", "scanned-lab.pdf"))
+      .expect(201);
+    expect(["pdf_ocr", "pdf_scan"]).toContain(res.body.record.sourceFormat);
+    if (res.body.record.sourceFormat === "pdf_ocr") {
+      expect(res.body.record.data.values.some((v) => /hemoglobin/i.test(v.name))).toBe(true);
+    } else {
+      expect(res.body.record.status).toBe("needs_review");
+    }
+  });
+
   it("hides unreviewed records from the patient until staff verifies them", async () => {
     const ingest = await api
       .post("/api/records/ingest")

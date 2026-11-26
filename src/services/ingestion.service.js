@@ -5,7 +5,7 @@ import { env } from "../config/env.js";
 import { manualRecordSchema, recordSchema, reviewSchema } from "../schemas/record.schema.js";
 import { auditRequest } from "./audit.service.js";
 import { extractText as ocrText } from "./ocr.service.js";
-import { extractPdfText } from "./pdf.service.js";
+import { extractPdfText, rasterizePdf } from "./pdf.service.js";
 import { normalizeCsv, normalizeDicom, normalizeJson, normalizeOcrText, normalizeType, toNumber, flagFor } from "./normalization.service.js";
 import { saveEncrypted, sha256 } from "./file-storage.service.js";
 import { canReadPatient } from "../middleware/consent.js";
@@ -145,8 +145,19 @@ async function parseFile(file) {
   if (format === "pdf") {
     const { text } = await extractPdfText(file.buffer);
     if (!text.trim()) {
+      // Scanned PDF: rasterize pages and run the same OCR pipeline as images.
+      try {
+        const pages = await rasterizePdf(file.buffer);
+        const results = [];
+        for (const png of pages) results.push(await ocrText(png));
+        const combined = results.map((r) => r.text).filter(Boolean).join("\n");
+        const confidence = results.length ? Math.min(...results.map((r) => r.confidence)) : 0;
+        if (combined.trim()) return normalizeOcrText(combined, { confidence, sourceFormat: "pdf_ocr" });
+      } catch {
+        // Fall through to manual review if rasterization/OCR is unavailable.
+      }
       return {
-        type: "lab", title: "Scanned PDF (manual entry required)", summary: "No embedded text layer",
+        type: "lab", title: "Scanned PDF (manual entry required)", summary: "OCR could not extract values",
         observedAt: new Date().toISOString(), data: { values: [] }, status: "needs_review",
         confidence: null, needsReview: true, sourceFormat: "pdf_scan",
       };
