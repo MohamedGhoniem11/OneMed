@@ -555,27 +555,36 @@ export async function setUserRoleAdmin(id: string, role: string) {
   return mutate(db => { const u:any = db.users.find(x=>x.uid===id||(x as any).id===id); if(u) u.role=role; return u; });
 }
 
-// ---------------- Remove actions (soft delete where clinical data is involved) ----------------
-export async function deleteRecord(id: string) {
-  if (API_MODE === 'api') return http<any>(`/records/${id}`, { method:'DELETE' }, token());
-  return mutate(db => { const r:any = (db.records as any[]).find(x=>x.id===id); if(r) r.lifecycle='deleted'; return r; });
+// ---------------- Lifecycle actions (archive, hide, deactivate) ----------------
+export async function listArchivedRecords(patientId?: string): Promise<MedicalRecord[]> {
+  if (API_MODE === 'api') {
+    const q = new URLSearchParams({ lifecycle:'archived', ...(patientId?{patientId}:{}) });
+    const r = await http<{items:any[]}>(`/records?${q}`, {}, token());
+    return r.items.map(normalizeRecord);
+  }
+  return loadDB().records.filter(r => (!patientId||r.patientId===patientId) && r.lifecycle==='archived');
+}
+export async function archiveRecord(id: string) {
+  if (API_MODE === 'api') return http<any>(`/records/${id}/archive`, { method:'POST' }, token());
+  return mutate(db => { const r:any = (db.records as any[]).find(x=>x.id===id); if(r) r.lifecycle='archived'; return r; });
+}
+export async function restoreRecord(id: string) {
+  if (API_MODE === 'api') return http<any>(`/records/${id}/restore`, { method:'POST' }, token());
+  return mutate(db => { const r:any = (db.records as any[]).find(x=>x.id===id); if(r) r.lifecycle='accessible'; return r; });
 }
 export async function deleteNotification(id: string) {
   if (API_MODE === 'api') return http<any>(`/notifications/${id}`, { method:'DELETE' }, token());
   return mutate(db => { db.notifications = (db.notifications as any[]).filter(n=>n.id!==id) as any; return true; });
 }
-export async function deleteConversation(id: string) {
-  if (API_MODE === 'api') return http<any>(`/messages/conversations/${id}`, { method:'DELETE' }, token());
-  return mutate(db => { db.conversations = (db.conversations as any[]).filter(c=>c.id!==id) as any;
-    db.messages = (db.messages as any[]).filter(m=>m.conversationId!==id) as any; return true; });
+/** Hides a conversation for the signed-in participant only; messages are kept. */
+export async function hideConversation(id: string) {
+  if (API_MODE === 'api') return http<any>(`/messages/conversations/${id}/hide`, { method:'PATCH' }, token());
+  return mutate(db => { const c:any = (db.conversations as any[]).find(x=>x.id===id);
+    const uidValue=getSession()?.user.uid; if(c) c.hiddenFor=[...new Set([...(c.hiddenFor||[]),uidValue])]; return c; });
 }
-export async function discardPrescription(id: string) {
-  if (API_MODE === 'api') return http<any>(`/prescriptions/${id}`, { method:'DELETE' }, token());
-  return mutate(db => { const r:any = (db.prescriptions as any[]).find(x=>x.id===id); if(r){r.status='cancelled';r.extractionStatus='cancelled';} return r; });
-}
-export async function deleteUserAdmin(id: string) {
-  if (API_MODE === 'api') return http<any>(`/users/${id}`, { method:'DELETE' }, token());
-  return mutate(db => { db.users = (db.users as any[]).filter(u=>u.uid!==id&&(u as any).id!==id) as any; return true; });
+export async function setUserStatusAdmin(id: string, status: 'active'|'inactive') {
+  if (API_MODE === 'api') return http<any>(`/users/${id}/status`, { method:'PATCH', body:JSON.stringify({ status }) }, token());
+  return mutate(db => { const u:any = db.users.find(x=>x.uid===id||(x as any).id===id); if(u) u.status=status; return u; });
 }
 export async function setInstitutionActive(id: string, active: boolean) {
   if (API_MODE === 'api') return http<any>(`/institutions/${id}/active`, { method:'PATCH', body:JSON.stringify({ active }) }, token());

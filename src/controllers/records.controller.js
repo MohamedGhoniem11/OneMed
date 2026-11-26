@@ -11,6 +11,7 @@ export const list = send((req) =>
   service.listVisibleRecords(req, {
     type: req.query.type,
     patientId: req.query.patientId,
+    lifecycle: req.query.lifecycle,
     limit: parseLimit(req.query.limit),
   }),
 );
@@ -31,15 +32,20 @@ export const createManual = send(async (req) => {
 
 export const review = send((req) => service.reviewRecord(req));
 
-export const remove = send(async (req) => {
-  const record = await service.softDeleteRecord(req, req.params.id);
+export const archive = send(async (req) => {
+  const record = await service.archiveRecord(req, req.params.id);
   await auditRequest(req, {
-    action: "record_removed",
-    resourceType: "record",
-    resourceId: record.id,
-    patientId: record.patientId,
+    action: "record_archived", resourceType: "record", resourceId: record.id, patientId: record.patientId,
   });
-  return { ok: true, id: record.id };
+  return { ok: true, id: record.id, lifecycle: record.lifecycle };
+});
+
+export const restore = send(async (req) => {
+  const record = await service.restoreRecord(req, req.params.id);
+  await auditRequest(req, {
+    action: "record_restored", resourceType: "record", resourceId: record.id, patientId: record.patientId,
+  });
+  return { ok: true, id: record.id, lifecycle: record.lifecycle };
 });
 
 export async function downloadOriginal(req, res, next) {

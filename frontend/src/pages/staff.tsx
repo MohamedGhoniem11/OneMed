@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  Activity, Building2, CheckCircle2, ClipboardList, Clock, FileSpreadsheet, FileText,
-  FlaskConical, MapPin, MessageCircle, Pill, Plug, Plus, Search, ShieldCheck, Store, Trash2, Upload, Users,
+  Activity, Archive, Building2, CheckCircle2, ClipboardList, Clock, FileSpreadsheet, FileText,
+  FlaskConical, MapPin, MessageCircle, Pill, Plug, Plus, RotateCcw, Search, ShieldCheck, Store, Trash2, Upload, Users,
 } from 'lucide-react';
 import { BarChart, Bar, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import * as api from '../api/client';
@@ -22,8 +22,9 @@ export function LabPortal({ initialTab = 'upload' }: { initialTab?: string }) {
   const [history,setHistory]=useState<MedicalRecord[]>([]); const [file,setFile]=useState<File|null>(null); const [ingestedId,setIngestedId]=useState('');
   const [batch,setBatch]=useState(''); const [manual,setManual]=useState({test:'',value:'',unit:'',ref:''});
   const [pending,setPending]=useState<MedicalRecord[]>([]); const [busy,setBusy]=useState(false); const [reviewing,setReviewing]=useState<MedicalRecord|null>(null);
-  const [archiveQuery,setArchiveQuery]=useState(''); const [archiveType,setArchiveType]=useState('all'); const [removing,setRemoving]=useState<MedicalRecord|null>(null);
-  const load=()=>Promise.all([api.listRecords().then(setHistory), api.pendingRecords().then(setPending)]);
+  const [archiveQuery,setArchiveQuery]=useState(''); const [archiveType,setArchiveType]=useState('all');
+  const [archived,setArchived]=useState<MedicalRecord[]>([]); const [lifecycleTarget,setLifecycleTarget]=useState<MedicalRecord|null>(null);
+  const load=()=>Promise.all([api.listRecords().then(setHistory), api.pendingRecords().then(setPending), api.listArchivedRecords().then(setArchived)]);
   useEffect(()=>{ void api.searchPatients('').then(a=>{setPatients(a);setPatientId(a[0]?.id||'');}).catch(()=>{}); void load(); },[]);
 
   const err = (key:string, fallback:string) => t(key, { defaultValue: fallback });
@@ -128,6 +129,7 @@ export function LabPortal({ initialTab = 'upload' }: { initialTab?: string }) {
       {id:'upload',label:t('upload')},{id:'batch',label:t('batchImport')},{id:'manual',label:t('manualEntry')},
       {id:'verify',label:`${t('dataVerification')}${pending.length?` (${pending.length})`:''}`},
       {id:'records',label:t('records')},
+      {id:'archived',label:`${t('archived',{defaultValue:'Archived'})}${archived.length?` (${archived.length})`:''}`},
     ]} active={tab} onChange={setTab}/>
     <div className="grid cols-2" style={{alignItems:'start'}}>
       <div className="grid" style={{gap:16}}>
@@ -178,11 +180,25 @@ export function LabPortal({ initialTab = 'upload' }: { initialTab?: string }) {
         {archive.map(r=><tr key={r.id}><td>{date(r.date)}</td><td>{patientName(r.patientId)}</td><td><strong>{r.title}</strong><div style={{fontSize:12,color:'var(--muted)'}}>{r.summary}</div></td>
           <td style={{fontSize:12}}>{(r.values||[]).slice(0,3).map((v:any)=>`${v.name} ${v.value}${v.unit}`).join(' · ')||'-'}</td>
           <td>{r.confidence!=null?`${r.confidence}%`:'-'}</td><td><StatusBadge status={r.status||'normal'}/></td>
-          <td><button className="btn sm outline" aria-label={`${t('delete')} ${r.title}`} onClick={()=>setRemoving(r)}><Trash2 size={14}/></button></td></tr>)}</tbody></table>{!archive.length&&<Empty/>}</div>
+          <td><button className="btn sm outline" onClick={()=>setLifecycleTarget(r)}><Archive size={14}/> {t('archive',{defaultValue:'Archive'})}</button></td></tr>)}</tbody></table>{!archive.length&&<Empty/>}</div>
+    </Card>}
+    {tab==='archived' && <Card title={t('archived',{defaultValue:'Archived records'})} pad={false}>
+      <div className="table-wrap"><table className="tbl"><thead><tr><th>{t('date')}</th><th>{t('patient')}</th><th>{t('name')}</th><th>{t('status')}</th><th>{t('action')}</th></tr></thead><tbody>
+        {archived.map(r=><tr key={r.id}><td>{date(r.date)}</td><td>{patientName(r.patientId)}</td><td><strong>{r.title}</strong><div style={{fontSize:12,color:'var(--muted)'}}>{r.summary}</div></td>
+          <td><Badge tone="gray">{t('archived',{defaultValue:'Archived'})}</Badge></td>
+          <td><button className="btn sm outline" onClick={()=>setLifecycleTarget(r)}><RotateCcw size={14}/> {t('restore',{defaultValue:'Restore'})}</button></td></tr>)}</tbody></table>{!archived.length&&<Empty message={t('noneRecorded')}/>}</div>
+      <p className="disclaimer">{t('archiveHint',{defaultValue:'Authorized clinicians can still view and restore archived records; audit events are retained.'})}</p>
     </Card>}
     {reviewing && <ReviewDialog record={reviewing} patients={patients} onClose={()=>setReviewing(null)} onSave={values=>void review(reviewing,values)}/>}
-    {removing && <ConfirmDialog title={t('delete')} message={t('removeRecordConfirm',{defaultValue:`Remove "${removing.title}" from patient views? The event stays in the audit trail.`})}
-      onClose={()=>setRemoving(null)} busy={busy} onConfirm={()=>void (async()=>{setBusy(true);try{await api.deleteRecord(removing.id);setRemoving(null);toast(t('saved'));await load();}catch(e:any){toast(e.message,true);}finally{setBusy(false);}})()}/>}
+    {lifecycleTarget && <ConfirmDialog variant={lifecycleTarget.lifecycle==='archived'?'primary':'danger'}
+      title={lifecycleTarget.lifecycle==='archived'?t('restore',{defaultValue:'Restore'}):t('archive',{defaultValue:'Archive'})}
+      message={t('recordLifecycleConfirm',{defaultValue:`${lifecycleTarget.lifecycle==='archived'?'Restore':'Archive'} "${lifecycleTarget.title}"? Authorized clinicians keep access and the action is audited.`})}
+      confirmLabel={lifecycleTarget.lifecycle==='archived'?t('restore',{defaultValue:'Restore'}):t('archive',{defaultValue:'Archive'})}
+      onClose={()=>setLifecycleTarget(null)} busy={busy}
+      onConfirm={()=>void (async()=>{setBusy(true);try{
+        if(lifecycleTarget.lifecycle==='archived') await api.restoreRecord(lifecycleTarget.id); else await api.archiveRecord(lifecycleTarget.id);
+        setLifecycleTarget(null);toast(t('saved'));await load();
+      }catch(e:any){toast(e.message,true);}finally{setBusy(false);}})()}/>}
   </>;
 }
 
@@ -344,9 +360,10 @@ export function AdminUsers() {
       <div className="table-wrap"><table className="tbl"><thead><tr><th>{t('name')}</th><th>{t('email')}</th><th>{t('role')}</th><th>{t('institution')}</th><th>{t('status')}</th><th>{t('action')}</th></tr></thead><tbody>
         {visible.map(u=><tr key={u.uid}><td>{u.name}</td><td>{u.email}</td><td><Badge>{t(u.role==='lab_staff'?'labStaff':u.role)}</Badge></td><td>{u.institutionId||'-'}</td><td><StatusBadge status={u.status||'active'}/></td>
           <td><div style={{display:'flex',gap:4}}><button className="btn sm outline" onClick={()=>openEditor(u)}>{t('edit')}</button>
-            <button className="btn sm outline" disabled={u.uid===session!.user.uid} aria-label={`${t('delete')} ${u.name}`}
-              title={u.uid===session!.user.uid?t('cannotDeleteSelf',{defaultValue:'You cannot delete your own account'}):t('delete')}
-              onClick={()=>setRemoving(u)}><Trash2 size={14}/></button></div></td></tr>)}</tbody></table>{!visible.length&&<Empty/>}</div></Card>
+            <button className="btn sm outline" disabled={u.uid===session!.user.uid}
+              title={u.uid===session!.user.uid?t('cannotChangeSelf',{defaultValue:'You cannot change your own status'})
+                :(u.status==='active'?t('deactivate',{defaultValue:'Deactivate'}):t('activate',{defaultValue:'Activate'}))}
+              onClick={()=>setRemoving(u)}>{u.status==='active'?t('deactivate',{defaultValue:'Deactivate'}):t('activate',{defaultValue:'Activate'})}</button></div></td></tr>)}</tbody></table>{!visible.length&&<Empty/>}</div></Card>
     {open && <Modal title={t('addUser')} onClose={()=>setOpen(false)} footer={<><button className="btn outline" onClick={()=>setOpen(false)}>{t('cancel')}</button><button className="btn primary" disabled={busy} onClick={()=>void create()}>{busy?t('creating'):t('submit')}</button></>}>
       {errors.length>0 && <div className="alert red" role="alert">{errors.map((e,i)=><div key={i}>{e}</div>)}</div>}
       <Field label={t('name')} error={errors.includes(t('fieldRequired'))?t('fieldRequired'):undefined}><input className="input" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></Field>
@@ -361,8 +378,12 @@ export function AdminUsers() {
       <Field label={t('role')}><select className="input" value={editForm.role} onChange={e=>setEditForm({...editForm,role:e.target.value})}>
         {['patient','doctor','lab_staff','pharmacy','hospital_admin','admin'].map(r=><option key={r} value={r}>{t(r==='lab_staff'?'labStaff':r==='hospital_admin'?'hospitalAdmin':r)}</option>)}</select></Field>
       <p className="disclaimer">{t('roleChangeHint',{defaultValue:'Role changes take effect the next time this user signs in.'})}</p></Modal>}
-    {removing && <ConfirmDialog title={t('delete')} message={t('removeUserConfirm',{defaultValue:`Delete ${removing.name}? Their sessions will be revoked. This cannot be undone.`})}
-      onClose={()=>setRemoving(null)} busy={busy} onConfirm={()=>void (async()=>{setBusy(true);try{await api.deleteUserAdmin(removing.uid);setRemoving(null);void load();toast(t('saved'));}catch(e:any){toast(e.message,true);}finally{setBusy(false);}})()}/>}
+    {removing && <ConfirmDialog title={removing.status==='active'?t('deactivate',{defaultValue:'Deactivate'}):t('activate',{defaultValue:'Activate'})}
+      message={t('userStatusConfirm',{defaultValue:`${removing.status==='active'?'Deactivate':'Reactivate'} ${removing.name}? ${removing.status==='active'?'All their sessions will be revoked and records preserved.':'They will need to sign in again.'}`})}
+      confirmLabel={removing.status==='active'?t('deactivate',{defaultValue:'Deactivate'}):t('activate',{defaultValue:'Activate'})}
+      variant={removing.status==='active'?'danger':'primary'}
+      onClose={()=>setRemoving(null)} busy={busy}
+      onConfirm={()=>void (async()=>{setBusy(true);try{await api.setUserStatusAdmin(removing.uid,removing.status==='active'?'inactive':'active');setRemoving(null);void load();toast(t('saved'));}catch(e:any){toast(e.message,true);}finally{setBusy(false);}})()}/>}
   </>; }
 export function AdminInstitutions(){
   const {t}=useTranslation(); const {toast}=useToast(); const [list,setList]=useState<Institution[]>([]);
@@ -403,6 +424,7 @@ export function AdminInstitutions(){
     {removingInst && <ConfirmDialog title={removingInst.active?t('deactivate',{defaultValue:'Deactivate'}):t('activate',{defaultValue:'Activate'})}
       message={t('removeInstitutionConfirm',{defaultValue:`${removingInst.active?'Deactivate':'Activate'} ${removingInst.name}? Deactivated institutions stop accepting new records.`})}
       confirmLabel={removingInst.active?t('deactivate',{defaultValue:'Deactivate'}):t('activate',{defaultValue:'Activate'})}
+      variant={removingInst.active?'danger':'primary'}
       onClose={()=>setRemovingInst(null)} busy={busy}
       onConfirm={()=>void (async()=>{setBusy(true);try{await api.setInstitutionActive(removingInst.id,!removingInst.active);setRemovingInst(null);void load();toast(t('saved'));}catch(e:any){toast(e.message,true);}finally{setBusy(false);}})()}/>}
   </>; }
@@ -418,6 +440,7 @@ export function AdminPharmacies(){
         {x.status!=='pending'&&<button className="btn sm outline" onClick={()=>setRemoving(x)}>{x.status==='approved'?t('deactivate',{defaultValue:'Deactivate'}):t('activate',{defaultValue:'Activate'})}</button>}</div></td></tr>)}</tbody></table>{!list.length&&<Empty/>}</div></Card>
     {removing && <ConfirmDialog title={t('delete')} message={t('removePharmacyConfirm',{defaultValue:`Change ${removing.name} to ${removing.status==='approved'?'suspended':'approved'}? Patients will ${removing.status==='approved'?'no longer':'again'} see this pharmacy.`})}
       confirmLabel={removing.status==='approved'?t('deactivate',{defaultValue:'Deactivate'}):t('activate',{defaultValue:'Activate'})}
+      variant={removing.status==='approved'?'danger':'primary'}
       onClose={()=>setRemoving(null)} busy={busy}
       onConfirm={()=>void (async()=>{setBusy(true);try{await api.setPharmacyStatus(removing.id,removing.status==='approved'?'suspended':'approved');setRemoving(null);void load();toast(t('saved'));}catch(e:any){toast(e.message,true);}finally{setBusy(false);}})()}/>}
   </>; }

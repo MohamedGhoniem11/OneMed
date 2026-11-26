@@ -12,7 +12,7 @@ Bilingual (Arabic/English) healthcare connectivity platform (academic build): pa
 - Gemini-backed, grounded first-aid chatbot and doctor assistant with confidence, sources, disclaimers and Report Issue.
 - Prescription OCR/LLM extraction, mandatory doctor confirmation, 24-hour fulfillment links, GPS-sorted pharmacies and WhatsApp deep links.
 - In-app notifications with an FCM adapter, encrypted original uploads (AES-256-GCM), hash-chained audit log, reports (PDF/FHIR/CSV/JSON) and analytics.
-- Confirm-backed remove actions: patient/lab record removal (soft delete, audit retained), notification and conversation deletion, doctor draft prescription discard, admin user deletion and institution/pharmacy deactivation.
+- Confirm-backed lifecycle actions: authorized staff archive/restore clinical records (clinicians retain access), users can hide a conversation only for themselves and remove their notifications, admins deactivate/reactivate staff, institutions and pharmacies with session revocation and audit events.
 - PWA shell, RTL support, responsive navigation and Lighthouse 100/100/100 desktop baseline.
 
 ## Quick start (no credentials)

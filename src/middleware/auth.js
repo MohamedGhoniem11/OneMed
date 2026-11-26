@@ -31,8 +31,12 @@ export const authenticate = async (req, res, next) => {
     req.session = session;
     await loadAffiliation(req);
     next();
-  } catch {
-    res.status(401).json({ message: "Invalid or expired token", requestId: req.id });
+  } catch (error) {
+    const status = error?.status && error.status >= 400 && error.status < 500 ? error.status : 401;
+    res.status(status).json({
+      message: status === 401 ? "Invalid or expired token" : error.message,
+      requestId: req.id,
+    });
   }
 };
 

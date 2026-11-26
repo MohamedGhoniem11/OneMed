@@ -4,11 +4,12 @@ import { parseLimit } from "../utils/query.js";
 
 const COLLECTION = "institutions";
 
-export async function list({ type, city, active = true, limit, startAfter } = {}) {
+export async function list({ type, city, active, limit, startAfter } = {}) {
   const where = [];
   if (type) where.push({ field: "type", op: "==", value: type });
   if (city) where.push({ field: "city", op: "==", value: city });
-  if (active !== undefined) where.push({ field: "active", op: "==", value: active });
+  // undefined/null means "all statuses"; callers that want active-only pass true.
+  if (active !== undefined && active !== null) where.push({ field: "active", op: "==", value: active });
   return getStore().query(COLLECTION, {
     where,
     orderBy: [{ field: "__id__", direction: "asc" }],

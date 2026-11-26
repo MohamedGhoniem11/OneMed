@@ -38,9 +38,10 @@ export async function getForUser(user) {
     where: [{ field: "institutionId", op: "==", value: institutionId }],
     limit: 1,
   });
-  if (byInstitution.items[0]) return byInstitution.items[0];
-  // Never silently fall back to another pharmacy: that enables cross-tenant
-  // order reading and WhatsApp-number takeover.
+  const pharmacy = byInstitution.items[0];
+  if (pharmacy && pharmacy.active && pharmacy.status === "approved") return pharmacy;
+  // Never fall back to another pharmacy, and never grant access to a suspended
+  // one: that enables cross-tenant order reading and WhatsApp-number takeover.
   return null;
 }
 

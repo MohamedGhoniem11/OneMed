@@ -71,6 +71,12 @@ export function requirePatientAccess(scope, { resourceType, resourceId } = {}) {
 }
 
 /** Load an institution's affiliated staff for the current user. */
+async function assertInstitutionActive(store, institutionId) {
+  if (!institutionId) return;
+  const institution = await store.get("institutions", institutionId);
+  if (institution && !institution.active) throw httpError(403, "Institution is inactive");
+}
+
 export async function loadAffiliation(req) {
   if (!req.user?.uid) return;
   const store = getStore();
@@ -78,11 +84,16 @@ export async function loadAffiliation(req) {
   if (doctor?.institutionId) {
     req.affiliation = { institutionId: doctor.institutionId, kind: "doctor" };
     req.user.institutionId = doctor.institutionId;
+    await assertInstitutionActive(store, doctor.institutionId);
     return;
   }
   const user = await store.get("users", req.user.uid);
-  if (user?.institutionId) {
+  if (!user) return;
+  req.userRecord = user;
+  if (user.status === "inactive") throw httpError(403, "Account is inactive");
+  if (user.institutionId) {
     req.affiliation = { institutionId: user.institutionId, kind: user.role };
     req.user.institutionId = user.institutionId;
+    await assertInstitutionActive(store, user.institutionId);
   }
 }

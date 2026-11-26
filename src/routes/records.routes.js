@@ -17,7 +17,9 @@ router.get("/", requirePermission("records:read"), c.list);
 router.get("/:id", requirePermission("records:read"), c.getOne);
 router.get("/:id/original", requirePermission("records:read"), c.downloadOriginal);
 router.patch("/:id/review", requirePermission("records:write"), c.review);
-// Owner or records-writer with consent; authorization is enforced in the service.
-router.delete("/:id", c.remove);
+// Archive/restore: documented lifecycle states, restricted to records writers
+// with patient consent. Patients cannot modify clinical records.
+router.post("/:id/archive", requirePermission("records:write"), c.archive);
+router.post("/:id/restore", requirePermission("records:write"), c.restore);
 
 export default router;

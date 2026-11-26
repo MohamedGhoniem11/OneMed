@@ -14,6 +14,7 @@ router.get("/", authenticate, requireRole("admin", "hospital_admin"), c.getAll);
 
 router.use(authenticate, requireRole("admin"));
 router.route("/:id").get(c.getOne).patch(c.updateOne).delete(c.remove);
+router.patch("/:id/status", c.setStatus);
 router.patch("/:id/role", c.setRole);
 
 export default router;

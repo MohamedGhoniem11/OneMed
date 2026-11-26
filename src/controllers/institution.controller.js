@@ -3,6 +3,8 @@ import { httpError } from "../utils/http-error.js";
 import { validate } from "../utils/schema.js";
 import { institutionSchema } from "../schemas/institution.schema.js";
 import { auditRequest } from "../services/audit.service.js";
+import { getStore } from "../store/index.js";
+import { revokeUserSessions } from "../services/session.service.js";
 
 export async function list(req, res, next) {
   try {
@@ -50,10 +52,21 @@ export async function setActive(req, res, next) {
     const { active } = req.body || {};
     if (typeof active !== "boolean") throw httpError(400, "active must be true or false");
     const institution = await service.setActive(req.params.id, active);
+    // Deactivation must end existing access immediately; reactivation requires
+    // affected staff to sign in again.
+    let revoked = 0;
+    if (!active) {
+      const { items } = await getStore().query("users", {
+        where: [{ field: "institutionId", op: "==", value: req.params.id }],
+        limit: 200,
+      });
+      for (const user of items) revoked += await revokeUserSessions(user.uid || user.id, "institution_deactivated");
+    }
     await auditRequest(req, {
       action: active ? "institution_activated" : "institution_deactivated",
       resourceType: "institution",
       resourceId: req.params.id,
+      metadata: { active, sessionsRevoked: revoked },
     });
     res.json(institution);
   } catch (err) {

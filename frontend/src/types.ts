@@ -19,7 +19,7 @@ export interface MedicalRecord {
   id: string; patientId: string; type: 'lab' | 'imaging' | 'prescription' | 'note' | 'visit' | 'vitals';
   title: string; institution: string; institutionId?: string; date: string;
   summary?: string; details?: string; values?: LabValue[]; confidence?: number;
-  status?: 'accessible' | 'needs_review' | 'archived'; modality?: string;
+  status?: 'accessible' | 'needs_review' | 'archived'; modality?: string; lifecycle?: string;
 }
 export interface Medicine { name: string; dosage: string; frequency: string; duration: string; instructions?: string; confidence?: number }
 export type OrderStatus = 'received' | 'verifying' | 'preparing' | 'ready' | 'handed_over' | 'completed' | 'cancelled';

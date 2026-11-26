@@ -63,19 +63,6 @@ export async function confirm(id, doctorId, body, { actorName } = {}) {
   return { ...updated, actorName };
 }
 
-/** Discard an unconfirmed extraction draft; confirmed prescriptions are kept. */
-export async function discardDraft(id, doctorId) {
-  const prescription = await getStore().get(COLLECTION, id);
-  if (!prescription) throw httpError(404, "Prescription not found");
-  if (prescription.doctorId !== doctorId) throw httpError(403, "Forbidden");
-  if (prescription.status === "confirmed") throw httpError(409, "Confirmed prescriptions cannot be discarded");
-  return getStore().update(COLLECTION, id, {
-    status: "cancelled",
-    extractionStatus: "cancelled",
-    updatedAt: new Date(),
-  });
-}
-
 export async function list({ doctorId, patientId, limit = 20, startAfter } = {}) {
   const where = [];
   if (doctorId) where.push({ field: "doctorId", op: "==", value: doctorId });

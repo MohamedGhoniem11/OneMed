@@ -10,6 +10,7 @@ async function visibleConversation(conversationId, user) {
   if (!c) throw httpError(404, "Conversation not found");
   const isParticipant = c.patientId === user.uid || c.otherUserId === user.uid || user.role === "admin";
   if (!isParticipant) throw httpError(403, "Forbidden");
+  if ((c.hiddenFor || []).includes(user.uid)) throw httpError(404, "Conversation not found");
   return c;
 }
 
@@ -18,7 +19,9 @@ export async function listConversations(user) {
     orderBy: [{ field: "updatedAt", direction: "desc" }],
     limit: 200,
   });
-  return items.filter((c) => c.patientId === user.uid || c.otherUserId === user.uid || user.role === "admin");
+  return items
+    .filter((c) => c.patientId === user.uid || c.otherUserId === user.uid || user.role === "admin")
+    .filter((c) => !(c.hiddenFor || []).includes(user.uid));
 }
 
 export async function createConversation({ patientId, otherUserId, otherName, role }, user) {
@@ -43,14 +46,15 @@ export async function createConversation({ patientId, otherUserId, otherName, ro
   });
 }
 
-export async function removeConversation(conversationId, user) {
+/** Hides a conversation for the requesting participant only; other participants
+ * keep the full history. Messages are retained for the audit trail. */
+export async function hideConversation(conversationId, user) {
   const conversation = await visibleConversation(conversationId, user);
-  const { items } = await getStore().query(MESSAGES, {
-    where: [{ field: "conversationId", op: "==", value: conversationId }],
-    limit: 500,
-  });
-  await Promise.all(items.map((m) => getStore().delete(MESSAGES, m.id)));
-  await getStore().delete(CONVERSATIONS, conversationId);
+  if (conversation.patientId !== user.uid && conversation.otherUserId !== user.uid) {
+    throw httpError(403, "Only participants can hide a conversation");
+  }
+  const hiddenFor = [...new Set([...(conversation.hiddenFor || []), user.uid])];
+  await getStore().update(CONVERSATIONS, conversationId, { hiddenFor, updatedAt: new Date() });
   return { ok: true, id: conversation.id };
 }
 

@@ -94,11 +94,11 @@ export function Modal({title,children,onClose,footer,className=''}:{title:string
 
 /** Lightweight dialog used for menus and the mobile "More" sheet. */
 /** Consistent destructive-action confirmation used by remove buttons. */
-export function ConfirmDialog({title,message,onConfirm,onClose,busy=false,confirmLabel}:{title:string;message:string;onConfirm:()=>void;onClose:()=>void;busy?:boolean;confirmLabel?:string}) {
+export function ConfirmDialog({title,message,onConfirm,onClose,busy=false,confirmLabel,variant='danger'}:{title:string;message:string;onConfirm:()=>void;onClose:()=>void;busy?:boolean;confirmLabel?:string;variant?:'danger'|'primary'}) {
   const {t}=useTranslation();
   return <Modal title={title} onClose={onClose} footer={<>
     <button className="btn outline" onClick={onClose}>{t('cancel')}</button>
-    <button className="btn danger" disabled={busy} onClick={onConfirm} aria-busy={busy}>{confirmLabel||t('delete')}</button>
+    <button className={`btn ${variant}`} disabled={busy} onClick={onConfirm} aria-busy={busy}>{confirmLabel||t('delete')}</button>
   </>}><p>{message}</p></Modal>;
 }
 

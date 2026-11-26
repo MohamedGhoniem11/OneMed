@@ -3,6 +3,7 @@ import { authenticate, requireRole } from "../middleware/auth.js";
 import { getStore } from "../store/index.js";
 import { httpError } from "../utils/http-error.js";
 import { auditRequest } from "../services/audit.service.js";
+import { revokeUserSessions } from "../services/session.service.js";
 
 const router = Router();
 router.use(authenticate, requireRole("admin"));
@@ -33,9 +34,17 @@ router.patch("/pharmacies/:id/status", async (req, res, next) => {
     const updated = await getStore().update("pharmacies", pharmacy.id, {
       status, active: status === "approved", updatedAt: new Date(),
     });
+    let revoked = 0;
+    if (status !== "approved") {
+      const { items } = await getStore().query("users", {
+        where: [{ field: "institutionId", op: "==", value: pharmacy.id }],
+        limit: 200,
+      });
+      for (const user of items) revoked += await revokeUserSessions(user.uid || user.id, "pharmacy_suspended");
+    }
     await auditRequest(req, {
       action: "pharmacy_status_changed", resourceType: "pharmacy", resourceId: pharmacy.id,
-      metadata: { status },
+      metadata: { status, sessionsRevoked: revoked },
     });
     res.json(updated);
   } catch (error) { next(error); }

@@ -241,7 +241,7 @@ export async function reviewRecord(req) {
 }
 
 /** List records the requester is allowed to see, hiding unreviewed data from patients. */
-export async function listVisibleRecords(req, { type, patientId, limit } = {}) {
+export async function listVisibleRecords(req, { type, patientId, limit, lifecycle } = {}) {
   const where = [];
   if (patientId) where.push({ field: "patientId", op: "==", value: patientId });
   if (type) where.push({ field: "type", op: "==", value: normalizeType(type) });
@@ -254,6 +254,8 @@ export async function listVisibleRecords(req, { type, patientId, limit } = {}) {
   const items = [];
   for (const record of page.items) {
     if (record.lifecycle === "deleted") continue;
+    const archived = record.lifecycle === "archived";
+    if (lifecycle === "archived" ? !archived : archived) continue;
     if (req.user.role === "patient" && (record.status === "needs_review" || record.lifecycle === "manual_review")) continue;
     if (!allowed.has(record.patientId)) {
       let ok;
@@ -268,6 +270,7 @@ export async function listVisibleRecords(req, { type, patientId, limit } = {}) {
 export async function getVisibleRecord(req, id) {
   const record = await getStore().get(RECORDS, id);
   if (!record || record.lifecycle === "deleted") throw httpError(404, "Record not found");
+  if (req.user.role === "patient" && record.lifecycle === "archived") throw httpError(404, "Record not found");
   await canReadPatient(req, record.patientId, { scope: "records" });
   if (req.user.role === "patient" && (record.status === "needs_review" || record.lifecycle === "manual_review")) {
     throw httpError(404, "Record not found");
@@ -276,20 +279,38 @@ export async function getVisibleRecord(req, id) {
 }
 
 /**
- * Soft-delete: clinical records are retained for the audit trail but removed
- * from every patient/staff view. The patient owner or a records writer with
- * patient consent may remove a record.
+ * Archiving follows the documented record lifecycle (Fig. 6): authorized staff
+ * move older records to cold storage, where consented clinicians can still
+ * read and restore them. Patients cannot modify clinical records.
  */
-export async function softDeleteRecord(req, id) {
+async function requireRecordWriter(req, id) {
+  if (!can(req.user?.role, "records:write")) throw httpError(403, "Forbidden");
   const record = await getStore().get(RECORDS, id);
   if (!record || record.lifecycle === "deleted") throw httpError(404, "Record not found");
-  if (req.user?.uid !== record.patientId) {
-    if (!can(req.user?.role, "records:write")) throw httpError(403, "Forbidden");
-    await canReadPatient(req, record.patientId, { scope: "records" });
-  }
+  await canReadPatient(req, record.patientId, { scope: "records" });
+  return record;
+}
+
+export async function archiveRecord(req, id) {
+  const record = await requireRecordWriter(req, id);
+  if (record.lifecycle === "archived") throw httpError(409, "Record already archived");
   return getStore().update(RECORDS, id, {
-    lifecycle: "deleted",
-    lifecycleHistory: [...(record.lifecycleHistory || []).slice(-19), { step: "deleted", at: new Date() }],
+    lifecycle: "archived",
+    archivedAt: new Date(),
+    archivedBy: req.user.uid,
+    lifecycleHistory: [...(record.lifecycleHistory || []).slice(-19), { step: "archived", at: new Date() }],
+    updatedAt: new Date(),
+  });
+}
+
+export async function restoreRecord(req, id) {
+  const record = await requireRecordWriter(req, id);
+  if (record.lifecycle !== "archived") throw httpError(409, "Record is not archived");
+  return getStore().update(RECORDS, id, {
+    lifecycle: "accessible",
+    archivedAt: null,
+    archivedBy: null,
+    lifecycleHistory: [...(record.lifecycleHistory || []).slice(-19), { step: "accessible", at: new Date() }],
     updatedAt: new Date(),
   });
 }
@@ -300,6 +321,6 @@ export async function pendingReview() {
     orderBy: [{ field: "createdAt", direction: "desc" }],
     limit: 100,
   });
-  page.items = page.items.filter((r) => r.lifecycle !== "deleted");
+  page.items = page.items.filter((r) => r.lifecycle !== "deleted" && r.lifecycle !== "archived");
   return page;
 }

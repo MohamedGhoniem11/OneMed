@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import './i18n';
 import './index.css';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { ToastProvider } from './components/ui';
+import { logout } from './api/client';
 import { AppShell } from './components/AppShell';
 import type { Role } from './types';
 import {
@@ -41,6 +42,10 @@ function AppRedirect() {
   const map: Record<Role,string> = { patient:'/app/patient', doctor:'/app/doctor', lab_staff:'/app/lab', pharmacy:'/app/pharmacy', hospital_admin:'/app/hospital', admin:'/app/admin' };
   // A stale/unknown role must never produce an undefined Navigate target.
   const target = session ? (map[session.user.role] || '/login') : '/login';
+  useEffect(() => {
+    // Clear a stale session so it cannot bounce between /app and /login.
+    if (session && !map[session.user.role]) void logout();
+  }, [session]);
   return <Navigate to={target} replace/>;
 }
 import { useParams } from 'react-router-dom';

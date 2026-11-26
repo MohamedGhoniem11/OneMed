@@ -9,6 +9,6 @@ router.get("/conversations", c.listConversations);
 router.post("/conversations", c.createConversation);
 router.get("/conversations/:id/messages", c.listMessages);
 router.post("/conversations/:id/messages", c.sendMessage);
-router.delete("/conversations/:id", c.removeConversation);
+router.patch("/conversations/:id/hide", c.hideConversation);
 
 export default router;
