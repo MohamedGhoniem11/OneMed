@@ -69,14 +69,17 @@ export function createFirestoreStore() {
 
     async set(name, id, data, { merge = false } = {}) {
       if (!id) throw new Error("set requires a document id");
-      const ref = db.collection(name).doc(id);
-      await ref.set(stripId(data), { merge });
-      return toRecord(await ref.get());
+      const clean = stripId(data);
+      await db.collection(name).doc(id).set(clean, { merge });
+      // The caller supplied the complete stored shape; re-reading it costs a
+      // second network round trip (~550 ms) for no new information.
+      return { id, ...toIso(clean) };
     },
 
     async add(name, data) {
-      const ref = await db.collection(name).add(stripId(data));
-      return toRecord(await ref.get());
+      const clean = stripId(data);
+      const ref = await db.collection(name).add(clean);
+      return { id: ref.id, ...toIso(clean) };
     },
 
     async update(name, id, data) {
