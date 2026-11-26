@@ -92,6 +92,7 @@ describe("Authorization matrix and security regressions", () => {
       patientId: P, granteeType: "doctor", granteeId: D, scope: ["records"], status: "active", grantedAt: new Date(),
     });
     await api.get(`/api/patients/${P}/records`).set(bearer(doctor)).expect(200);
+    await new Promise((resolve) => setTimeout(resolve, 50));
     const { items } = await getStore().query("accessLog", {
       where: [{ field: "patientId", op: "==", value: P }], limit: 50,
     });
