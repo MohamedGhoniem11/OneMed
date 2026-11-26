@@ -22,6 +22,9 @@
     "dev:all": "node scripts/dev-all.mjs",
     "demo": "node scripts/demo-walkthrough.mjs",
     "perf:smoke": "node scripts/perf-smoke.mjs",
+    "archive:records": "node scripts/archive-records.mjs",
+    "backup": "node scripts/backup.mjs",
+    "restore:backup": "node scripts/restore-backup.mjs",
     "purge:deletions": "node scripts/purge-deletions.mjs",
     "set:admin": "node scripts/setAdmin.js"
   },
