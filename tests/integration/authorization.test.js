@@ -87,6 +87,18 @@ describe("Authorization matrix and security regressions", () => {
     await api.get("/api/pharmacy/profile").set(bearer(pharmacy.accessToken)).expect(404);
   });
 
+  it("audits record reads with user, patient and IP metadata", async () => {
+    await api.get(`/api/patients/${P}/records`).set(bearer(doctor)).expect(200);
+    const { items } = await getStore().query("accessLog", {
+      where: [{ field: "patientId", op: "==", value: P }], limit: 50,
+    });
+    const read = items.find((entry) => entry.action?.startsWith("get_") && entry.actorId === D);
+    expect(read).toBeTruthy();
+    expect(read.metadata?.path).toContain("/patients/");
+    expect(read.metadata?.path).not.toContain("token=");
+    expect(typeof read.ip).toBe("string");
+  });
+
   it("lab staff cannot mint an NFC token for a patient", async () => {
     await api.post("/api/nfc").set(bearer(lab)).send({ patientId: P }).expect(403);
   });

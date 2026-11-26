@@ -10,7 +10,8 @@ import { appendAudit } from "../services/audit.service.js";
  */
 export default async function auditMiddleware(req, res, next) {
   res.on("finish", () => {
-    if (req.method === "GET" || req.method === "OPTIONS" || req.method === "HEAD") return;
+    if (req.method === "OPTIONS" || req.method === "HEAD") return;
+    if (req.path === "/" || req.path === "/health") return;
     if (res.statusCode >= 500) return;
     if (req.path.startsWith("/auth")) return; // richer auth-service audit
 
@@ -27,6 +28,8 @@ export default async function auditMiddleware(req, res, next) {
       resourceType: req.baseUrl.replace(/^\/api\//, "") || "api",
       resourceId: req.params?.id ?? req.params?.patientId ?? null,
       patientId: req.body?.patientId ?? req.query?.patientId ?? req.params?.patientId ?? null,
+      ip: req.ip ?? "",
+      userAgent: req.get("user-agent") ?? "",
       metadata: {
         method: req.method,
         // Never persist raw bearer tokens: use the route pattern when available.
