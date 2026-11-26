@@ -1,6 +1,7 @@
 import { FieldPath } from "firebase-admin/firestore";
 import { getDb } from "../config/firebase.js";
 import { httpError } from "../utils/http-error.js";
+import { env } from "../config/env.js";
 
 /**
  * Firestore implementation of the persistence port. Mirrors the local store's
@@ -98,6 +99,15 @@ export function createFirestoreStore() {
     },
 
     async vectorSearch(name, vector, { limit = 5, field = "embedding" } = {}) {
+      if (env.llmDriver === "cloud" && name === "guidelineChunks") {
+        const res = await fetch(`${env.functionsBaseUrl}/searchGuidelines`, {
+          method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ embedding: vector, limit }), signal: AbortSignal.timeout(20000),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw httpError(502, json.message || "Cloud guideline search failed");
+        return json.chunks || [];
+      }
       try {
         const snapshot = await db.collection(name).findNearest(field, vector, {
           limit,

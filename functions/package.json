@@ -1,0 +1,17 @@
+{
+  "name": "onemed-functions",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OneMed Cloud Functions for grounded LLM generation and guideline retrieval",
+  "main": "index.js",
+  "engines": { "node": "20" },
+  "scripts": {
+    "serve": "firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.0.0"
+  }
+}

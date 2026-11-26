@@ -7,7 +7,18 @@ import { env } from "../config/env.js";
  */
 const base = "https://generativelanguage.googleapis.com/v1beta/models";
 
-export const llmMode = () => (env.geminiApiKey ? "gemini" : "offline");
+export const llmMode = () => (env.llmDriver === "cloud" || env.geminiApiKey ? "gemini" : "offline");
+
+async function cloudCall(action, body) {
+  if (!env.functionsBaseUrl) throw new Error("FUNCTIONS_BASE_URL is not configured");
+  const res = await fetch(`${env.functionsBaseUrl}/${action}`, {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20000),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json.message || `Cloud function ${action} failed (${res.status})`);
+  return json;
+}
 
 async function gemini(path, body, timeoutMs = 12000) {
   const controller = new AbortController();
@@ -43,6 +54,11 @@ function offlineEmbedding(text) {
 
 export async function embed(texts) {
   const list = Array.isArray(texts) ? texts : [texts];
+  if (env.llmDriver === "cloud") {
+    const results = [];
+    for (const text of list) results.push((await cloudCall("embed", { text })).values);
+    return results;
+  }
   if (llmMode() === "offline") return list.map(offlineEmbedding);
   const results = [];
   for (const text of list) {
@@ -82,6 +98,10 @@ export function cosine(a, b) {
 
 /** Grounded generation. The system prompt enforces the medical safety boundaries. */
 export async function generate({ system, prompt, maxOutputTokens = 500 }) {
+  if (env.llmDriver === "cloud") {
+    const result = await cloudCall("generate", { system, prompt, maxOutputTokens });
+    return { text: result.text || "", mode: "gemini-cloud" };
+  }
   if (llmMode() === "offline") {
     return { text: "", mode: "offline" };
   }
