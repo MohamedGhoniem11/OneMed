@@ -76,8 +76,28 @@ describe("M4 emergency public page and first-aid chatbot", () => {
     const res = await api.post(`/api/emergency/${emergencyToken}/chat`)
       .send({ message: "What is the patient's income and insurance policy number?", language: "en" })
       .expect(200);
-    expect(res.body.text).toContain("I cannot provide guidance for this situation");
+    expect(res.body.scope).toBe("out_of_scope");
+    expect(res.body.text).toContain("I can help with simple first-aid steps only");
+    expect(res.body.text).toMatch(/call emergency services \(123\)/i);
     expect(res.body.confidence).toBe("Knowledge Gap");
+  });
+
+  it("never refuses a possible emergency or self-harm message", async () => {
+    const emergency = await api.post(`/api/emergency/${emergencyToken}/chat`)
+      .send({ message: "He is in cardiac arrest, help!", language: "en" }).expect(200);
+    expect(emergency.body.scope).toBe("emergency");
+    expect(emergency.body.text).toContain("Call emergency services (123)");
+    const selfHarm = await api.post(`/api/emergency/${emergencyToken}/chat`)
+      .send({ message: "أريد أن أؤذي نفسي", language: "ar" }).expect(200);
+    expect(selfHarm.body.scope).toBe("emergency");
+    expect(selfHarm.body.text).toContain("١٢٣");
+  });
+
+  it("answers Arabic first-aid questions in Arabic with the 123 lead", async () => {
+    const res = await api.post(`/api/emergency/${emergencyToken}/chat`)
+      .send({ message: "شخص عنده تشنج، ماذا أفعل؟", language: "ar" }).expect(200);
+    expect(res.body.scope).toBe("first_aid");
+    expect(res.body.text).toContain("١٢٣");
   });
 
   it("rejects invalid tokens and empty messages", async () => {
@@ -87,7 +107,7 @@ describe("M4 emergency public page and first-aid chatbot", () => {
 
   it("logs scans and chats in the hash-chained audit log", async () => {
     const session = await createSession({ id: "admin-emergency", role: "admin", email: "admin@test.example" }, { mfa: true });
-    const audit = await api.get("/api/audit").set("Authorization", `Bearer ${session.accessToken}`).expect(200);
+    const audit = await api.get("/api/audit?limit=200").set("Authorization", `Bearer ${session.accessToken}`).expect(200);
     const actions = audit.body.auditLog.map((e) => e.action);
     expect(actions).toContain("emergency_page_viewed");
     expect(actions).toContain("emergency_chat");

@@ -56,14 +56,15 @@ beforeAll(async () => {
 
 describe("M6 clinical AI, analytics, reports and credits", () => {
   it("produces a grounded clinical summary with sources, confidence and disclaimer", async () => {
-    const res = await api.get(`/api/analytics/clinical/${PATIENT}/summary`).set(bearer(patientToken)).expect(200);
+    const res = await api.get(`/api/analytics/clinical/${PATIENT}/summary`).set(bearer(doctorToken)).expect(200);
     expect(res.body.text).toMatch(/not medical advice/i);
     expect(res.body.text).toContain("M6 Analytics Patient");
     expect(["High", "Moderate", "Low"]).toContain(res.body.confidence);
     expect(Array.isArray(res.body.sources)).toBe(true);
   });
 
-  it("enforces consent on clinical summaries and analytics", async () => {
+  it("enforces role and consent on clinical summaries and analytics", async () => {
+    await api.get(`/api/analytics/clinical/${PATIENT}/summary`).set(bearer(patientToken)).expect(403);
     await api.get(`/api/analytics/clinical/${PATIENT}/summary`).set(bearer(doctorToken)).expect(200);
     await api.get(`/api/analytics/clinical/${PATIENT}/summary`).set(bearer(strangerToken)).expect(403);
     await api.get(`/api/analytics/patient/${PATIENT}`).set(bearer(strangerToken)).expect(403);
@@ -105,7 +106,7 @@ describe("M6 clinical AI, analytics, reports and credits", () => {
     const labs = await api.get(`/api/reports/labs?patientId=${PATIENT}&format=csv`).set(bearer(patientToken)).expect(200);
     expect(labs.text).toContain("HbA1c");
     expect(labs.text).toContain("test,value,unit");
-    const clinical = await api.get(`/api/reports/clinical-summary?patientId=${PATIENT}&format=json`).set(bearer(patientToken)).expect(200);
+    const clinical = await api.get(`/api/reports/clinical-summary?patientId=${PATIENT}&format=json`).set(bearer(doctorToken)).expect(200);
     expect(clinical.body.disclaimer || clinical.body.text).toBeTruthy();
     const population = await api.get("/api/reports/population?format=json").set(bearer(hospitalToken)).expect(200);
     expect(population.body.generatedAt).toBeTruthy();

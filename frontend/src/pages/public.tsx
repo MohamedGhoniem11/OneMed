@@ -337,9 +337,11 @@ export function EmergencyPage() {
     setChat(p=>[...p,{role:'user',text}]); setMsg('');
     try {
       const r = await api.emergencyChat(token, text, i18n.language==='ar'?'ar':'en');
-      setChat(p=>[...p,{role:'assistant', text:r.text, sources:r.sources, confidence:r.confidence, disclaimer:r.disclaimer}]);
+      setChat(p=>[...p,{role:'assistant', text:r.text, sources:r.sources, confidence:r.confidence, disclaimer:r.disclaimer,
+        scope:r.scope, mode:r.mode, error:r.error, retryable:r.retryable, followUp:r.followUp}]);
     } catch(e:any) { setChat(p=>[...p,{role:'assistant', text:e.message||t('serviceUnavailable')}]); }
   };
+  const lastQuestion = [...chat].reverse().find((c) => c.role === 'user')?.text || '';
   const report = (turn: ChatTurn) => void api.reportIssue({
     kind:'emergency_chat', message:t('issueReasonFirstAid'), source:turn.sources?.join(', ')||'emergency-chat',
   }).then(()=>toast(t('issueLogged'))).catch((e:any)=>toast(e.message,true));
@@ -463,6 +465,9 @@ export function EmergencyPage() {
           <div style={{whiteSpace:'pre-wrap'}}>{c.text}</div>
           {c.sources?.length?<div className="chat-sources">{c.sources.join(' · ')}</div>:null}
           {c.confidence && <Badge tone={c.confidence==='High'?'green':'amber'}>{t(c.confidence==='Knowledge Gap'?'knowledgeGapShort':String(c.confidence).toLowerCase())}</Badge>}
+          {c.error && <div className="alert red" role="alert">{c.error}
+            {c.retryable && lastQuestion && <button type="button" className="btn sm outline chat-report" onClick={()=>void send(lastQuestion)}>{t('retry')}</button>}</div>}
+          {c.role==='assistant' && c.disclaimer && <div className="chat-sources">{c.disclaimer}</div>}
           {c.role==='assistant' && <button type="button" className="btn sm outline chat-report" onClick={()=>report(c)}>{t('reportIssue')}</button>}
         </div>)}
       </div>

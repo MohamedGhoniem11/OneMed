@@ -3,6 +3,7 @@ import { httpError } from "../utils/http-error.js";
 import { auditRequest } from "./audit.service.js";
 import { resolveEmergency } from "./token.service.js";
 import { embed, generate, llmMode, offlineRank } from "./llm.service.js";
+import { classify, safeReply, systemRules } from "./ai-policy.service.js";
 
 const PATIENTS = "patients";
 const CHUNKS = "guidelineChunks";
@@ -81,12 +82,15 @@ function approvedContext(patient) {
   return parts.join(". ") + ".";
 }
 
-const SYSTEM_PROMPT = `You are a first-aid guidance assistant on a public emergency page. The person using you is NOT a medical professional.
-ALWAYS begin your answer with: "Call emergency services (123) immediately if you have not already."
-Use simple, non-medical language and short numbered steps, one sentence per step.
-Use ONLY the provided guideline context. NEVER diagnose, NEVER recommend medications, NEVER suggest procedures beyond basic first aid.
-If the context does not cover the situation, reply exactly: "I cannot provide guidance for this situation. Please wait for emergency services."
-Always end with: "This guidance is for temporary assistance only until professional help arrives." and cite the source.`;
+function systemPrompt(language) {
+  const lead = language === "ar"
+    ? 'ابدأ دائماً بـ: "اتصل بخدمات الطوارئ (١٢٣) فوراً إن لم تكن قد فعلت ذلك."'
+    : 'ALWAYS begin your answer with: "Call emergency services (123) immediately if you have not already."';
+  const tail = language === "ar"
+    ? 'اختم بـ: "هذه إرشادات مؤقتة حتى وصول المساعدة المتخصصة." واذكر المصدر.'
+    : 'End with: "This guidance is for temporary assistance only until professional help arrives." and cite the source.';
+  return `${systemRules("public-first-aid", language)} ${lead} Use short numbered steps, one sentence per step, based ONLY on the supplied guideline context. If the context does not cover the question, ask one short follow-up; never refuse a possible emergency and always tell the user to call 123. ${tail}`;
+}
 
 function confidenceFor(topScore, mode = llmMode()) {
   if (mode === "offline") {
@@ -117,6 +121,25 @@ export async function chat(token, message, { req, language = "en" } = {}) {
   }
   const context = approvedContext({ ...patient, name: await displayName(patient) });
   const mode = llmMode();
+  const disclaimer = language === "ar"
+    ? "إرشادات إسعافات أولية فقط، وليست بديلاً عن الرعاية الطبية. اتصل بالإسعاف (١٢٣)."
+    : "First-aid guidance only, not a substitute for professional medical care. Call emergency services (123).";
+  const decision = classify(message, "public-first-aid");
+  if (decision.scope !== "first_aid") {
+    const text = decision.scope === "emergency"
+      ? safeReply("emergency", language)
+      : decision.scope === "unclear" ? safeReply("unclear", language) : safeReply("firstAidOutOfScope", language);
+    const response = {
+      text, confidence: decision.scope === "emergency" ? "High" : "Knowledge Gap",
+      sources: [], disclaimer, mode: "policy", scope: decision.scope, followUp: decision.followUp,
+    };
+    await auditRequest(req, {
+      action: "emergency_chat", resourceType: "emergency", resourceId: record.id, patientId: patient.id,
+      actorId: null, actorRole: "public",
+      metadata: { scope: decision.scope, mode: "policy", language },
+    });
+    return response;
+  }
   let hits;
   if (mode === "offline") {
     const all = await getStore().query(CHUNKS, { limit: 500 });
@@ -127,28 +150,32 @@ export async function chat(token, message, { req, language = "en" } = {}) {
   }
   const model = mode === "gemini" ? process.env.GEMINI_EMBEDDING_MODEL : "offline-256";
   const minScore = mode === "offline" ? 0.12 : 0.28;
-  const chunks = hits.filter((h) => (mode === "offline" || (h.embeddingModel || "") === model) && h.score > minScore && h.language === language);
+  const chunks = hits
+    .filter((h) => (mode === "offline" || (h.embeddingModel || "") === model) && h.score > minScore
+      && (h.language === language || (language === "ar" && h.language === "en")))
+    .sort((a, b) => (a.language === language ? 0 : 1) - (b.language === language ? 0 : 1));
   const confidence = confidenceFor(chunks[0]?.score || 0, mode);
 
   let text;
+  let degraded = false;
+  let result;
   if (confidence === "Knowledge Gap") {
-    text = language === "ar"
-      ? "لا أستطيع تقديم إرشادات لهذه الحالة. يرجى انتظار الإسعاف."
-      : "I cannot provide guidance for this situation. Please wait for emergency services.";
+    text = safeReply("knowledgeGap", language);
   } else {
     const sources = chunks.map((c, i) => `[${i + 1}] ${c.source} - ${c.section}\n${c.text}`).join("\n\n");
-    const prompt = `Bystander question: ${message}\n\nApproved patient context: ${context}\n\nGuideline context:\n${sources}\n\nAnswer in ${language === "ar" ? "Arabic" : "English"}.`;
-    let result;
+    const prompt = `Bystander question: ${message}\n\nApproved patient context: ${context}\n\nGuideline context:\n${sources}\n\nAnswer in ${language === "ar" ? "Arabic (keep medicine names in Latin script)" : "English"}.`;
     try {
-      result = await generate({ system: SYSTEM_PROMPT, prompt });
+      result = await generate({ system: systemPrompt(language), prompt, maxOutputTokens: 1600 });
+      if (mode === "gemini" && !result.text) degraded = true;
     } catch {
-      // A cloud generation failure (timeout, safety block, 5xx) must never
-      // turn a public emergency request into a 500 - fall back to cited steps.
-      result = { text: "", mode: "offline" };
+      // Cloud failure must not turn an emergency request into a 500, but the
+      // response must be labelled as a fallback and offer a retry.
+      degraded = true;
     }
-    text = result.text || offlineAnswer(chunks, context, language);
-    if (result.mode === "gemini" && !text.includes("123") && !text.includes("١٢٣")) {
+    text = result?.text || offlineAnswer(chunks, context, language);
+    if (result?.mode === "gemini" && !text.includes("123") && !text.includes("١٢٣")) {
       text = offlineAnswer(chunks, context, language);
+      degraded = true;
     }
   }
 
@@ -156,10 +183,13 @@ export async function chat(token, message, { req, language = "en" } = {}) {
     text,
     confidence,
     sources: chunks.map((c) => `${c.source} - ${c.section}`),
-    disclaimer: language === "ar"
-      ? "إرشادات إسعافات أولية فقط، وليست بديلاً عن الرعاية الطبية. اتصل بالإسعاف (١٢٣)."
-      : "First-aid guidance only, not a substitute for professional medical care. Call emergency services (123).",
-    mode: llmMode(),
+    disclaimer,
+    mode: degraded ? "fallback" : (result?.mode || llmMode()),
+    scope: decision.scope,
+    ...(degraded ? {
+      error: language === "ar" ? "تعذّر الاتصال بخدمة الذكاء الاصطناعي. يمكنك إعادة المحاولة." : "The AI service is temporarily unavailable. Please retry.",
+      retryable: true,
+    } : {}),
   };
   await auditRequest(req, {
     action: "emergency_chat",
@@ -168,7 +198,7 @@ export async function chat(token, message, { req, language = "en" } = {}) {
     patientId: patient.id,
     actorId: null,
     actorRole: "public",
-    metadata: { confidence, sources: response.sources, mode: llmMode() },
+    metadata: { confidence, sources: response.sources, mode: response.mode, scope: decision.scope, degraded, language },
   });
   return response;
 }

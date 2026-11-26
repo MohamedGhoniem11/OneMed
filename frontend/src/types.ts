@@ -47,5 +47,5 @@ export interface Conversation { id: string; patientId: string; otherUserId: stri
 export interface Notification { id: string; userId: string; title: string; body: string; type: 'lab' | 'message' | 'prescription' | 'system'; read: boolean; createdAt: string }
 export interface AuditEntry { id: string; patientId?: string; actor: string; actorName: string; action: string; resource: string; timestamp: string; ip: string; hash: string; previousHash: string }
 export interface GuidelineChunk { id: string; text: string; source: string; section: string; tags: string[]; language: Lang; version: string }
-export interface ChatTurn { role: 'user' | 'assistant'; text: string; sources?: string[]; confidence?: 'High' | 'Moderate' | 'Low' | 'Knowledge Gap'; disclaimer?: string }
+export interface ChatTurn { role: 'user' | 'assistant'; text: string; sources?: string[]; confidence?: 'High' | 'Moderate' | 'Low' | 'Knowledge Gap'; disclaimer?: string; scope?: string; mode?: string; error?: string; retryable?: boolean; followUp?: boolean }
 export interface Session { token: string; refreshToken?: string; user: User; expiresAt: string }

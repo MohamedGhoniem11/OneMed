@@ -3,12 +3,11 @@ import { httpError } from "../utils/http-error.js";
 import { valuesOf, dateOf } from "../utils/clinical-values.js";
 import { embed, generate, llmMode, offlineRank, cosine } from "./llm.service.js";
 import { auditRequest } from "./audit.service.js";
+import { classify, policyFor, safeReply, systemRules } from "./ai-policy.service.js";
 
-const SYSTEM = `You are a clinical navigation assistant inside a doctor's patient record.
-Use ONLY the structured patient facts and guideline excerpts supplied in the prompt.
-Summarise, retrieve and compare - never diagnose, never prescribe, never recommend treatment or medication.
-If the supplied context is insufficient, reply exactly: "I cannot answer from the available patient data. Please review the source records."
-Use short bullet-like sentences and end with: "Decision-support only. The treating doctor remains responsible for clinical decisions."`;
+function systemPrompt(language) {
+  return `${systemRules("doctor-navigation", language)} Use ONLY the structured patient facts and supplied guideline excerpts. Summarise, retrieve and compare. If a fact is missing, say so and name what is missing instead of inventing data. Keep medicine names in Latin script. End with: "Decision-support only. The treating doctor remains responsible for clinical decisions."`;
+}
 
 function confidenceLabel(score) {
   if (score >= 0.75) return "High";
@@ -51,6 +50,24 @@ const DISCLAIMER = "Decision-support only. The treating doctor remains responsib
 export async function doctorChat(req, patientId, message, language = "en") {
   const text = String(message || "").trim();
   if (!text) throw httpError(400, "A message is required");
+  if (!policyFor(req, "doctor-navigation")) throw httpError(403, "Doctor role required for this assistant");
+  const decision = classify(text, "doctor-navigation");
+  if (decision.scope !== "record_query") {
+    const replyKind = decision.scope === "emergency" ? "emergency"
+      : decision.scope === "bounded" ? "doctorBoundary"
+        : decision.scope === "unclear" ? "unclear" : "doctorOutOfScope";
+    const response = {
+      role: "assistant", text: safeReply(replyKind, language),
+      confidence: decision.scope === "emergency" ? "High" : "Knowledge Gap",
+      sources: [], disclaimer: DISCLAIMER, mode: "policy", scope: decision.scope,
+      followUp: decision.followUp, isKnowledgeGap: decision.scope !== "emergency",
+    };
+    await auditRequest(req, {
+      action: "doctor_ai_query", resourceType: "ai", resourceId: patientId, patientId,
+      purpose: "scope_decision", metadata: { scope: decision.scope, mode: "policy", language },
+    });
+    return response;
+  }
   const context = await patientContext(patientId);
   const chunksPage = await getStore().query("guidelineChunks", { limit: 500 });
   const chunks = chunksPage.items;
@@ -68,26 +85,28 @@ export async function doctorChat(req, patientId, message, language = "en") {
   }
   const relevant = hits.filter((chunk) => chunk.language === language || chunk.language === "en").slice(0, 5);
   const topScore = relevant[0]?.score || 0;
-  const hasNumbers = context.observations.some((o) => o.values.some((v) => typeof v.value === "number"));
-  const score = 0.4 * Math.min(1, topScore / 0.5) + (hasNumbers ? 0.2 : 0.05) + 0.2 + (mode === "gemini" ? 0.2 : 0.1);
-  const confidence = confidenceLabel(score);
+  const confidence = relevant.length ? confidenceLabel(topScore) : "Knowledge Gap";
   const sources = relevant.map((chunk) => `${chunk.source} §${chunk.section}`);
   const gap = confidence === "Knowledge Gap" || relevant.length === 0;
   const facts = JSON.stringify(context, null, 2);
   const excerpts = relevant.map((c) => `[${c.source} §${c.section}] ${c.text}`).join("\n");
-  const prompt = `Doctor's question: ${text}\n\nPatient facts (JSON):\n${facts}\n\nGuideline excerpts:\n${excerpts || "none retrieved"}`;
+  const prompt = `Doctor's question: ${text}\n\nPatient facts (JSON):\n${facts}\n\nGuideline excerpts:\n${excerpts || "none retrieved"}\n\nAnswer in ${language === "ar" ? "Arabic (keep medicine names in Latin script)" : "English"}.`;
 
   let answer;
+  let degraded = false;
+  let result;
   if (gap) {
-    answer = "I cannot answer from the available patient data. Please review the source records.";
+    answer = language === "ar"
+      ? "لا توجد بيانات مسجّلة كافية للإجابة. اسأل عن نتيجة تحليل أو دواء أو حساسية مسجّلة."
+      : "There is not enough recorded data to answer that. Ask about a recorded lab value, medicine or allergy.";
   } else if (mode === "gemini") {
-    let generated = "";
     try {
-      generated = (await generate({ system: SYSTEM, prompt, maxOutputTokens: 600 })).text || "";
+      result = await generate({ system: systemPrompt(language), prompt, maxOutputTokens: 1600 });
+      answer = result.text || "";
+      if (!answer && mode === "gemini") degraded = true;
     } catch {
-      // Cloud failure degrades to the same deterministic extractive fallback.
+      degraded = true;
     }
-    answer = generated;
   }
   if (!answer) {
     // Deterministic extractive answer: quote the retrieved facts, no invention.
@@ -110,7 +129,7 @@ export async function doctorChat(req, patientId, message, language = "en") {
     resourceId: patientId,
     patientId,
     purpose: "clinical_navigation",
-    metadata: { confidence, sources, mode, questionLength: text.length },
+    metadata: { confidence, sources, mode: degraded ? "fallback" : mode, scope: decision.scope, questionLength: text.length, language },
   });
 
   return {
@@ -119,7 +138,12 @@ export async function doctorChat(req, patientId, message, language = "en") {
     confidence,
     sources,
     disclaimer: DISCLAIMER,
-    mode,
+    mode: degraded ? "fallback" : (result?.mode || mode),
+    scope: decision.scope,
+    ...(degraded ? {
+      error: language === "ar" ? "تعذّر الاتصال بخدمة الذكاء الاصطناعي. يمكنك إعادة المحاولة." : "The AI service is temporarily unavailable. Please retry.",
+      retryable: true,
+    } : {}),
     isKnowledgeGap: gap,
   };
 }

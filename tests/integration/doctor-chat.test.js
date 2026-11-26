@@ -10,7 +10,7 @@ const P = "chat_patient";
 const D = "chat_doctor";
 const X = "chat_stranger";
 
-let doctor, stranger;
+let doctor, stranger, patient;
 
 beforeAll(async () => {
   const store = getStore();
@@ -35,9 +35,10 @@ beforeAll(async () => {
     language: "en", text: "Sit the person upright, loosen tight clothing and call emergency services if breathing worsens.",
     tags: ["breathing", "asthma"], embedding: new Array(64).fill(0).map((_, i) => i % 3 ? 0.01 : -0.01), version: "2024",
   });
-  [doctor, stranger] = (await Promise.all([
+  [doctor, stranger, patient] = (await Promise.all([
     createSession({ id: D, role: "doctor", email: "d@chat.test" }, { mfa: true }),
     createSession({ id: X, role: "doctor", email: "x@chat.test" }, { mfa: true }),
+    createSession({ id: P, role: "patient", email: "p@chat.test" }),
   ])).map((s) => s.accessToken);
 });
 
@@ -55,6 +56,33 @@ describe("Doctor-facing patient-scoped RAG assistant", () => {
   it("refuses a stranger without consent", async () => {
     await api.post(`/api/analytics/clinical/${P}/chat`)
       .set(bearer(stranger)).send({ message: "summarise the patient" }).expect(403);
+  });
+
+  it("denies the doctor assistant to patients", async () => {
+    await api.post(`/api/analytics/clinical/${P}/chat`)
+      .set(bearer(patient)).send({ message: "summarise my lab results" }).expect(403);
+  });
+
+  it("bounds diagnosis requests and politely declines unrelated questions", async () => {
+    const rx = await api.post(`/api/analytics/clinical/${P}/chat`)
+      .set(bearer(doctor)).send({ message: "Diagnose the patient and prescribe drug doses", language: "en" }).expect(200);
+    expect(rx.body.scope).toBe("bounded");
+    expect(rx.body.text).toContain("I do not diagnose or prescribe");
+    const weather = await api.post(`/api/analytics/clinical/${P}/chat`)
+      .set(bearer(doctor)).send({ message: "What is the weather in Cairo tomorrow?", language: "en" }).expect(200);
+    expect(weather.body.scope).toBe("out_of_scope");
+    expect(weather.body.text).toContain("recorded information");
+  });
+
+  it("never refuses a possible emergency and answers Arabic in Arabic", async () => {
+    const em = await api.post(`/api/analytics/clinical/${P}/chat`)
+      .set(bearer(doctor)).send({ message: "The patient is not breathing, help!", language: "en" }).expect(200);
+    expect(em.body.scope).toBe("emergency");
+    expect(em.body.text).toContain("123");
+    const ar = await api.post(`/api/analytics/clinical/${P}/chat`)
+      .set(bearer(doctor)).send({ message: "لخّص نتائج التحاليل المسجلة", language: "ar" }).expect(200);
+    expect(["record_query", "unclear"]).toContain(ar.body.scope);
+    expect(ar.body.disclaimer).toContain("responsible for clinical decisions");
   });
 
   it("rejects empty messages and audits every query", async () => {

@@ -3,6 +3,7 @@ import { httpError } from "../utils/http-error.js";
 import { canReadPatient } from "../middleware/consent.js";
 import { generate, llmMode } from "./llm.service.js";
 import { valuesOf, dateOf } from "../utils/clinical-values.js";
+import { policyFor, systemRules } from "./ai-policy.service.js";
 
 const RECORDS = "records";
 const PRESCRIPTIONS = "prescriptions";
@@ -35,6 +36,7 @@ export async function clinicalSummary(req, patientId) {
   const patient = await getStore().get("patients", patientId);
   if (!patient) throw httpError(404, "Patient not found");
   await canReadPatient(req, patientId, { scope: "records" });
+  if (!policyFor(req, "clinical-summary")) throw httpError(403, "Doctor role required for clinical summary");
 
   const recordsPage = await getStore().query(RECORDS, {
     where: [{ field: "patientId", op: "==", value: patientId }],
@@ -62,16 +64,19 @@ export async function clinicalSummary(req, patientId) {
     prescriptions: prescriptions.slice(0, 10).map((rx) => ({ status: rx.status, items: rx.items || rx.medicines || [] })),
   };
   let text = offlineSummary(facts);
+  let degraded = false;
   if (llmMode() === "gemini") {
     try {
       const result = await generate({
-        system: SUMMARY_SYSTEM,
+        system: `${SUMMARY_SYSTEM} ${systemRules("clinical-summary")}`,
         prompt: `Patient data (JSON):\n${JSON.stringify(facts, null, 2)}\n\nSummarize for clinical navigation.`,
-        maxOutputTokens: 700,
+        maxOutputTokens: 1200,
       });
       if (result.text && result.text.toLowerCase().includes("not medical advice")) text = result.text;
+      else degraded = true;
     } catch {
-      // Deterministic summary above remains the safe fallback.
+      // Deterministic summary remains the safe fallback, but is labelled as such.
+      degraded = true;
     }
   }
 
@@ -81,7 +86,8 @@ export async function clinicalSummary(req, patientId) {
     text,
     confidence,
     sources,
-    mode: llmMode(),
+    mode: degraded ? "fallback" : llmMode(),
+    ...(degraded ? { error: "The AI service is temporarily unavailable. Please retry.", retryable: true } : {}),
     disclaimer: "AI-generated navigation aid only. Not medical advice.",
   };
 }

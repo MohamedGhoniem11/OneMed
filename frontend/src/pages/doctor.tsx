@@ -63,7 +63,8 @@ export function PatientViewer() {
   const contact = () => (patient as any)?.emergencyContact || (patient as any)?.emergencyContacts?.[0] || null;
   const fmt = (v:any) => v ? new Intl.DateTimeFormat(i18n.language||'en',{dateStyle:'medium',timeStyle:'short'}).format(new Date(v)) : '-';
   const filtered = records.filter(r=>type==='all'||r.type===type);
-  const send = async () => { if(!msg.trim()) return; const question=msg; setChat(c=>[...c,{role:'user',text:question}]); setMsg('');
+  const lastQuestion = [...chat].reverse().find((c) => c.role === 'user')?.text || '';
+  const send = async (override?: string) => { const question=(override ?? msg).trim(); if(!question) return; setChat(c=>[...c,{role:'user',text:question}]); setMsg('');
     try { const r=await api.doctorChat(id,question,i18n.language); setChat(c=>[...c,r]); }
     catch(e:any){ setChat(c=>[...c,{role:'assistant',text:e.message||t('assistantUnavailable')}]); } };
   const series = records.filter(r=>r.values?.some(v=>v.name==='HbA1c')).map(r=>({date:new Intl.DateTimeFormat(i18n.language||'en',{month:'short'}).format(new Date(r.date)),value:r.values!.find(v=>v.name==='HbA1c')!.value}));
@@ -108,7 +109,15 @@ export function PatientViewer() {
     <div style={{display:'flex',gap:8,marginTop:16}}><button className="btn outline" onClick={()=>setAiOpen(true)}><Bot size={16}/> {t('aiAssistant')}</button><button className="btn outline" onClick={()=>setOverride(true)}>{t('emergencyOverride')}</button></div>
     {aiOpen && <Modal title={t('aiAssistant')} onClose={()=>setAiOpen(false)}><div className="alert blue">{t('aiDisclaimer')}</div>
       <div className="disclaimer" style={{marginBottom:8}}>{t('scopedTo', {name:patient?.name||t('thisPatient')})}</div>
-      <div className="chat-log" aria-live="polite">{chat.map((c,i)=><div key={i} className={`msg ${c.role==='user'?'me':''}`}><div style={{whiteSpace:'pre-wrap'}}>{c.text}</div>{c.confidence&&<div style={{marginTop:6}}><Badge tone={c.confidence==='High'?'green':c.confidence==='Knowledge Gap'?'gray':'amber'}>{t(c.confidence==='Knowledge Gap'?'knowledgeGapShort':String(c.confidence).toLowerCase())}</Badge></div>}{(c.sources||[]).length>0&&<div style={{fontSize:11,marginTop:6,opacity:.75}}>{(c.sources||[]).join(' · ')}</div>}{c.role==='assistant'&&<button className="btn sm outline" style={{marginTop:8}} onClick={()=>void api.reportIssue({kind:'doctor_chat',message:t('reportIssueReason'),source:(c.sources||[]).join(', ')||'doctor-chat'}).then(()=>toast(t('issueLogged'))).catch((e:any)=>toast(e.message,true))}>{t('reportIssue')}</button>}</div>)}</div>
+      <div className="chat-log" aria-live="polite">{chat.map((c,i)=><div key={i} className={`msg ${c.role==='user'?'me':''}`}>
+        <div style={{whiteSpace:'pre-wrap'}}>{c.text}</div>
+        {c.confidence&&<div style={{marginTop:6}}><Badge tone={c.confidence==='High'?'green':c.confidence==='Knowledge Gap'?'gray':'amber'}>{t(c.confidence==='Knowledge Gap'?'knowledgeGapShort':String(c.confidence).toLowerCase())}</Badge></div>}
+        {(c.sources||[]).length>0&&<div style={{fontSize:11,marginTop:6,opacity:.75}}>{(c.sources||[]).join(' · ')}</div>}
+        {c.error&&<div className="alert red" role="alert" style={{marginTop:8}}>{c.error}
+          {c.retryable&&lastQuestion&&<button className="btn sm outline" style={{marginTop:6}} onClick={()=>void send(lastQuestion)}>{t('retry')}</button>}</div>}
+        {c.role==='assistant'&&c.disclaimer&&<div style={{fontSize:11,marginTop:6,opacity:.75}}>{c.disclaimer}</div>}
+        {c.role==='assistant'&&<button className="btn sm outline" style={{marginTop:8}} onClick={()=>void api.reportIssue({kind:'doctor_chat',message:t('reportIssueReason'),source:(c.sources||[]).join(', ')||'doctor-chat'}).then(()=>toast(t('issueLogged'))).catch((e:any)=>toast(e.message,true))}>{t('reportIssue')}</button>}
+      </div>)}</div>
       <div style={{display:'flex',gap:8,marginTop:10}}><input className="input" aria-label={t('askAboutPatient')} value={msg} onChange={e=>setMsg(e.target.value)} placeholder={t('askAboutPatient')} onKeyDown={e=>{if(e.key==='Enter')void send();}}/><button className="btn primary" disabled={!msg.trim()} onClick={()=>void send()}>{t('send')}</button></div></Modal>}
     {override && <Modal title={t('emergencyOverride')} onClose={()=>setOverride(false)} footer={<><button className="btn outline" onClick={()=>setOverride(false)}>{t('cancel')}</button><button className="btn danger" onClick={async()=>{ if(reason.trim().length<10) return toast(t('justificationRequired'),true); try { const r=await api.emergencyOverride(id,reason); setOverrideResult(r); toast(t('overrideLogged')); setOverride(false); setReason(''); } catch(e:any) { toast(e.message,true); } }}>{t('confirm')}</button></>}><Field label={t('writtenJustification')}><textarea className="input" rows={3} value={reason} onChange={e=>setReason(e.target.value)} placeholder={t('justificationPlaceholder')}/></Field><p className="disclaimer">{t('overrideDisclaimer')}</p></Modal>}
   </>;
