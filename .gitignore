@@ -21,3 +21,7 @@ coverage/
 # logs
 *.log
 npm-debug.log*
+
+# Playwright artifacts
+frontend/playwright-report/
+frontend/test-results/
