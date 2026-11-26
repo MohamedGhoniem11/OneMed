@@ -18,8 +18,10 @@ if (env.trustProxy) app.set("trust proxy", env.trustProxy);
 app.use(requestId);
 app.use(
   helmet({
-    // The API only serves JSON; the frontend is deployed separately.
-    contentSecurityPolicy: false,
+    // API-only: no executable content, no inline scripts, no framing.
+    contentSecurityPolicy: { directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } },
+    referrerPolicy: { policy: "no-referrer" },
+    hsts: { maxAge: 31_536_000, includeSubDomains: true, preload: true },
   }),
 );
 
