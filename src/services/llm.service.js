@@ -97,7 +97,7 @@ export function cosine(a, b) {
 }
 
 /** Grounded generation. The system prompt enforces the medical safety boundaries. */
-export async function generate({ system, prompt, maxOutputTokens = 500 }) {
+export async function generate({ system, prompt, maxOutputTokens = 1600 }) {
   if (env.llmDriver === "cloud") {
     const result = await cloudCall("generate", { system, prompt, maxOutputTokens });
     return { text: result.text || "", mode: "gemini-cloud" };

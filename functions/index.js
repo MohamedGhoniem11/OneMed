@@ -16,7 +16,7 @@ setGlobalOptions({ region: "europe-west1", maxInstances: 10, timeoutSeconds: 30 
 
 const ALLOWED = (process.env.CORS_ORIGINS || "").split(",").map((s) => s.trim()).filter(Boolean);
 const GEMINI_KEY = process.env.GEMINI_API_KEY || "";
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+const MODEL = process.env.GEMINI_MODEL || "gemini-3.5-flash-lite";
 const EMBED_MODEL = process.env.GEMINI_EMBEDDING_MODEL || "gemini-embedding-001";
 
 function cors(req, res) {
