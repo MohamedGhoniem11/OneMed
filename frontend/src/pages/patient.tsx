@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import {
   CartesianGrid, Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis,
-  Legend, BarChart, Bar,
+  Legend, BarChart, Bar, RadialBarChart, RadialBar, Cell,
 } from 'recharts';
 import * as api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
@@ -74,16 +74,21 @@ export function PatientAnalytics() {
   const { session } = useAuth(); const { t } = useTranslation(); const {toast}=useToast();
   const pid = session!.user.uid;
   const [analytics,setAnalytics]=useState<any>(null);
+  const [imaging,setImaging]=useState<MedicalRecord[]>([]);
+  const [showRanges,setShowRanges]=useState(false);
   const [view,setView] = useState('analytics');
-  useEffect(()=>{ void api.patientAnalytics(pid).then(setAnalytics).catch(()=>{}); },[pid]);
+  useEffect(()=>{ void api.patientAnalytics(pid).then(setAnalytics).catch(()=>{}); void api.listRecords(pid,'imaging').then(setImaging).catch(()=>{}); },[pid]);
   const ind:any = analytics?.indicators || {};
   const bp = analytics?.bloodPressure || [];
   const a1c = (analytics?.labTrends||[]).filter((x:any)=>x.HbA1c!=null).map((x:any)=>({date:x.date,value:x.HbA1c}));
   const lipids:any[] = analytics?.lipidPanel || [];
   const meds:any[] = analytics?.medications || [];
   const toneOf = (v:any)=>v?.flag==='high'?'red':v?.flag==='low'?'amber':'green';
+  const visits = Object.entries(analytics?.visits||{}).map(([month,count])=>({month,count:Number(count)}));
+  const comparison = (analytics?.labTrends||[]).map((x:any)=>({date:x.date,HbA1c:x.HbA1c,Glucose:x.Glucose||x['Glucose, Fasting'],Creatinine:x.Creatinine}));
+  const plainTrend = (ind.hba1c?.flag==='high'||ind.systolic?.flag==='high') ? t('trendWatch') : t('trendStable');
   const dl = async(type:string,format:string)=>{ try{ await api.downloadReport(type,{patientId:pid,format}); toast(t('saved')); }catch(e:any){ toast(e.message,true); } };
-  return <><PageHead title={t('patientAnalytics')} subtitle={t('comprehensiveHealth')} actions={<button className="btn outline" onClick={()=>void dl('history','pdf')}><Download size={16}/> {t('exportPdf')}</button>}/>
+  return <><PageHead title={t('patientAnalytics')} subtitle={plainTrend} actions={<><button className="btn outline" onClick={()=>setShowRanges(v=>!v)}>{showRanges?t('hideRanges'):t('showRanges')}</button><button className="btn outline" onClick={()=>void dl('history','pdf')}><Download size={16}/> {t('exportPdf')}</button></>}/>
     <SectionTabs tabs={[{id:'overview',label:t('overview')},{id:'analytics',label:t('analytics')},{id:'reports',label:t('reports')}]} active={view} onChange={setView}/>
     {view==='reports' ? <Card title={t('yourHealthReports')}><p style={{color:'var(--muted)'}}>{t('reportsIntro')}</p>
       <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
@@ -114,6 +119,12 @@ export function PatientAnalytics() {
       {lipids.length?lipids.map((v:any)=><div className="lipid-row" key={v.name}><span className="lipid-name">{v.name}</span><span className="lipid-track"><i className="lipid-fill" style={{width:`${Math.min(100,(v.value||0)/3)}%`,background:toneOf(v)==='red'?'var(--red)':toneOf(v)==='green'?'var(--green)':'var(--amber)'}}/></span><span className="lipid-val">{v.value??'-'} {v.unit||''}</span></div>):<Empty message={t('noLipidResults')}/>}
     </Card>
     <Card title={t('medicationTimeline')} style={{marginTop:16}}><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('medicine')}</th><th>{t('dosage')}</th><th>{t('status')}</th></tr></thead><tbody>{meds.map((m:any,i:number)=><tr key={i}><td>{m.name}</td><td>{m.dosage||m.dose||'-'}</td><td><Badge tone={m.status==='confirmed'?'green':'amber'}>{t(m.status||'recorded')}</Badge></td></tr>)}</tbody></table>{!meds.length&&<Empty/>}</div></Card>
+    <div className="grid cols-2" style={{marginTop:16}}>
+      <Card title={t('visitFrequency')}><ResponsiveContainer width="100%" height={220}><BarChart data={visits}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="month"/><YAxis allowDecimals={false}/><Tooltip/><Bar dataKey="count" fill="#006a61"/></BarChart></ResponsiveContainer>{!visits.length&&<Empty message={t('noRecords')}/>}</Card>
+      <Card title={t('testComparison')}><ResponsiveContainer width="100%" height={220}><BarChart data={comparison}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="date"/><YAxis/><Tooltip/><Legend/><Bar dataKey="HbA1c" fill="#d99219"/>{showRanges&&<><Bar dataKey="Glucose" fill="#006a61"/><Bar dataKey="Creatinine" fill="#0f9d6e"/></>}</BarChart></ResponsiveContainer>{!comparison.length&&<Empty message={t('noRecords')}/>}</Card>
+    </div>
+    <Card title={t('healthScore')} style={{marginTop:16}}><div style={{display:'flex',alignItems:'center',gap:24}}><ResponsiveContainer width={180} height={180}><RadialBarChart innerRadius="70%" outerRadius="100%" data={[{name:t('healthScore'),value:analytics?.healthScore||0,fill:'#0f9d6e'}]} startAngle={90} endAngle={-270}><RadialBar dataKey="value" cornerRadius={8}/><Cell fill="#e7f6f3"/></RadialBarChart></ResponsiveContainer><div><strong style={{fontSize:32}}>{analytics?.healthScore??'-'}%</strong><p style={{color:'var(--muted)'}}>{t('indicatorsInRange')}</p><a href="https://www.who.int/news-room/fact-sheets/detail/diabetes" target="_blank" rel="noreferrer" className="btn sm outline">{t('education')}</a></div></div></Card>
+    <Card title={t('imagingTimeline')} style={{marginTop:16}}>{imaging.length?<div className="timeline">{imaging.map(r=><div key={r.id} className="timeline-item"><Badge tone="blue">{r.type}</Badge> <strong>{r.title}</strong><div style={{fontSize:12,color:'var(--muted)'}}>{new Date(r.date).toLocaleDateString()}</div></div>)}</div>:<Empty message={t('noImaging')}/>}</Card>
     <Card title={t('conditionSummary')} style={{marginTop:16}}><div className="grid cols-4">{[...(analytics?.conditions||[]), `HbA1c ${ind.hba1c?.value??'-'}`, `BP ${ind.systolic?.value??'-'}/${ind.diastolic?.value??'-'}`].map((label,i)=><div key={i} className="alert" style={{background:'#fff',padding:12}}><Badge tone={i>=(analytics?.conditions||[]).length?toneOf(i===(analytics?.conditions||[]).length?ind.hba1c:ind.systolic) as any:'red'}>{label}</Badge></div>)}</div></Card>
     </>}
   </>;
