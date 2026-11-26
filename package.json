@@ -42,6 +42,7 @@
     "multer": "^2.5.0",
     "otplib": "^13.6.0",
     "pdfjs-dist": "^6.5.438",
+    "pdfkit": "^0.21.0",
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
