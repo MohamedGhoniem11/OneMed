@@ -1,7 +1,10 @@
 import { loadDB, saveDB, findUserByEmail, DEMO_PASSWORDS, roleHome } from '../data/demo';
 import type { Role, User, Session, Patient, MedicalRecord, Prescription, Pharmacy, Institution, Consent, EmergencyProfile, Conversation, Message, Notification, AuditEntry, ChatTurn, EmergencySettings } from '../types';
 
-export const API_MODE = (import.meta.env.VITE_API_MODE as string) || 'demo';
+// Production never uses browser demo data or demo credentials.
+export const API_MODE = import.meta.env.PROD
+  ? 'api'
+  : ((import.meta.env.VITE_API_MODE as string) || 'demo');
 const BASE = (import.meta.env.VITE_API_URL as string) || '/api';
 
 export class ApiError extends Error { constructor(public status: number, msg: string) { super(msg); } }

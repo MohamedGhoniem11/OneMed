@@ -1,433 +1,103 @@
-# OneMed
+# OneMed — Unified Medical Data Platform
 
-**Unified Medical Data Platform & AI Diagnostic Assistant**
+Bilingual (Arabic/English) healthcare connectivity demo: patient timelines, consent-gated clinical access, lab ingestion, prescription extraction and pharmacy fulfillment, emergency QR/NFC pages with grounded first-aid guidance, analytics, reports and role-based portals for six roles.
 
-OneMed bridges fragmented healthcare data across Egyptian hospitals, laboratories,
-and pharmacies. Hospitals and labs push patient data (test results, scans, full
-history) into a centralized secure profile; authorized doctors retrieve a complete
-patient history in under 5 seconds via NFC tap, QR scan, or National ID lookup.
+> Academic graduation project. Production deployment requires Firebase Blaze credentials supplied through environment variables; no secrets are included in this repository.
 
-> Graduation Project — Alexandria University, Faculty of Computers and Data Science
-> (2025–2026)
+## Features
 
-> **Status:** an audited academic demo. All documented portals, public pages,
-> REST APIs, bilingual UI, reports, analytics and seeded demo data are
-> implemented. Aspirational NFRs (uptime, large-scale load, Egypt data-centre
-> hosting, third-party pen test) and a few deployment-dependent features are
-> listed as limitations in [docs/AUDIT.md](docs/AUDIT.md).
+- Six roles: patient, doctor, lab staff, pharmacy, hospital admin, system admin.
+- Multi-format ingestion: PDF (digital text + scanned OCR), JPG/PNG, CSV/JSON/FHIR/DICOM metadata, manual entry; 50 MB cap; low-confidence manual review.
+- Signed QR connection (15 min), emergency QR/NFC capability links with expiry and revocation, public privacy-filtered emergency page.
+- Gemini-backed, grounded first-aid chatbot and doctor assistant with confidence, sources, disclaimers and Report Issue.
+- Prescription OCR/LLM extraction, mandatory doctor confirmation, 24-hour fulfillment links, GPS-sorted pharmacies and WhatsApp deep links.
+- In-app notifications with an FCM adapter, encrypted original uploads (AES-256-GCM), hash-chained audit log, reports (PDF/FHIR/CSV/JSON) and analytics.
+- PWA shell, RTL support, responsive navigation and Lighthouse 100/100/100 desktop baseline.
 
----
-
-## Quick start (no credentials required)
-
-Requires Node.js 20.19+ (Node 22 LTS recommended).
+## Quick start (no credentials)
 
 ```bash
 npm install
 cd frontend && npm install && cd ..
-npm run seed        # create empty demo DB + accounts BEFORE starting the API
-npm run dev:all     # API :3000 + frontend :5173 in API mode
+npm run seed          # create demo accounts and data BEFORE starting the API
+npm run dev:all       # API :3000 + UI :5173 in API mode
 ```
 
-The API starts at `http://localhost:3000` in **local demo mode**:
+Open <http://localhost:5173>. Health check: <http://localhost:3000/>.
 
-- file-backed persistence at `data/local-db.json`;
-- backend-issued 15-minute JWTs with scrypt-hashed local passwords;
-- a development signing secret generated once at `data/.jwt-secret`.
+Without `VITE_API_MODE=api` the UI runs in browser demo mode with localStorage data. Production builds always use API mode.
 
-`data/` is gitignored. This mode exists so the project runs on any clean machine
-and in CI. It is **not** a production deployment mode: use Firebase (below) and
-synthetic demo data only.
+### Demo accounts (from `npm run seed`)
 
-Health check:
+| Role | Email | Password |
+|---|---|---|
+| patient | mona.patient@example.com | Demo!onemed1 |
+| doctor | karim.doctor@example.com | Demo!onemedD1 |
+| lab staff | nadia.lab@example.com | Demo!onemedL1 |
+| pharmacy | pharmacy.desk@example.com | Demo!onemedP1 |
+| hospital admin | hany.admin@example.com | Demo!onemedH1 |
+| admin | admin.onemed@example.com | Demo!onemedA1 |
 
-```bash
-curl http://localhost:3000/
-# {"status":"ok","persistence":"local","authProvider":"local","time":"..."}
-```
+Staff roles require TOTP MFA; seeded secrets are written to `userMfa/{uid}`.
 
-### Demo data
+## Environment
 
-```bash
-npm run seed          # idempotent: 8 accounts, 3 patients, records, QR/NFC, KB
-```
+Copy `.env.example` to `.env`. Never commit real values.
 
-Test accounts are printed by `npm run seed` and are also listed in
-[Run instructions](#phase-2-quick-start). `npm run demo` walks 12 end-to-end
-flows against a running API.
+| Variable | Purpose |
+|---|---|
+| `NODE_ENV`, `PORT`, `HOST`, `TRUST_PROXY` | Runtime and reverse proxy |
+| `PERSISTENCE`, `AUTH_PROVIDER` | `firestore`/`local`, `firebase`/`local` |
+| `AUTH_JWT_SECRET`, `UPLOAD_ENCRYPTION_KEY` | Required in production (32/64 hex chars) |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` or `GOOGLE_APPLICATION_CREDENTIALS` | Firebase Admin credential |
+| `FIREBASE_PROJECT_ID`, `FIREBASE_API_KEY` | Project and Web API key (phone OTP) |
+| `FIREBASE_PHONE_AUTH` | Enables real Firebase phone OTP; required in production |
+| `FIREBASE_STORAGE_BUCKET`, `STORAGE_DRIVER=firebase` | Encrypted original uploads in Firebase Storage |
+| `LLM_DRIVER=cloud`, `FUNCTIONS_BASE_URL` | Gemini/RAG calls through Cloud Functions |
+| `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_EMBEDDING_MODEL` | Used by Cloud Functions (and direct local mode) |
+| `CORS_ORIGINS`, `PUBLIC_BASE_URL` | Allowed origins and links in QR messages |
+| `AUTH_OTP_DEV_DELIVERY` | Must be false in production |
+| `BACKUP_DIR`, `ARCHIVE_AFTER_DAYS` | Backup location and record archival threshold |
+| rate-limit/TTL variables | See `.env.example` for all defaults |
 
-### Frontend
+Production startup fails closed if any required variable is missing or demo delivery/rate-limit bypass is enabled.
 
-`npm run dev:all` starts both processes. To run only the UI:
+## Scripts
 
-```bash
-cd frontend
-VITE_API_MODE=api npm run dev     # Linux/macOS
-# Windows PowerShell: $env:VITE_API_MODE='api'; npm run dev
-```
-
-Without `VITE_API_MODE=api` the UI runs in browser demo mode with its own
-localStorage seed data. The dev server proxies `/api` to port 3000.
-
----
-
-## Production mode (Firebase)
-
-1. Create a Firebase project and enable **Firestore** and **Authentication**
-   (Email/Password).
-2. Download a service account key and save it as `serviceAccountKey.json` in the
-   repository root (gitignored).
-3. Copy `.env.example` to `.env` and set at least:
-
-   ```ini
-   PERSISTENCE=firestore
-   AUTH_PROVIDER=firebase
-   FIREBASE_API_KEY=<Firebase Web API key>
-   CORS_ORIGINS=https://your-frontend.example
-   ```
-
-   `FIREBASE_API_KEY` is the **Web API key** (Project settings → General). It is
-   required by the backend for password sign-in and custom-token exchange. It is
-   not the service account key.
-4. Restart with `npm start`.
-
-If `PERSISTENCE`/`AUTH_PROVIDER` are omitted, OneMed selects Firebase
-automatically when a service account file (or the matching emulator host) is
-present, and local mode otherwise. If you add only the service account and not
-`FIREBASE_API_KEY`, registration still succeeds but returns an explicit
-`customToken` with `requiresClientExchange: true` instead of a session; the
-client SDK must exchange it. No silent null tokens.
-
-### Firebase emulator (optional)
-
-Install Java, then set `FIRESTORE_EMULATOR_HOST` and/or
-`FIREBASE_AUTH_EMULATOR_HOST`, plus `FIREBASE_PROJECT_ID`. The emulator path is
-implemented but **has not been exercised in this environment** (no Java/Docker
-available).
-
----
-
-## Status
-
-| Capability | State | Notes |
-|-----------|-------|-------|
-| Credential-free boot + local store | Implemented | real file persistence; atomic writes |
-| Local auth (register/login, scrypt, JWT) | Implemented | 15-min access token; refresh/MFA in M1 |
-| Firebase/Firestore adapters | Implemented | lazy init; requires credentials |
-| Security baseline | Implemented | helmet, CORS allowlist, rate limits, sanitized 500s, request IDs |
-| Prescription OCR + parsing (Tesseract.js) | Implemented | bilingual `ara+eng`; no LLM/key |
-| Prescription persistence | Implemented | create / list / get by id |
-| Role guards | Implemented | six canonical roles; admin management |
-| Complete role-based frontend | Implemented | every documented portal/page; demo-data mode by default, REST-ready via `VITE_API_MODE=api` |
-| Automated tests + CI | Implemented | Vitest/Supertest, ESLint, GitHub Actions |
-| Medical ingestion API (M2) | Implemented | PDF/image/CSV/JSON/FHIR/DICOM + manual entry, AES-256-GCM originals, <80% review gate |
-| Patient/lab/pharmacy portals | Implemented | patient/lab/pharmacy screens wired to REST APIs with demo fallbacks |
-| Consent, audit hash chain, QR/NFC | Implemented | scoped consent, hash chain, signed 15-min QR and NFC tokens, emergency override |
-| Emergency RAG chatbot / Gemini | Implemented | privacy-filtered public page, signed QR, 123-first grounded answers with citations |
-| Fulfillment link + GPS pharmacy match | Implemented | 24h signed links, GPS-sorted pharmacies, WhatsApp orders |
-| Clinical AI, analytics, reports, credits | Implemented | grounded summaries, patient/population analytics, 5 reports (PDF/FHIR/CSV/JSON), credit ledger |
-| Bilingual PWA / accessibility polish | Planned | M7 |
-
----
-
-## Architecture
-
-```
-Presentation   React 18 + TypeScript + Vite 8 — complete role-based PWA-ready UI
-                      │  HTTPS / REST (Vite proxies /api in development)
-Application    Node.js + Express 4 (ESM)
-                      │  routes → controllers → services → ports
-Ports          store:  local file store  |  Firestore
-               auth:   local JWT + scrypt (demo/CI)  |  Firebase Auth
-               OCR:    Tesseract.js (WASM) + PDF.js text layer
-               files:  AES-256-GCM encrypted originals + SHA-256 checksums
-Data            local data/local-db.json  |  Firestore
-```
-
-The store and identity-provider ports keep domain services independent of the
-cloud vendor. Both implementations are real; local mode is an offline demo/CI
-adapter, not mock data. Firebase remains the production target. Gemini and the
-remaining AI services will follow the same port pattern.
-
-### Prescription OCR (implemented)
-
-```
-Upload (multer, in-memory, image only, 5 MB)
-  → Tesseract.js worker (default ara+eng, cached)
-  → heuristic regex parser
-  → { rawText, ocrConfidence, lang, items[], warnings[] }
-  → doctor review in frontend
-  → persistence via POST /api/prescriptions
-```
-
-- No LLM and no API key; extraction is deterministic and runs locally.
-- `ocrConfidence` is Tesseract's word-level confidence, **not** field-level accuracy.
-- Measured on clean synthetic typed images, each fixture run with its declared
-  language:
-
-  | Fixture | OCR language | Confidence | Minimum gate |
-  |---------|--------------|------------|--------------|
-  | English | `eng` | 95 | 90 |
-  | Arabic | `ara` | 87 | 80 |
-  | Bilingual | `ara+eng` | 93 | 90 |
-
-  The Arabic-only score (87) is lower than the previous `ara+eng`-for-everything
-  claim (91). It is above the approved **<80% manual-review threshold** (OQ4).
-  Production defaults to `ara+eng`.
-- Known limits: handwriting is unreliable; Arabic-Indic digits/units are not
-  normalized; dose can fold into the medicine name in Arabic layouts. Every row
-  is intended for doctor confirmation before use.
-
----
-
-## API
-
-Base path: `/api`. Protected routes require `Authorization: Bearer <token>`.
-
-| Method | Path | Access | Description |
-|--------|------|--------|-------------|
-| GET | `/` | public | Health/mode check |
-| POST | `/api/auth/register` | public | Register patient or doctor; returns session |
-| POST | `/api/auth/login` | public | Email/password login |
-| GET | `/api/users/me` | any signed-in user | Own profile |
-| PATCH | `/api/users/me` | any signed-in user | Update `name`/`phone` |
-| GET | `/api/users` | admin | List users (paginated) |
-| GET/PATCH/DELETE | `/api/users/:id` | admin | Read/update/delete a user |
-| PATCH | `/api/users/:id/role` | admin | Set any of the six roles |
-| GET/PUT/PATCH | `/api/doctors/me` | doctor | Doctor profile |
-| GET | `/api/doctors` | signed-in | List verified doctors |
-| GET | `/api/doctors/:id` | signed-in | Doctor profile (license hidden unless owner/admin) |
-| PATCH | `/api/doctors/:id/verify` | admin | Verify a doctor |
-| POST | `/api/prescriptions/extract` | doctor | Multipart image → OCR + parsed items |
-| POST | `/api/prescriptions` | doctor | Persist a reviewed prescription |
-| GET | `/api/prescriptions` | doctor, admin | List with pagination |
-| GET | `/api/prescriptions/:id` | doctor (owner), admin | Get one |
-| GET | `/api/records` | signed-in, consent-scoped | List records (`?type=lab&patientId=…&limit=…`) |
-| GET | `/api/records/pending` | staff with `records:write` | Low-confidence review queue |
-| GET | `/api/records/:id` | consent-scoped | Get one record |
-| GET | `/api/records/:id/original` | consent-scoped | Decrypt and download the original document |
-| POST | `/api/records/manual` | staff with `records:write` | Manual value entry |
-| POST | `/api/records/ingest` | staff with `records:write` | Multipart file → normalized record (`file`, `patientId`) |
-| PATCH | `/api/records/:id/review` | staff with `records:write` | Verify a low-confidence extraction |
-| GET | `/api/patients/search?q=` | staff with `patients:read` | Consent-filtered patient search |
-| POST | `/api/patients/:id/emergency-override` | doctor/hospital admin/admin | Logged, time-limited critical-info access |
-| POST | `/api/connect/qr` | doctor | Create a 15-minute signed connection QR |
-| GET | `/api/connect/:token` | public | Resolve a scanned QR (clinician/scope only) |
-| POST | `/api/connect/:token/accept` | patient | Grant scoped, expiring consent |
-| POST | `/api/nfc` | staff with `patients:read` | Issue a signed NFC patient token |
-| GET | `/api/nfc/:token` | public | Resolve a wristband tap (scan logged) |
-| GET | `/api/nfc/mine` | patient | Own wristband status (never returns the raw token) |
-| POST | `/api/emergency/qr` | patient | Issue a signed emergency QR token |
-| PATCH | `/api/emergency/privacy` | patient | Configure public emergency fields |
-| GET | `/api/emergency/:token` | public, rate-limited | Privacy-filtered emergency profile; scan logged |
-| POST | `/api/emergency/:token/chat` | public, rate-limited | Grounded first-aid guidance with sources |
-| POST | `/api/prescriptions` | doctor | Create a pending prescription |
-| POST | `/api/prescriptions/:id/confirm` | doctor | Confirm and issue a 24h fulfillment link |
-| GET | `/api/fulfillment/:token` | public, rate-limited | Prescription summary + GPS-sorted pharmacies |
-| POST | `/api/fulfillment/:token/select` | public, rate-limited | Select pharmacy and get WhatsApp deep link |
-| GET/PATCH | `/api/pharmacy/orders` | pharmacy/admin | Order inbox and status transitions |
-| GET/PATCH | `/api/pharmacy/profile` | pharmacy/admin | Pharmacy profile and GPS/hours |
-| GET/POST | `/api/messages/conversations` | signed-in | Conversations |
-| GET/POST | `/api/messages/conversations/:id/messages` | participant | Messages |
-| GET | `/api/notifications` | signed-in | In-app notification center |
-| GET | `/api/analytics/clinical/:patientId/summary` | patient/doctor/admin (consent-gated) | Grounded clinical summary with confidence, sources and disclaimer |
-| GET | `/api/analytics/patient/:patientId` | patient/doctor/admin (consent-gated) | Lab trends, BP, lipids, medications, health score |
-| GET | `/api/analytics/population` | hospital_admin/admin | De-identified aggregate analytics |
-| GET | `/api/analytics/credits` | doctor/lab_staff/hospital_admin/admin | Institution credit balance |
-| GET | `/api/reports/:type?format=pdf\|csv\|json\|fhir\|text` | patient/doctor/hospital_admin/admin | Reports: `history`, `labs`, `clinical-summary`, `audit`, `population` |
-
-**Reports:** `history` and `labs` export FHIR R4 Bundles/DiagnosticReports; `audit` and `population` export CSV; every type exports PDF. All five report generations are audit logged.
-
-**Documented heuristics (OQ17):** the patient health score is the percentage of tracked indicators inside their reference range (0 when no numeric indicator exists); contribution credits award 10 per verified (non-review) upload to the uploading institution. Reference ranges are illustrative catalog values in `src/utils/clinical-values.js`, not a diagnostic device.
-
-**Fulfillment:** links expire after `FULFILLMENT_TTL_SECONDS` (default 24h); pharmacy selection is GPS-sorted and generates a `wa.me` deep link with structured medicines. FCM device push is not configured in this environment; notifications are available in-app.
-
-**Emergency AI:** Gemini (`GEMINI_MODEL`, default `gemini-2.5-flash`) with Firestore vector search on `guidelineChunks`, seeded via `npm run seed:guidelines`. If no key is configured, a labelled deterministic offline provider keeps the demo functional. The public page exposes only fields the patient approved; every view and chat is audit logged.
-
-**Connection/NFC tokens:** JWT-based capability tokens, SHA-256 hashes at rest, domain-separated from login tokens. QR connections expire after `CONNECTION_TTL_SECONDS` (default 900); NFC tokens are revocable. Raw tokens are returned once.
-
-**Ingestion formats:** PDF text layer, JPG/PNG (Tesseract.js `ara+eng`), CSV/TSV, JSON/FHIR R4, DICOM metadata, and manual entry. Originals are encrypted with AES-256-GCM; every file has a SHA-256 checksum. Values below 80% OCR confidence are stored as `needs_review` and hidden from patients until confirmed.
-
-Register body:
-
-```json
-{
-  "name": "Mona Ali",
-  "email": "mona@example.com",
-  "password": "secret123",
-  "role": "patient",
-  "phone": "01012345678",
-  "emergencyContact": { "name": "Ahmed Ali", "relationship": "Brother", "phone": "01099998888" },
-  "patient": { "nationalId": "29001010101234", "dateOfBirth": "1990-01-10",
-               "gender": "female", "bloodGroup": "O+", "city": "Alexandria" }
-}
-```
-
-Only `patient` and `doctor` may self-register; staff roles are assigned by an
-admin. Six canonical roles: `patient`, `doctor`, `lab_staff`, `pharmacy`,
-`hospital_admin`, `admin`.
-
-**Extract response**
-
-```json
-{
-  "rawText": "...",
-  "ocrConfidence": 92,
-  "lang": "ara+eng",
-  "items": [
-    { "name": "Amoxicillin", "dose": "500mg", "frequency": "1x3",
-      "duration": "5 days", "notes": "...", "needsReview": false }
-  ],
-  "warnings": []
-}
-```
-
-Errors are JSON: `{ "message": "...", "requestId": "..." }`. 5xx responses never
-include internal details; use the request id to correlate with server logs.
-
----
+| Command | Purpose |
+|---|---|
+| `npm start` | Start API only |
+| `npm run dev:all` | Start API + frontend in API mode |
+| `npm run seed` / `seed:guidelines` | Idempotent demo data / first-aid KB |
+| `npm run test:ocr`, `test:ocr:accuracy` | OCR smoke/accuracy |
+| `npm run demo` | 12-flow end-to-end API walkthrough |
+| `npm run perf:smoke` | Measured NFR subset → `docs/PERFORMANCE.md` (local only) |
+| `npm run backup`, `restore:backup -- <file> --confirm` | Encrypted backup/restore |
+| `npm run archive:records` | Move aged records to `archived` state |
+| `npm run purge:deletions` | Process due EDP erasure requests |
+| `npm run set:admin -- <email>` | Promote an account to admin |
+| `npm test`, `npm run lint` | Backend tests/lint |
+| `cd frontend && npm test`, `npm run build`, `npm run test:e2e` | Frontend tests/build/Playwright |
 
 ## Testing
 
-```bash
-npm test                    # 34 unit + integration tests (local adapter)
-npm run lint                # ESLint flat config
-npm run test:ocr            # smoke test on a synthetic prescription
-npm run test:ocr:accuracy   # English / Arabic-only / bilingual fixtures
-node scripts/ocr-file.mjs <image-path> [lang]   # OCR an arbitrary image
-```
+- Backend: Vitest + Supertest integration and unit tests (RBAC, authorization matrix, MFA, OTP, audit, ingestion, fulfillment, doctor chat, backup/restore).
+- Frontend: Vitest unit tests and Playwright desktop/tablet/mobile flows (slow network, network errors, session expiry).
+- CI installs, lints, type-checks, tests, builds, runs Playwright, scans secrets, and lints Cloud Functions.
 
-The OCR accuracy harness now runs each fixture with its actual language code
-(`eng`, `ara`, `ara+eng`) and prints the measured confidence. It passes 3/3 on
-the synthetic typed fixtures; these numbers do not transfer to handwriting or
-poor-quality scans.
+## Deployment (Firebase Blaze)
 
-CI (`.github/workflows/ci.yml`) runs lint, tests, the production dependency
-audit, both OCR suites, and the frontend build on every push and pull request.
+1. Create a Firebase project on Blaze; enable Firestore, Authentication (Email/Password + Phone), Storage and Cloud Functions.
+2. Create a service account with Firestore/Storage/Admin privileges; supply it via `FIREBASE_SERVICE_ACCOUNT_JSON` (preferred in hosting) or a gitignored file path in `GOOGLE_APPLICATION_CREDENTIALS`.
+3. Set the variables in the table above, especially `FIREBASE_API_KEY`, `FIREBASE_PHONE_AUTH=true`, `FIREBASE_STORAGE_BUCKET`, `STORAGE_DRIVER=firebase`, `LLM_DRIVER=cloud`, `FUNCTIONS_BASE_URL`, and production secrets.
+4. Deploy functions: `npm --prefix functions ci && npm --prefix functions run deploy`.
+5. Deploy rules/indexes: `firebase deploy --only firestore:rules,firestore:indexes`.
+6. Build the frontend (`npm --prefix frontend run build`) and deploy `frontend/dist` with Firebase Hosting or another static host; configure rewrites to `index.html`.
+7. Run `npm run seed` only for a demo environment; never seed test accounts in production.
 
-The production dependency tree has **0 reported vulnerabilities**
-(`npm audit --omit=dev`). A moderate, dev-only advisory remains in
-`nodemon → minimatch`; it is not shipped in production and has no compatible
-fixed release yet.
+## Known limitations
 
----
-
-## Environment variables
-
-See `.env.example` for the complete annotated list.
-
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `NODE_ENV` | `development` | `production` requires explicit `AUTH_JWT_SECRET` in local mode |
-| `PORT` | `3000` | API port |
-| `PERSISTENCE` | auto | `local` or `firestore` |
-| `AUTH_PROVIDER` | auto | `local` or `firebase` |
-| `LOCAL_DATA_DIR` | `data` | local store + generated dev secret |
-| `AUTH_JWT_SECRET` | generated in dev | 32+ chars; required in production local mode |
-| `AUTH_ACCESS_TTL_SECONDS` | `900` | access-token lifetime |
-| `GOOGLE_APPLICATION_CREDENTIALS` | `./serviceAccountKey.json` | service account JSON path |
-| `FIREBASE_SERVICE_ACCOUNT_JSON` | — | inline service account JSON (hosted deploys) |
-| `FIREBASE_PROJECT_ID` | — | required with emulators |
-| `FIREBASE_API_KEY` | — | Firebase Web API key for password sign-in/token exchange |
-| `FIRESTORE_EMULATOR_HOST` | — | Firestore emulator |
-| `FIREBASE_AUTH_EMULATOR_HOST` | — | Auth emulator |
-| `CORS_ORIGINS` | localhost 5173/4173 | comma-separated allowlist |
-| `RATE_LIMIT_*` | 300/20/30 | global/auth/OCR rate limits per 15 min |
-| `JSON_BODY_LIMIT` | `1mb` | JSON body cap |
-| `TESSERACT_LANG` | `ara+eng` | default OCR language |
-
----
-
-## Project structure
-
-```
-OneMed-main/
-├── src/
-│   ├── app.js, server.js          # Express app + graceful boot/shutdown
-│   ├── auth/                      # local IdP, Firebase IdP, JWT secret
-│   ├── config/                    # validated env + lazy Firebase init
-│   ├── constants/roles.js         # six canonical roles
-│   ├── controllers/               # auth, user, doctor, prescription
-│   ├── middleware/                # auth, roles, errors, request ids, rate limits, upload
-│   ├── routes/                    # /api route groups
-│   ├── schemas/                   # document/request schemas
-│   ├── services/                  # domain logic, OCR, parser
-│   ├── store/                     # persistence port: local + Firestore
-│   └── utils/                     # schema validator, validators, http errors
-├── scripts/                       # OCR CLIs/tests, admin bootstrap
-├── tests/                         # Vitest unit + Supertest integration
-├── frontend/                      # React + Vite prototypes (port 5173)
-├── .env.example
-├── .github/workflows/ci.yml
-└── package.json
-```
-
----
-
-## Security & compliance
-
-**Implemented now:** Firebase/local token verification; six-role guards; schema
-validation; scrypt password hashing (local mode); 15-minute access tokens;
-helmet security headers; explicit CORS allowlist; request rate limits; request
-IDs; sanitized 5xx responses; upload MIME/size limits; prescription ownership
-checks.
-
-**Planned (later milestones):** refresh-token rotation and inactivity logout,
-MFA for medical staff, AES-256 field encryption, TLS 1.3 termination, consent
-enforcement, SHA-256 hash-chained append-only audit log, QR/NFC emergency tokens
-with rate limiting, deletion/portability pipeline, Egyptian EDP Law mapping. The
-Arabic/Egyptian data-localization limitation (no Firebase Egypt region) will be
-documented in the final submission, not hidden.
-
----
-
-## Roadmap (next milestones)
-
-- **M1** — full data model, six-role RBAC, OTP + staff MFA, audit chain, seed data
-- **M2** — multi-format ingestion (PDF/CSV/JSON/FHIR/DICOM metadata), lab portal
-- **M3** — patient search, record timeline, consent QR, NFC landing
-- **M4** — patient portal, emergency QR/public page, first-aid RAG chatbot
-- **M5** — doctor confirmation gate, 24h fulfillment link, GPS pharmacy match, WhatsApp, messaging
-- **M6** ✅ — clinical summary, analytics, reports, population metrics, credit ledger
-- **M7** — Arabic/English RTL, PWA, landing page, accessibility
-- **M8** — hardening, measured performance, UAT, traceability/demo/limitations docs
-
----
-
-## Team
-
-Alexandria University — 11-member team. See the report for full task allocation.
-
-| Member | Role |
-|--------|------|
-| Mohamed Amgad Aly | AI & Backend |
-| Hassan Ahmed Mohammed | Backend |
-| Ahmed Adel Elsayed | Cyber Security |
-| Seif Saad Abdulmagied | Dashboard |
-| Saif Eldein Ashraf | Dashboard & Reporting |
-| Mahmoud Safwat | Frontend & Backend |
-| Abdallah Hamed Kheder | Frontend & Database |
-| Seif Abdelazem Ahmed | Business Analysis |
-| Ziad Mustafa Eid | Frontend |
-| Mohamed Ahmed Mohamed | Frontend & Reporting |
-| Mina Mounir Youssef | Frontend & Backend |
-
-
-## Phase 2 quick start
-
-`ash
-# one command: API on :3000 + frontend in API mode on :5173
-npm install && (cd frontend && npm install)
-npm run dev:all
-
-# scripted end-to-end verification of 11 documented flows (requires the API running)
-npm run demo
-
-# open the demo hub in the app: /app/demos (reachable from the main navigation)
-`
-
-Other useful commands: 
-pm run seed (idempotent realistic demo data incl. emergency QR/NFC links), 
-pm run seed:guidelines, 
-pm run purge:deletions (EDP erasure job), 
-pm run set:admin -- <email>.
+- Firebase resources, real phone OTP delivery, FCM push and native vector indexes require your credentials and deployment; they are not verifiable in CI.
+- Aspirational NFRs (uptime, large-scale concurrency, Egypt-region hosting, penetration testing) are not claimed as verified.
+- Mobile/tablet behavior is covered by Playwright emulation; real device/NFC hardware testing remains manual.
+- Drug-interaction validation is intentionally out of scope (requires a licensed drug database and clinical governance).
