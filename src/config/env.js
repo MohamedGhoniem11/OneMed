@@ -165,9 +165,34 @@ if (cookieSameSite === "none" && !cookieSecure) {
 }
 const otpDevDelivery = readBool("AUTH_OTP_DEV_DELIVERY", nodeEnv !== "production");
 if (nodeEnv === "production" && otpDevDelivery) {
-  console.warn(
-    "[config] AUTH_OTP_DEV_DELIVERY=true in production. OTP codes will be returned by the API and logged; use only for a controlled demo.",
-  );
+  throw new ConfigError("AUTH_OTP_DEV_DELIVERY must be false in production. Configure the Firebase phone Auth provider.");
+}
+
+const storageDriver = readEnum("STORAGE_DRIVER", ["local", "firebase"], nodeEnv === "production" ? "firebase" : "local");
+const llmDriver = readEnum("LLM_DRIVER", ["direct", "cloud"], nodeEnv === "production" ? "cloud" : "direct");
+const firebaseStorageBucket = readString("FIREBASE_STORAGE_BUCKET");
+const functionsBaseUrl = readString("FUNCTIONS_BASE_URL").replace(/\/$/, "");
+const firebasePhoneAuth = readBool("FIREBASE_PHONE_AUTH", nodeEnv === "production");
+const backupDir = resolveFromRoot(readString("BACKUP_DIR", "data/backups"));
+const archiveAfterDays = readInt("ARCHIVE_AFTER_DAYS", 365, { min: 30, max: 3650 });
+
+if (nodeEnv === "production") {
+  const required = {
+    PERSISTENCE: persistence === "firestore",
+    AUTH_PROVIDER: authProvider === "firebase",
+    AUTH_JWT_SECRET: Boolean(authJwtSecret),
+    UPLOAD_ENCRYPTION_KEY: Boolean(uploadEncryptionKey),
+    FIREBASE_API_KEY: Boolean(readString("FIREBASE_API_KEY")),
+    FIREBASE_SERVICE_ACCOUNT_JSON_or_file: firebaseConfigured,
+    FIREBASE_STORAGE_BUCKET: Boolean(firebaseStorageBucket),
+    FUNCTIONS_BASE_URL: Boolean(functionsBaseUrl),
+    FIREBASE_PHONE_AUTH: firebasePhoneAuth,
+  };
+  const missing = Object.entries(required).filter(([, ok]) => !ok).map(([key]) => key);
+  if (missing.length) throw new ConfigError(`Production configuration is incomplete: ${missing.join(", ")}`);
+  if (storageDriver !== "firebase") throw new ConfigError("STORAGE_DRIVER=firebase is required in production");
+  if (llmDriver !== "cloud") throw new ConfigError("LLM_DRIVER=cloud is required in production");
+  if (rateLimitDisabled) throw new ConfigError("RATE_LIMIT_DISABLED must be false in production");
 }
 
 export const env = Object.freeze({
@@ -206,6 +231,13 @@ export const env = Object.freeze({
   hasEmulator,
   firebaseProjectId: readString("FIREBASE_PROJECT_ID", hasEmulator ? "demo-onemed" : ""),
   firebaseApiKey: readString("FIREBASE_API_KEY"),
+  storageDriver,
+  firebaseStorageBucket,
+  functionsBaseUrl,
+  firebasePhoneAuth,
+  llmDriver,
+  backupDir,
+  archiveAfterDays,
   firestoreEmulatorHost: readString("FIRESTORE_EMULATOR_HOST"),
   firebaseAuthEmulatorHost: readString("FIREBASE_AUTH_EMULATOR_HOST"),
 
