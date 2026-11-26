@@ -92,7 +92,8 @@ describe("M3 connection QR, NFC and clinical access", () => {
       .set(bearer(adminToken))
       .send({ patientId: P1, nfcUid: "NTAG424-TEST" })
       .expect(201);
-    expect(issued.body.token.split(".")).toHaveLength(3);
+    expect(issued.body.token.startsWith("om_")).toBe(true);
+    expect(issued.body.token).not.toContain("user_");
     expect(issued.body.url).toContain("/nfc/");
 
     const resolved = await api.get(`/api/nfc/${issued.body.token}`).expect(200);

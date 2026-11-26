@@ -1,5 +1,9 @@
 {
   "indexes": [
+    { "collectionGroup": "connectionTokens", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "tokenHash", "order": "ASCENDING" }] },
+    { "collectionGroup": "nfcTokens", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "tokenHash", "order": "ASCENDING" }] },
+    { "collectionGroup": "emergencyQr", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "tokenHash", "order": "ASCENDING" }] },
+    { "collectionGroup": "fulfillmentLinks", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "tokenHash", "order": "ASCENDING" }] },
     {
       "collectionGroup": "records",
       "queryScope": "COLLECTION",

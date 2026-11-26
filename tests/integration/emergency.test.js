@@ -39,7 +39,8 @@ beforeAll(async () => {
 describe("M4 emergency public page and first-aid chatbot", () => {
   it("issues an emergency QR and exposes only approved fields", async () => {
     const issued = await api.post("/api/emergency/qr").set("Authorization", `Bearer ${patientToken}`).expect(200);
-    expect(issued.body.token.split(".")).toHaveLength(3);
+    expect(issued.body.token.startsWith("om_")).toBe(true);
+    expect(issued.body.token).not.toContain("user_");
 
     const res = await api.get(`/api/emergency/${emergencyToken}`).expect(200);
     expect(res.body.visible.patientName).toBe("Emergency Patient");

@@ -10,7 +10,9 @@ describe("signed connection and NFC tokens", () => {
       patientId: "patient-1", doctorId: "doctor-1", doctorName: "Dr. One",
       scope: ["records"], purpose: "Consultation",
     });
-    expect(created.token.split(".")).toHaveLength(3);
+    expect(created.token.startsWith("om_conn_")).toBe(true);
+    expect(created.token).not.toContain("patient-1");
+    expect(Buffer.from(created.token, "utf8").toString("base64")).not.toContain("cGF0aWVudC0x");
     expect(created.expiresAt.getTime() - Date.now()).toBeGreaterThan(14 * 60_000);
     const record = await getStore().get("connectionTokens", created.record.id);
     expect(record.tokenHash).not.toBe(created.token);
@@ -44,7 +46,6 @@ describe("signed connection and NFC tokens", () => {
 
   it("rejects tampered tokens", async () => {
     const created = await createConnection({ patientId: "patient-4", doctorId: "doctor-1", scope: ["records"] });
-    const [head, payload, signature] = created.token.split(".");
-    await expect(resolveConnection(`${head}.${payload}.${signature.slice(0, -2)}xx`)).rejects.toMatchObject({ status: 400 });
+    await expect(resolveConnection(`${created.token.slice(0, -2)}xx`)).rejects.toMatchObject({ status: 404 });
   });
 });
