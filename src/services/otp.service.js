@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { env } from "../config/env.js";
 import { getStore } from "../store/index.js";
 import { httpError } from "../utils/http-error.js";
+import { sendPhoneCode, verifyPhoneCode } from "./otp-delivery.service.js";
 
 /**
  * Registration OTP challenges (R2/R3, OQ14).
@@ -39,17 +40,17 @@ async function expirePrevious(userId, purpose) {
 }
 
 export async function createOtpChallenge({ userId, email, phone = "", purpose = "registration", name = "" }) {
-  if (!env.authOtpDevDelivery) {
-    throw httpError(
-      503,
-      "OTP delivery is not configured. Set AUTH_OTP_DEV_DELIVERY=true for the controlled demo or integrate an email provider.",
-    );
+  const useFirebase = env.firebasePhoneAuth && !env.authOtpDevDelivery;
+  if (!useFirebase && !env.authOtpDevDelivery) {
+    throw httpError(503, "OTP delivery is not configured. Configure Firebase phone Auth.");
   }
+  if (useFirebase && !phone) throw httpError(400, "A phone number is required for OTP verification");
 
   await expirePrevious(userId, purpose);
 
   const challengeId = crypto.randomUUID();
-  const code = generateCode();
+  const delivery = useFirebase ? await sendPhoneCode(phone) : { provider: "dev-response" };
+  const code = useFirebase ? null : generateCode();
   const salt = crypto.randomBytes(16).toString("hex");
   const now = new Date();
   const expiresAt = new Date(now.getTime() + env.authOtpTtlMinutes * 60_000);
@@ -61,25 +62,26 @@ export async function createOtpChallenge({ userId, email, phone = "", purpose = 
     name,
     purpose,
     codeSalt: salt,
-    codeHash: hash(challengeId, salt, code),
+    codeHash: code ? hash(challengeId, salt, code) : null,
+    provider: delivery.provider,
+    providerSession: delivery.session || null,
     attempts: 0,
     consumedAt: null,
     createdAt: now,
     updatedAt: now,
     expiresAt,
-    delivery: "dev-response",
+    delivery: delivery.provider,
   });
 
-  console.log(`[auth] Dev OTP for ${email || phone} (${purpose}): ${code}`);
+  if (!useFirebase) console.log(`[auth] Dev OTP for ${email || phone} (${purpose}): ${code}`);
 
   return {
     challengeId,
     purpose,
     expiresAt: expiresAt.toISOString(),
-    // Clearly labeled demo delivery. Never returned in production unless the
-    // operator explicitly opted in for a controlled demo.
-    ...(env.authOtpDevDelivery ? { devCode: code } : {}),
-    delivery: env.authOtpDevDelivery ? "dev-response" : "external-required",
+    // Dev codes are returned only for the explicit local demo mode.
+    ...(!useFirebase && env.authOtpDevDelivery ? { devCode: code } : {}),
+    delivery: delivery.provider,
   };
 }
 
@@ -92,6 +94,17 @@ export async function verifyOtpChallenge({ challengeId, code, purpose = "registr
   if (new Date(challenge.expiresAt) <= new Date()) throw httpError(400, "Verification code expired");
   if (challenge.attempts >= env.authOtpMaxAttempts) {
     throw httpError(429, "Too many verification attempts; request a new code");
+  }
+
+  if (challenge.provider === "firebase-phone") {
+    const provider = await verifyPhoneCode(challenge.providerSession, code);
+    await getStore().update(CHALLENGES, challengeId, {
+      consumedAt: new Date(),
+      consumedReason: "verified",
+      providerUid: provider.uid,
+      updatedAt: new Date(),
+    });
+    return { ...challenge, providerUid: provider.uid, providerIdToken: provider.idToken };
   }
 
   const expected = Buffer.from(challenge.codeHash, "hex");
