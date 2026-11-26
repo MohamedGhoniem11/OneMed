@@ -39,7 +39,9 @@ function Protected({ roles, children }: { roles?: Role[]; children: React.ReactN
 function AppRedirect() {
   const { session } = useAuth();
   const map: Record<Role,string> = { patient:'/app/patient', doctor:'/app/doctor', lab_staff:'/app/lab', pharmacy:'/app/pharmacy', hospital_admin:'/app/hospital', admin:'/app/admin' };
-  return <Navigate to={session ? map[session.user.role] : '/login'} replace/>;
+  // A stale/unknown role must never produce an undefined Navigate target.
+  const target = session ? (map[session.user.role] || '/login') : '/login';
+  return <Navigate to={target} replace/>;
 }
 import { useParams } from 'react-router-dom';
 function ConsentQrRoute() { const { token='' } = useParams(); return <ConsentQrPage token={token}/>; }
