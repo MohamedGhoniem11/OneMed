@@ -30,6 +30,9 @@
   /* ── Shadows ── */
   --shadow-nav:   0px 1px 2px 0px rgba(0,0,0,0.05);
   --shadow-card:  0px 4px 20px 0px rgba(11,59,124,0.08);
+
+  /* ── Tab bar height — used by all pages ── */
+  --tab-bar-h: 72px;
 }
 
 html, body, #root {
