@@ -25,3 +25,7 @@ npm-debug.log*
 # Playwright artifacts
 frontend/playwright-report/
 frontend/test-results/
+
+# Internal reports (kept outside the public repo)
+FINAL-REPORT.md
+docs/
