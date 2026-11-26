@@ -9,5 +9,6 @@ router.post("/device-token", c.registerDevice);
 router.get("/", c.list);
 router.post("/read-all", c.markAll);
 router.post("/:id/read", c.markOne);
+router.delete("/:id", c.remove);
 
 export default router;

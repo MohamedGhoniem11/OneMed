@@ -17,5 +17,7 @@ router.get("/", requirePermission("records:read"), c.list);
 router.get("/:id", requirePermission("records:read"), c.getOne);
 router.get("/:id/original", requirePermission("records:read"), c.downloadOriginal);
 router.patch("/:id/review", requirePermission("records:write"), c.review);
+// Owner or records-writer with consent; authorization is enforced in the service.
+router.delete("/:id", c.remove);
 
 export default router;

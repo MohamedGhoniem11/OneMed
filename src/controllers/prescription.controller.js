@@ -98,6 +98,21 @@ export async function confirm(req, res, next) {
   }
 }
 
+export async function discardDraft(req, res, next) {
+  try {
+    const prescription = await service.discardDraft(req.params.id, req.user.uid);
+    await auditRequest(req, {
+      action: "prescription_draft_discarded",
+      resourceType: "prescription",
+      resourceId: prescription.id,
+      patientId: prescription.patientId,
+    });
+    res.json(prescription);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function listForPatient(req, res, next) {
   try {
     const patientId = req.params.patientId;

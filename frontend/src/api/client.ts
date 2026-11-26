@@ -156,7 +156,7 @@ export async function logout(): Promise<void> {
 // ---------------- Generic data access ----------------
 export async function list<T>(collection: keyof ReturnType<typeof loadDB>, filter?: (x:any)=>boolean): Promise<T[]> {
   if (API_MODE === 'api') {
-    const map: Record<string,string> = { patients:'/patients', prescriptions:'/prescriptions', pharmacies:'/admin/pharmacies', institutions:'/institutions', consents:'/consents', users:'/users', records:'/records' };
+    const map: Record<string,string> = { patients:'/patients', prescriptions:'/prescriptions', pharmacies:'/admin/pharmacies', institutions:'/institutions?active=all', consents:'/consents', users:'/users', records:'/records' };
     const path = map[collection as string];
     if (!path) return [] as T[];
     const r = await http<any>(path, {}, getSession()?.token);
@@ -553,6 +553,37 @@ export async function updateUserAdmin(id: string, patch: any) {
 export async function setUserRoleAdmin(id: string, role: string) {
   if (API_MODE === 'api') return http<any>(`/users/${id}/role`, { method:'PATCH', body:JSON.stringify({ role }) }, token());
   return mutate(db => { const u:any = db.users.find(x=>x.uid===id||(x as any).id===id); if(u) u.role=role; return u; });
+}
+
+// ---------------- Remove actions (soft delete where clinical data is involved) ----------------
+export async function deleteRecord(id: string) {
+  if (API_MODE === 'api') return http<any>(`/records/${id}`, { method:'DELETE' }, token());
+  return mutate(db => { const r:any = (db.records as any[]).find(x=>x.id===id); if(r) r.lifecycle='deleted'; return r; });
+}
+export async function deleteNotification(id: string) {
+  if (API_MODE === 'api') return http<any>(`/notifications/${id}`, { method:'DELETE' }, token());
+  return mutate(db => { db.notifications = (db.notifications as any[]).filter(n=>n.id!==id) as any; return true; });
+}
+export async function deleteConversation(id: string) {
+  if (API_MODE === 'api') return http<any>(`/messages/conversations/${id}`, { method:'DELETE' }, token());
+  return mutate(db => { db.conversations = (db.conversations as any[]).filter(c=>c.id!==id) as any;
+    db.messages = (db.messages as any[]).filter(m=>m.conversationId!==id) as any; return true; });
+}
+export async function discardPrescription(id: string) {
+  if (API_MODE === 'api') return http<any>(`/prescriptions/${id}`, { method:'DELETE' }, token());
+  return mutate(db => { const r:any = (db.prescriptions as any[]).find(x=>x.id===id); if(r){r.status='cancelled';r.extractionStatus='cancelled';} return r; });
+}
+export async function deleteUserAdmin(id: string) {
+  if (API_MODE === 'api') return http<any>(`/users/${id}`, { method:'DELETE' }, token());
+  return mutate(db => { db.users = (db.users as any[]).filter(u=>u.uid!==id&&(u as any).id!==id) as any; return true; });
+}
+export async function setInstitutionActive(id: string, active: boolean) {
+  if (API_MODE === 'api') return http<any>(`/institutions/${id}/active`, { method:'PATCH', body:JSON.stringify({ active }) }, token());
+  return mutate(db => { const i:any = (db.institutions as any[]).find(x=>x.id===id); if(i) i.active=active; return i; });
+}
+export async function setPharmacyStatus(id: string, status: string) {
+  if (API_MODE === 'api') return http<any>(`/admin/pharmacies/${id}/status`, { method:'PATCH', body:JSON.stringify({ status }) }, token());
+  return mutate(db => { const p:any = (db.pharmacies as any[]).find(x=>x.id===id); if(p){p.status=status;p.active=status==='approved';} return p; });
 }
 
 export async function createStaffAccount(data: any) {

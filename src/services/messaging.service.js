@@ -43,6 +43,17 @@ export async function createConversation({ patientId, otherUserId, otherName, ro
   });
 }
 
+export async function removeConversation(conversationId, user) {
+  const conversation = await visibleConversation(conversationId, user);
+  const { items } = await getStore().query(MESSAGES, {
+    where: [{ field: "conversationId", op: "==", value: conversationId }],
+    limit: 500,
+  });
+  await Promise.all(items.map((m) => getStore().delete(MESSAGES, m.id)));
+  await getStore().delete(CONVERSATIONS, conversationId);
+  return { ok: true, id: conversation.id };
+}
+
 export async function listMessages(conversationId, user) {
   await visibleConversation(conversationId, user);
   const { items } = await getStore().query(MESSAGES, {

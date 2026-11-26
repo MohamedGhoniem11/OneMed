@@ -37,3 +37,10 @@ export async function markRead(userId, id) {
   if (!note || note.userId !== userId) throw httpError(404, "Notification not found");
   return getStore().update(COLLECTION, id, { read: true });
 }
+
+export async function removeForUser(userId, id) {
+  const note = await getStore().get(COLLECTION, id);
+  if (!note || note.userId !== userId) throw httpError(404, "Notification not found");
+  await getStore().delete(COLLECTION, id);
+  return { ok: true, id };
+}

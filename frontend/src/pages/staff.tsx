@@ -9,7 +9,7 @@ import { BarChart, Bar, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import * as api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import type { MedicalRecord, Patient, Prescription, Pharmacy, Institution, User, AuditEntry, OrderStatus } from '../types';
-import { Badge, Card, Chip, Empty, Field, MetricCard, Modal, PageHead, SectionTabs, Stat, StatusBadge, Tabs, useToast, VerificationRow } from '../components/ui';
+import { Badge, Card, Chip, ConfirmDialog, Empty, Field, MetricCard, Modal, PageHead, SectionTabs, Stat, StatusBadge, Tabs, useToast, VerificationRow } from '../components/ui';
 
 type LabRow = { test:string; value:string; unit:string; ref:string; confidence:number };
 const ALLOWED_UPLOAD = /\.(pdf|png|jpe?g|webp|bmp|tiff?|csv|json|fhir|dcm|dicom|txt)$/i;
@@ -22,7 +22,7 @@ export function LabPortal({ initialTab = 'upload' }: { initialTab?: string }) {
   const [history,setHistory]=useState<MedicalRecord[]>([]); const [file,setFile]=useState<File|null>(null); const [ingestedId,setIngestedId]=useState('');
   const [batch,setBatch]=useState(''); const [manual,setManual]=useState({test:'',value:'',unit:'',ref:''});
   const [pending,setPending]=useState<MedicalRecord[]>([]); const [busy,setBusy]=useState(false); const [reviewing,setReviewing]=useState<MedicalRecord|null>(null);
-  const [archiveQuery,setArchiveQuery]=useState(''); const [archiveType,setArchiveType]=useState('all');
+  const [archiveQuery,setArchiveQuery]=useState(''); const [archiveType,setArchiveType]=useState('all'); const [removing,setRemoving]=useState<MedicalRecord|null>(null);
   const load=()=>Promise.all([api.listRecords().then(setHistory), api.pendingRecords().then(setPending)]);
   useEffect(()=>{ void api.searchPatients('').then(a=>{setPatients(a);setPatientId(a[0]?.id||'');}).catch(()=>{}); void load(); },[]);
 
@@ -174,12 +174,15 @@ export function LabPortal({ initialTab = 'upload' }: { initialTab?: string }) {
     {tab==='records' && <Card title={t('records')} pad={false}>
       <div style={{padding:18,display:'flex',gap:8,flexWrap:'wrap'}}><input className="input" placeholder={t('search')} value={archiveQuery} onChange={e=>setArchiveQuery(e.target.value)}/>
         <select className="input" value={archiveType} onChange={e=>setArchiveType(e.target.value)}>{['all','lab','vital','imaging','visit','note'].map(x=><option key={x} value={x}>{t(x==='all'?'all':x)}</option>)}</select></div>
-      <div className="table-wrap"><table className="tbl"><thead><tr><th>{t('date')}</th><th>{t('patient')}</th><th>{t('name')}</th><th>{t('value')}</th><th>{t('confidenceLabel')}</th><th>{t('status')}</th></tr></thead><tbody>
+      <div className="table-wrap"><table className="tbl"><thead><tr><th>{t('date')}</th><th>{t('patient')}</th><th>{t('name')}</th><th>{t('value')}</th><th>{t('confidenceLabel')}</th><th>{t('status')}</th><th>{t('action')}</th></tr></thead><tbody>
         {archive.map(r=><tr key={r.id}><td>{date(r.date)}</td><td>{patientName(r.patientId)}</td><td><strong>{r.title}</strong><div style={{fontSize:12,color:'var(--muted)'}}>{r.summary}</div></td>
           <td style={{fontSize:12}}>{(r.values||[]).slice(0,3).map((v:any)=>`${v.name} ${v.value}${v.unit}`).join(' · ')||'-'}</td>
-          <td>{r.confidence!=null?`${r.confidence}%`:'-'}</td><td><StatusBadge status={r.status||'normal'}/></td></tr>)}</tbody></table>{!archive.length&&<Empty/>}</div>
+          <td>{r.confidence!=null?`${r.confidence}%`:'-'}</td><td><StatusBadge status={r.status||'normal'}/></td>
+          <td><button className="btn sm outline" aria-label={`${t('delete')} ${r.title}`} onClick={()=>setRemoving(r)}><Trash2 size={14}/></button></td></tr>)}</tbody></table>{!archive.length&&<Empty/>}</div>
     </Card>}
     {reviewing && <ReviewDialog record={reviewing} patients={patients} onClose={()=>setReviewing(null)} onSave={values=>void review(reviewing,values)}/>}
+    {removing && <ConfirmDialog title={t('delete')} message={t('removeRecordConfirm',{defaultValue:`Remove "${removing.title}" from patient views? The event stays in the audit trail.`})}
+      onClose={()=>setRemoving(null)} busy={busy} onConfirm={()=>void (async()=>{setBusy(true);try{await api.deleteRecord(removing.id);setRemoving(null);toast(t('saved'));await load();}catch(e:any){toast(e.message,true);}finally{setBusy(false);}})()}/>}
   </>;
 }
 
@@ -303,11 +306,11 @@ export function AdminOverview() {
     </div></div></Card></>;
 }
 export function AdminUsers() {
-  const {t}=useTranslation(); const {toast}=useToast(); const [users,setUsers]=useState<User[]>([]);
+  const {t}=useTranslation(); const {toast}=useToast(); const {session}=useAuth(); const [users,setUsers]=useState<User[]>([]);
   const [open,setOpen]=useState(false); const [busy,setBusy]=useState(false); const [errors,setErrors]=useState<string[]>([]);
   const [form,setForm]=useState({name:'',email:'',password:'',role:'lab_staff' as any,phone:''});
   const [editing,setEditing]=useState<User|null>(null); const [editForm,setEditForm]=useState({name:'',phone:'',role:''});
-  const [q,setQ]=useState('');
+  const [removing,setRemoving]=useState<User|null>(null); const [q,setQ]=useState('');
   const load=()=>api.list<User>('users').then(setUsers).catch(()=>{});
   useEffect(()=>{void load();},[]);
   const create=async()=>{
@@ -340,7 +343,10 @@ export function AdminUsers() {
     <Card pad><div style={{padding:18}}><input className="input" placeholder={t('search')} value={q} onChange={e=>setQ(e.target.value)}/></div>
       <div className="table-wrap"><table className="tbl"><thead><tr><th>{t('name')}</th><th>{t('email')}</th><th>{t('role')}</th><th>{t('institution')}</th><th>{t('status')}</th><th>{t('action')}</th></tr></thead><tbody>
         {visible.map(u=><tr key={u.uid}><td>{u.name}</td><td>{u.email}</td><td><Badge>{t(u.role==='lab_staff'?'labStaff':u.role)}</Badge></td><td>{u.institutionId||'-'}</td><td><StatusBadge status={u.status||'active'}/></td>
-          <td><button className="btn sm outline" onClick={()=>openEditor(u)}>{t('edit')}</button></td></tr>)}</tbody></table>{!visible.length&&<Empty/>}</div></Card>
+          <td><div style={{display:'flex',gap:4}}><button className="btn sm outline" onClick={()=>openEditor(u)}>{t('edit')}</button>
+            <button className="btn sm outline" disabled={u.uid===session!.user.uid} aria-label={`${t('delete')} ${u.name}`}
+              title={u.uid===session!.user.uid?t('cannotDeleteSelf',{defaultValue:'You cannot delete your own account'}):t('delete')}
+              onClick={()=>setRemoving(u)}><Trash2 size={14}/></button></div></td></tr>)}</tbody></table>{!visible.length&&<Empty/>}</div></Card>
     {open && <Modal title={t('addUser')} onClose={()=>setOpen(false)} footer={<><button className="btn outline" onClick={()=>setOpen(false)}>{t('cancel')}</button><button className="btn primary" disabled={busy} onClick={()=>void create()}>{busy?t('creating'):t('submit')}</button></>}>
       {errors.length>0 && <div className="alert red" role="alert">{errors.map((e,i)=><div key={i}>{e}</div>)}</div>}
       <Field label={t('name')} error={errors.includes(t('fieldRequired'))?t('fieldRequired'):undefined}><input className="input" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></Field>
@@ -355,10 +361,13 @@ export function AdminUsers() {
       <Field label={t('role')}><select className="input" value={editForm.role} onChange={e=>setEditForm({...editForm,role:e.target.value})}>
         {['patient','doctor','lab_staff','pharmacy','hospital_admin','admin'].map(r=><option key={r} value={r}>{t(r==='lab_staff'?'labStaff':r==='hospital_admin'?'hospitalAdmin':r)}</option>)}</select></Field>
       <p className="disclaimer">{t('roleChangeHint',{defaultValue:'Role changes take effect the next time this user signs in.'})}</p></Modal>}
+    {removing && <ConfirmDialog title={t('delete')} message={t('removeUserConfirm',{defaultValue:`Delete ${removing.name}? Their sessions will be revoked. This cannot be undone.`})}
+      onClose={()=>setRemoving(null)} busy={busy} onConfirm={()=>void (async()=>{setBusy(true);try{await api.deleteUserAdmin(removing.uid);setRemoving(null);void load();toast(t('saved'));}catch(e:any){toast(e.message,true);}finally{setBusy(false);}})()}/>}
   </>; }
 export function AdminInstitutions(){
   const {t}=useTranslation(); const {toast}=useToast(); const [list,setList]=useState<Institution[]>([]);
   const [open,setOpen]=useState(false); const [busy,setBusy]=useState(false); const [errors,setErrors]=useState<string[]>([]);
+  const [removingInst,setRemovingInst]=useState<Institution|null>(null);
   const [form,setForm]=useState({name:'',type:'hospital',licenseNumber:'',city:'',address:'',contactEmail:'',contactPhone:''});
   const load=()=>api.list<Institution>('institutions').then(setList).catch(()=>{});
   useEffect(()=>{void load();},[]);
@@ -377,8 +386,10 @@ export function AdminInstitutions(){
   };
   return <><PageHead title={t('institutions')} subtitle={t('institutionsSubtitle')} actions={<button className="btn primary" onClick={()=>{setErrors([]);setOpen(true);}}><Plus size={16}/> {t('addInstitution',{defaultValue:'Add institution'})}</button>}/>
     <Card pad><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('name')}</th><th>{t('type')}</th><th>{t('license')}</th><th>{t('city')}</th><th>{t('status')}</th><th>{t('action')}</th></tr></thead><tbody>
-      {list.map(x=><tr key={x.id}><td>{x.name}</td><td>{x.type}</td><td style={{fontFamily:'monospace'}}>{x.licenseNumber}</td><td>{x.city}</td><td><StatusBadge status={x.verified?'verified':'pending_verification'}/></td>
-        <td>{!x.verified&&<button className="btn sm primary" onClick={()=>verify(x)}><ShieldCheck size={14}/> {t('verifyLicense')}</button>}</td></tr>)}</tbody></table>{!list.length&&<Empty/>}</div></Card>
+      {list.map(x=><tr key={x.id}><td>{x.name}</td><td>{x.type}</td><td style={{fontFamily:'monospace'}}>{x.licenseNumber}</td><td>{x.city}</td>
+        <td><StatusBadge status={!x.active?'inactive':x.verified?'verified':'pending_verification'}/></td>
+        <td><div style={{display:'flex',gap:4}}>{!x.verified&&<button className="btn sm primary" onClick={()=>verify(x)}><ShieldCheck size={14}/> {t('verifyLicense')}</button>}
+          <button className="btn sm outline" onClick={()=>setRemovingInst(x)}>{x.active?t('deactivate',{defaultValue:'Deactivate'}):t('activate',{defaultValue:'Activate'})}</button></div></td></tr>)}</tbody></table>{!list.length&&<Empty/>}</div></Card>
     {open && <Modal title={t('addInstitution',{defaultValue:'Add institution'})} onClose={()=>setOpen(false)} footer={<><button className="btn outline" onClick={()=>setOpen(false)}>{t('cancel')}</button><button className="btn primary" disabled={busy} onClick={()=>void create()}>{t('submit')}</button></>}>
       {errors.length>0 && <div className="alert red" role="alert">{errors.map((e,i)=><div key={i}>{e}</div>)}</div>}
       <Field label={t('name')}><input className="input" value={form.name} onChange={e=>setForm({...form,name:e.target.value})}/></Field>
@@ -389,10 +400,27 @@ export function AdminInstitutions(){
       <Field label={t('contactEmail',{defaultValue:'Contact email'})}><input className="input" type="email" value={form.contactEmail} onChange={e=>setForm({...form,contactEmail:e.target.value})}/></Field>
       <Field label={t('contactPhone',{defaultValue:'Contact phone'})}><input className="input" inputMode="tel" value={form.contactPhone} onChange={e=>setForm({...form,contactPhone:e.target.value})}/></Field>
     </Modal>}
+    {removingInst && <ConfirmDialog title={removingInst.active?t('deactivate',{defaultValue:'Deactivate'}):t('activate',{defaultValue:'Activate'})}
+      message={t('removeInstitutionConfirm',{defaultValue:`${removingInst.active?'Deactivate':'Activate'} ${removingInst.name}? Deactivated institutions stop accepting new records.`})}
+      confirmLabel={removingInst.active?t('deactivate',{defaultValue:'Deactivate'}):t('activate',{defaultValue:'Activate'})}
+      onClose={()=>setRemovingInst(null)} busy={busy}
+      onConfirm={()=>void (async()=>{setBusy(true);try{await api.setInstitutionActive(removingInst.id,!removingInst.active);setRemovingInst(null);void load();toast(t('saved'));}catch(e:any){toast(e.message,true);}finally{setBusy(false);}})()}/>}
   </>; }
-export function AdminPharmacies(){ const {t}=useTranslation(); const {toast}=useToast(); const [list,setList]=useState<Pharmacy[]>([]); useEffect(()=>{api.list<Pharmacy>('pharmacies').then(setList).catch(()=>{});},[]);
-  const approve=(x:Pharmacy)=>{void api.approvePharmacy(x.id).then(()=>{api.list<Pharmacy>('pharmacies').then(setList).catch(()=>{});toast(t('pharmacyApproved'));}).catch((e:any)=>toast(e.message,true));};
-  return <><PageHead title={t('pharmacies')} subtitle={t('pharmaciesSubtitle')}/><Card pad><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('name')}</th><th>{t('city')}</th><th translate="no">WhatsApp</th><th>{t('status')}</th><th>{t('fee')}</th><th>{t('action')}</th></tr></thead><tbody>{list.map(x=><tr key={x.id}><td><Store size={14}/> {x.name}</td><td>{x.city}</td><td translate="no">{x.whatsapp}</td><td><StatusBadge status={x.status}/></td><td>{x.monthlyFee} EGP</td><td>{x.status==='pending'&&<button className="btn sm primary" onClick={()=>approve(x)}>{t('approve')}</button>}</td></tr>)}</tbody></table></div></Card></>; }
+export function AdminPharmacies(){
+  const {t}=useTranslation(); const {toast}=useToast(); const [list,setList]=useState<Pharmacy[]>([]);
+  const [busy,setBusy]=useState(false); const [removing,setRemoving]=useState<Pharmacy|null>(null);
+  const load=()=>api.list<Pharmacy>('pharmacies').then(setList).catch(()=>{});
+  useEffect(()=>{void load();},[]);
+  const approve=(x:Pharmacy)=>{void api.approvePharmacy(x.id).then(()=>{void load();toast(t('pharmacyApproved'));}).catch((e:any)=>toast(e.message,true));};
+  return <><PageHead title={t('pharmacies')} subtitle={t('pharmaciesSubtitle')}/><Card pad><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('name')}</th><th>{t('city')}</th><th translate="no">WhatsApp</th><th>{t('status')}</th><th>{t('fee')}</th><th>{t('action')}</th></tr></thead><tbody>
+    {list.map(x=><tr key={x.id}><td><Store size={14}/> {x.name}</td><td>{x.city}</td><td translate="no">{x.whatsapp}</td><td><StatusBadge status={x.status}/></td><td>{x.monthlyFee} EGP</td>
+      <td><div style={{display:'flex',gap:4}}>{x.status==='pending'&&<button className="btn sm primary" onClick={()=>approve(x)}>{t('approve')}</button>}
+        {x.status!=='pending'&&<button className="btn sm outline" onClick={()=>setRemoving(x)}>{x.status==='approved'?t('deactivate',{defaultValue:'Deactivate'}):t('activate',{defaultValue:'Activate'})}</button>}</div></td></tr>)}</tbody></table>{!list.length&&<Empty/>}</div></Card>
+    {removing && <ConfirmDialog title={t('delete')} message={t('removePharmacyConfirm',{defaultValue:`Change ${removing.name} to ${removing.status==='approved'?'suspended':'approved'}? Patients will ${removing.status==='approved'?'no longer':'again'} see this pharmacy.`})}
+      confirmLabel={removing.status==='approved'?t('deactivate',{defaultValue:'Deactivate'}):t('activate',{defaultValue:'Activate'})}
+      onClose={()=>setRemoving(null)} busy={busy}
+      onConfirm={()=>void (async()=>{setBusy(true);try{await api.setPharmacyStatus(removing.id,removing.status==='approved'?'suspended':'approved');setRemoving(null);void load();toast(t('saved'));}catch(e:any){toast(e.message,true);}finally{setBusy(false);}})()}/>}
+  </>; }
 export function AdminAudit(){ const {t}=useTranslation(); const {toast}=useToast(); const [list,setList]=useState<any[]>([]); const [check,setCheck]=useState<any>(null);
   useEffect(()=>{void api.auditEntries().then(setList).catch(()=>{});},[]);
   const verify=async()=>{try{const v=await api.verifyAuditChain();setCheck(v);toast(v.valid?t('hashChainValidShort'):t('hashChainBrokenShort'),!v.valid);}catch(e:any){toast(e.message,true);}};

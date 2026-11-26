@@ -10,7 +10,7 @@ export async function list(req, res, next) {
     const page = await service.list({
       type,
       city,
-      active: req.query.active === undefined ? true : req.query.active === "true",
+      active: req.query.active === "all" ? undefined : req.query.active === undefined ? true : req.query.active === "true",
       limit: req.query.limit,
       startAfter,
     });
@@ -40,6 +40,22 @@ export async function create(req, res, next) {
       resourceId: institution.id,
     });
     res.status(201).json(institution);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function setActive(req, res, next) {
+  try {
+    const { active } = req.body || {};
+    if (typeof active !== "boolean") throw httpError(400, "active must be true or false");
+    const institution = await service.setActive(req.params.id, active);
+    await auditRequest(req, {
+      action: active ? "institution_activated" : "institution_deactivated",
+      resourceType: "institution",
+      resourceId: req.params.id,
+    });
+    res.json(institution);
   } catch (err) {
     next(err);
   }

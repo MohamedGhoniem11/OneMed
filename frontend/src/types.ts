@@ -25,7 +25,7 @@ export interface Medicine { name: string; dosage: string; frequency: string; dur
 export type OrderStatus = 'received' | 'verifying' | 'preparing' | 'ready' | 'handed_over' | 'completed' | 'cancelled';
 export interface Prescription {
   id: string; doctorId: string; doctorName: string; patientId: string; patientName: string;
-  date: string; status: 'pending' | 'confirmed'; extractionStatus: 'pending' | 'extracted' | 'confirmed';
+  date: string; status: 'pending' | 'confirmed' | 'cancelled'; extractionStatus: 'pending' | 'extracted' | 'confirmed' | 'cancelled';
   medicines: Medicine[]; confidence: number; notes?: string; linkToken?: string;
   linkExpiresAt?: string; fulfillmentLink?: string; pharmacyId?: string; orderStatus?: OrderStatus;
   whatsappUrl?: string;

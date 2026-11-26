@@ -9,6 +9,7 @@ import { extractPdfText, rasterizePdf } from "./pdf.service.js";
 import { normalizeCsv, normalizeDicom, normalizeJson, normalizeOcrText, normalizeType, toNumber, flagFor } from "./normalization.service.js";
 import { saveEncrypted, sha256 } from "./file-storage.service.js";
 import { canReadPatient } from "../middleware/consent.js";
+import { can } from "../constants/permissions.js";
 import { awardForUpload } from "./credit.service.js";
 import { notify } from "./notification.service.js";
 
@@ -252,6 +253,7 @@ export async function listVisibleRecords(req, { type, patientId, limit } = {}) {
   const allowed = new Map();
   const items = [];
   for (const record of page.items) {
+    if (record.lifecycle === "deleted") continue;
     if (req.user.role === "patient" && (record.status === "needs_review" || record.lifecycle === "manual_review")) continue;
     if (!allowed.has(record.patientId)) {
       let ok;
@@ -265,12 +267,31 @@ export async function listVisibleRecords(req, { type, patientId, limit } = {}) {
 
 export async function getVisibleRecord(req, id) {
   const record = await getStore().get(RECORDS, id);
-  if (!record) throw httpError(404, "Record not found");
+  if (!record || record.lifecycle === "deleted") throw httpError(404, "Record not found");
   await canReadPatient(req, record.patientId, { scope: "records" });
   if (req.user.role === "patient" && (record.status === "needs_review" || record.lifecycle === "manual_review")) {
     throw httpError(404, "Record not found");
   }
   return record;
+}
+
+/**
+ * Soft-delete: clinical records are retained for the audit trail but removed
+ * from every patient/staff view. The patient owner or a records writer with
+ * patient consent may remove a record.
+ */
+export async function softDeleteRecord(req, id) {
+  const record = await getStore().get(RECORDS, id);
+  if (!record || record.lifecycle === "deleted") throw httpError(404, "Record not found");
+  if (req.user?.uid !== record.patientId) {
+    if (!can(req.user?.role, "records:write")) throw httpError(403, "Forbidden");
+    await canReadPatient(req, record.patientId, { scope: "records" });
+  }
+  return getStore().update(RECORDS, id, {
+    lifecycle: "deleted",
+    lifecycleHistory: [...(record.lifecycleHistory || []).slice(-19), { step: "deleted", at: new Date() }],
+    updatedAt: new Date(),
+  });
 }
 
 export async function pendingReview() {
@@ -279,5 +300,6 @@ export async function pendingReview() {
     orderBy: [{ field: "createdAt", direction: "desc" }],
     limit: 100,
   });
+  page.items = page.items.filter((r) => r.lifecycle !== "deleted");
   return page;
 }

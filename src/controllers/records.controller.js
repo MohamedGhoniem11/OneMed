@@ -31,6 +31,17 @@ export const createManual = send(async (req) => {
 
 export const review = send((req) => service.reviewRecord(req));
 
+export const remove = send(async (req) => {
+  const record = await service.softDeleteRecord(req, req.params.id);
+  await auditRequest(req, {
+    action: "record_removed",
+    resourceType: "record",
+    resourceId: record.id,
+    patientId: record.patientId,
+  });
+  return { ok: true, id: record.id };
+});
+
 export async function downloadOriginal(req, res, next) {
   try {
     const record = await service.getVisibleRecord(req, req.params.id);

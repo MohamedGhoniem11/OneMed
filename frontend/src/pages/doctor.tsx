@@ -13,7 +13,7 @@ import {
 import * as api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
 import type { Patient, MedicalRecord, Prescription, Medicine, Consent, AuditEntry, ChatTurn, Conversation, Message } from '../types';
-import { Badge, Card, CopyButton, Empty, Field, IdentityStrip, Modal, PageHead, SectionTabs, SkeletonCards, Stat, StatusBadge, Tabs, useToast } from '../components/ui';
+import { Badge, Card, ConfirmDialog, CopyButton, Empty, Field, IdentityStrip, Modal, PageHead, SectionTabs, SkeletonCards, Stat, StatusBadge, Tabs, useToast } from '../components/ui';
 
 export function DoctorDashboard() {
   const { session } = useAuth(); const { t } = useTranslation(); const nav = useNavigate(); const {toast}=useToast();
@@ -102,7 +102,7 @@ export function DoctorPrescriptions() {
   const { session } = useAuth(); const { t } = useTranslation(); const {toast}=useToast();
   const [tab,setTab]=useState('list'); const [rx,setRx]=useState<Prescription[]>([]); const [patients,setPatients]=useState<Patient[]>([]);
   const [image,setImage]=useState<string|null>(null); const [items,setItems]=useState<Medicine[]>([]); const [confidence,setConfidence]=useState(0); const [patientId,setPatientId]=useState(''); const [busy,setBusy]=useState(false); const [link,setLink]=useState(''); const [draftId,setDraftId]=useState('');
-  const [zoom,setZoom]=useState(1); const [rotate,setRotate]=useState(0);
+  const [zoom,setZoom]=useState(1); const [rotate,setRotate]=useState(0); const [removing,setRemoving]=useState<Prescription|null>(null);
   useEffect(()=>{ api.list<Prescription>('prescriptions').then(a=>setRx(a.filter(r=>r.doctorId===session!.user.uid))).catch((e:any)=>toast(e.message,true)); api.searchPatients('').then(a=>{setPatients(a);setPatientId(a[0]?.id||'');}).catch(()=>{}); },[]);
   const file = async (f:File|undefined)=>{
     if(!f) return;
@@ -133,7 +133,8 @@ export function DoctorPrescriptions() {
   };
   return <><PageHead title={t('prescriptions')} subtitle={t('prescriptionsSubtitleDoctor')} actions={<button className="btn primary" onClick={()=>setTab('review')}><Upload size={16}/> {t('newExtraction')}</button>}/>
     <Tabs tabs={[{id:'list',label:t('prescriptions')},{id:'review',label:t('extractionReview')}]} active={tab} onChange={setTab}/>
-    {tab==='list'?<Card pad><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('date')}</th><th>{t('patient')}</th><th>{t('extractedMedicines')}</th><th>{t('confidenceLabel')}</th><th>{t('status')}</th><th>{t('action')}</th></tr></thead><tbody>{rx.map(r=><tr key={r.id}><td>{new Date(r.date).toLocaleDateString()}</td><td>{r.patientName}</td><td>{r.medicines.map(m=>m.name).join(', ')}</td><td><Badge tone={r.confidence>=90?'green':'amber'}>{r.confidence}%</Badge></td><td><StatusBadge status={r.extractionStatus}/></td><td><div style={{display:'flex',gap:4}}>{r.fulfillmentLink&&<Link className="btn sm" to={r.fulfillmentLink}>{t('view')}</Link>}</div></td></tr>)}</tbody></table>{!rx.length&&<Empty/>}</div></Card>
+    {tab==='list'?<Card pad><div className="table-wrap"><table className="tbl"><thead><tr><th>{t('date')}</th><th>{t('patient')}</th><th>{t('extractedMedicines')}</th><th>{t('confidenceLabel')}</th><th>{t('status')}</th><th>{t('action')}</th></tr></thead><tbody>{rx.map(r=><tr key={r.id}><td>{new Date(r.date).toLocaleDateString()}</td><td>{r.patientName}</td><td>{r.medicines.map(m=>m.name).join(', ')}</td><td><Badge tone={r.confidence>=90?'green':'amber'}>{r.confidence}%</Badge></td><td><StatusBadge status={r.extractionStatus}/></td><td><div style={{display:'flex',gap:4}}>{r.fulfillmentLink&&<Link className="btn sm" to={r.fulfillmentLink}>{t('view')}</Link>}
+          {r.status!=='confirmed'&&<button className="btn sm outline" aria-label={`${t('delete')} ${t('prescriptions')}`} onClick={()=>setRemoving(r)}><Trash2 size={14}/></button>}</div></td></tr>)}</tbody></table>{!rx.length&&<Empty/>}</div></Card>
     :<><div className="grid" style={{gridTemplateColumns:'minmax(0,1fr) minmax(0,1.3fr)',gap:16}}>
       <Card title={t('sourceDocument')} action={<div style={{display:'flex',gap:4}}><button className="btn sm outline" onClick={()=>setZoom(z=>Math.min(2.5,z+0.25))} aria-label={t('zoomIn')}>＋</button><button className="btn sm outline" onClick={()=>setZoom(z=>Math.max(.5,z-0.25))} aria-label={t('zoomOut')}>−</button><button className="btn sm outline" onClick={()=>setRotate(r=>(r+90)%360)} aria-label={t('rotate')}>⟳</button></div>}><label className="btn outline" style={{width:'100%'}}><ImageIcon size={16}/> {t('uploadPrescription')}<input type="file" accept="image/*" hidden onChange={e=>file(e.target.files?.[0])}/></label>
         <div style={{marginTop:14,minHeight:260,background:'#f7f9fc',border:'1px dashed var(--line)',borderRadius:8,display:'grid',placeItems:'center',overflow:'hidden'}}>{image?<img src={image} alt={t('uploadedPrescriptionAlt')} style={{maxWidth:'100%',maxHeight:340,transform:`scale(${zoom}) rotate(${rotate}deg)`,transition:'transform .2s'}}/>:<div className="empty"><Upload size={30}/><p>{t('uploadPrompt')}</p></div>}</div>
@@ -147,6 +148,8 @@ export function DoctorPrescriptions() {
         {link && <div className="alert green" style={{marginTop:12}}><CheckCircle2 size={16}/> {link}<br/><Link to={`/f/${link.split('/f/')[1]}`}>{t('openFulfillment')}</Link> <CopyButton value={link} label={t('copyLink')}/></div>}
       </div></Card>
     </div></>}
+    {removing && <ConfirmDialog title={t('delete')} message={t('discardPrescriptionConfirm',{defaultValue:'Discard this unconfirmed extraction draft? Confirmed prescriptions are never removed.'})}
+      onClose={()=>setRemoving(null)} onConfirm={()=>void (async()=>{try{await api.discardPrescription(removing.id);setRx(a=>a.map(x=>x.id===removing.id?{...x,status:'cancelled',extractionStatus:'cancelled'}:x));setRemoving(null);toast(t('saved'));}catch(e:any){toast(e.message,true);}})()}/>}
   </>;
 }
 
@@ -193,15 +196,20 @@ function DownloadIcon(){return <span>⬇</span>;}
 export function DoctorMessages() {
   const {t}=useTranslation(); const {session}=useAuth(); const {toast}=useToast();
   const [convs,setConvs]=useState<Conversation[]>([]); const [active,setActive]=useState<string|null>(null);
-  const [msgs,setMsgs]=useState<Message[]>([]); const [text,setText]=useState('');
+  const [msgs,setMsgs]=useState<Message[]>([]); const [text,setText]=useState(''); const [removing,setRemoving]=useState<Conversation|null>(null);
   useEffect(()=>{ void api.listConversations().then(a=>{setConvs(a);setActive(a[0]?.id||null);}).catch((e:any)=>toast(e.message,true)); },[]);
   useEffect(()=>{ if(active) void api.listMessages(active).then(setMsgs).catch((e:any)=>toast(e.message,true)); },[active]);
   const send=async()=>{ if(!text.trim()||!active) return; await api.sendMessage(active,text); setText(''); setMsgs(await api.listMessages(active)); toast(t('saved')); };
   return <><PageHead title={t('messages')} subtitle={t('messagesSubtitleDoctor')}/>
     <div className="grid" style={{gridTemplateColumns:'minmax(0,280px) minmax(0,1fr)'}}>
-      <Card pad><div className="card-body">{convs.map(c=><button key={c.id} className={`nav-item ${active===c.id?'active':''}`} style={{color:'var(--ink)'}} onClick={()=>setActive(c.id)}><span className="avatar">{c.otherName.slice(0,2).toUpperCase()}</span><span><strong>{c.otherName}</strong><div style={{fontSize:11,color:'var(--muted)'}}>{t(c.role==='lab_staff'?'labStaff':c.role)}</div></span></button>)}{!convs.length&&<Empty message={t('noConversationsYet')}/>}</div></Card>
+      <Card pad><div className="card-body">{convs.map(c=><div key={c.id} style={{display:'flex',alignItems:'center',gap:4}}>
+        <button className={`nav-item ${active===c.id?'active':''}`} style={{color:'var(--ink)',flex:1}} onClick={()=>setActive(c.id)}><span className="avatar">{c.otherName.slice(0,2).toUpperCase()}</span><span><strong>{c.otherName}</strong><div style={{fontSize:11,color:'var(--muted)'}}>{t(c.role==='lab_staff'?'labStaff':c.role)}</div></span></button>
+        <button className="btn sm outline" aria-label={`${t('delete')} ${c.otherName}`} onClick={()=>setRemoving(c)}><Trash2 size={14}/></button></div>)}{!convs.length&&<Empty message={t('noConversationsYet')}/>}</div></Card>
       <Card pad={false}><div className="card-head"><h3>{convs.find(c=>c.id===active)?.otherName||'-'}</h3></div><div className="card-body"><div className="chat-log">{msgs.map(m=><div key={m.id} className={`msg ${m.senderId===session!.user.uid?'me':''}`}>{m.text}<div style={{fontSize:10,opacity:.6,marginTop:4}}>{new Date(m.sentAt).toLocaleTimeString()}</div></div>)}</div><div style={{display:'flex',gap:8,marginTop:12}}><input className="input" value={text} onChange={e=>setText(e.target.value)} placeholder={t('typeMessage')} onKeyDown={e=>{if(e.key==='Enter')void send();}}/><button className="btn primary" onClick={()=>void send()}>{t('send')}</button></div></div></Card>
-    </div></>;
+    </div>
+    {removing && <ConfirmDialog title={t('delete')} message={t('removeConversationConfirm',{defaultValue:`Delete the conversation with ${removing.otherName} and its messages?`})}
+      onClose={()=>setRemoving(null)} onConfirm={()=>void (async()=>{try{await api.deleteConversation(removing.id);setConvs(a=>a.filter(c=>c.id!==removing.id));if(active===removing.id){setActive(null);setMsgs([]);}setRemoving(null);toast(t('saved'));}catch(e:any){toast(e.message,true);}})()}/>}
+  </>;
 }
 
 export function DoctorReports() {

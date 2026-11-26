@@ -36,3 +36,9 @@ export async function verify(id, verified) {
   if (!existing) throw httpError(404, "Institution not found");
   return getStore().update(COLLECTION, id, { verified, updatedAt: new Date() });
 }
+
+export async function setActive(id, active) {
+  const existing = await getStore().get(COLLECTION, id);
+  if (!existing) throw httpError(404, "Institution not found");
+  return getStore().update(COLLECTION, id, { active, updatedAt: new Date() });
+}

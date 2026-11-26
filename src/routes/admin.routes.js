@@ -24,4 +24,21 @@ router.patch("/pharmacies/:id/approve", async (req, res, next) => {
   } catch (error) { next(error); }
 });
 
+router.patch("/pharmacies/:id/status", async (req, res, next) => {
+  try {
+    const status = String(req.body?.status || "");
+    if (!["approved", "suspended", "inactive"].includes(status)) throw httpError(400, "Invalid pharmacy status");
+    const pharmacy = await getStore().get("pharmacies", req.params.id);
+    if (!pharmacy) throw httpError(404, "Pharmacy not found");
+    const updated = await getStore().update("pharmacies", pharmacy.id, {
+      status, active: status === "approved", updatedAt: new Date(),
+    });
+    await auditRequest(req, {
+      action: "pharmacy_status_changed", resourceType: "pharmacy", resourceId: pharmacy.id,
+      metadata: { status },
+    });
+    res.json(updated);
+  } catch (error) { next(error); }
+});
+
 export default router;

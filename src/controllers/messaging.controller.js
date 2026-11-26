@@ -8,3 +8,4 @@ export const listConversations = send(async (req) => ({ conversations: await ser
 export const createConversation = send(async (req) => service.createConversation(req.body, req.user), 201);
 export const listMessages = send(async (req) => ({ messages: await service.listMessages(req.params.id, req.user) }));
 export const sendMessage = send(async (req) => service.sendMessage(req.params.id, req.body, req.user), 201);
+export const removeConversation = send((req) => service.removeConversation(req.params.id, req.user));
