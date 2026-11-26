@@ -24,8 +24,8 @@ export function DoctorDashboard() {
     <PageHead title={t('goodMorning', {name:session!.user.name.split(' ').slice(-1)[0]})} subtitle={`${t('dashboard')} - ${new Date().toLocaleDateString()}`} actions={<span className="badge green">● {t('systemOnline')}</span>}/>
     <div style={{display:'flex',gap:10,marginBottom:16,flexWrap:'wrap'}}><input className="input" style={{maxWidth:400}} placeholder={t('searchPatientHint', {field:t('nationalId')})} value={q} onChange={e=>setQ(e.target.value)}/>
       <button className="btn danger" onClick={()=>void api.myEmergencyLink().then(p=>{if(p)window.open(p,'_blank');else toast(t('noEmergencyLink'),true);})}>✚ {t('emergencyShortcut')}</button>
-      <button className="btn outline" onClick={()=>nav('/app/doctor/qr')}><ScanLine size={16}/> {t('nfcScanner')}</button>
-      <button className="btn outline" onClick={()=>nav('/app/doctor/qr')}><QrCode size={16}/> {t('qrGenerator')}</button>
+      <button className="btn outline" onClick={()=>nav('/app/doctor/qr?tab=nfc')}><ScanLine size={16}/> {t('nfcScanner')}</button>
+      <button className="btn outline" onClick={()=>nav('/app/doctor/qr?tab=qr')}><QrCode size={16}/> {t('qrGenerator')}</button>
       <Link className="btn navy" to="/app/doctor/prescriptions"><Plus size={16}/> {t('newConsultation')}</Link></div>
     {loading ? <SkeletonCards/> : <div className="grid cols-2"><Card title={t('recentPatients')} action={<Link className="btn sm" to="/app/doctor/patients">{t('viewAll')}</Link>} pad={false}>
       <div className="table-wrap"><table className="tbl"><thead><tr><th>{t('patient')}</th><th>{t('nationalId')}</th><th>{t('status')}</th><th>{t('action')}</th></tr></thead><tbody>
@@ -152,7 +152,8 @@ export function DoctorPrescriptions() {
 
 export function DoctorQrTools() {
   const { session } = useAuth(); const { t } = useTranslation(); const {toast}=useToast(); const nav=useNavigate();
-  const [tab,setTab]=useState('nfc'); const [qr,setQr]=useState(''); const [seconds,setSeconds]=useState(900); const [token,setToken]=useState('');
+  const [params] = useSearchParams();
+  const [tab,setTab]=useState(params.get('tab')==='qr'?'qr':'nfc'); const [qr,setQr]=useState(''); const [seconds,setSeconds]=useState(900); const [token,setToken]=useState('');
   const [patients,setPatients]=useState<Patient[]>([]); const [patientId,setPatientId]=useState('');
   useEffect(()=>{ api.searchPatients('').then(a=>{setPatients(a);setPatientId(a[0]?.id||'');}).catch(()=>{}); },[]);
   useEffect(()=>{ if(!qr) return; const t=setInterval(()=>setSeconds(s=>Math.max(0,s-1)),1000); return ()=>clearInterval(t); },[qr]);

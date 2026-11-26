@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import QRCode from 'qrcode';
@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 import * as api from '../api/client';
 import { useAuth } from '../auth/AuthContext';
-import type { Patient, MedicalRecord, Prescription, Consent, EmergencyProfile, Notification, Conversation, Message, AuditEntry } from '../types';
+import type { Patient, MedicalRecord, Prescription, Consent, EmergencyProfile, Notification, Conversation, Message, AuditEntry, Institution } from '../types';
 import { Badge, Card, Chip, CopyButton, Empty, Field, IdentityStrip, MetricCard, Modal, PageHead, SectionTabs, SkeletonCards, Stat, StatusBadge, Tabs, useToast } from '../components/ui';
 
 const RECORD_COLORS:Record<string,string> = { lab:'blue', imaging:'purple', prescription:'green', note:'gray', visit:'blue', vitals:'teal' };
@@ -58,15 +58,28 @@ export function PatientDashboard() {
 }
 
 export function PatientRecords() {
-  const { session } = useAuth(); const { t } = useTranslation(); const {toast}=useToast(); const [records,setRecords] = useState<MedicalRecord[]>([]); const [type,setType] = useState('all'); const [q,setQ] = useState('');
-  useEffect(()=>{ api.listRecords(session!.user.uid).then(a=>setRecords(a.sort((x,y)=>String(y.date).localeCompare(String(x.date))))).catch((e:any)=>toast(e.message,true)); },[]);
+  const { session } = useAuth(); const { t } = useTranslation(); const {toast}=useToast();
+  const [params,setParams]=useSearchParams(); const [records,setRecords] = useState<MedicalRecord[]>([]); const [institutions,setInstitutions]=useState<Institution[]>([]);
+  const [type,setType] = useState('all'); const [q,setQ] = useState('');
+  useEffect(()=>{ api.listRecords(session!.user.uid).then(a=>setRecords(a.sort((x,y)=>String(y.date).localeCompare(String(x.date))))).catch((e:any)=>toast(e.message,true));
+    void api.list<Institution>('institutions').then(setInstitutions).catch(()=>{}); },[]);
   const filtered = records.filter(r=>(type==='all'||r.type===type) && (!q||`${r.title} ${r.institution}`.toLowerCase().includes(q.toLowerCase())));
+  const selected = records.find(r=>r.id===params.get('record'))||null;
   return <><PageHead title={t('records')} subtitle={t('clinicalTimeline')} actions={<button className="btn outline" onClick={()=>window.print()}><Download size={16}/> {t('printRecord')}</button>}/>
     <Card pad><div style={{padding:18,display:'flex',gap:10,flexWrap:'wrap'}}><input className="input" style={{maxWidth:260}} placeholder={t('search')} value={q} onChange={e=>setQ(e.target.value)}/><div className="tabs" style={{border:0,margin:0}}>{['all','lab','imaging','prescription','note','visit','vitals'].map(x=><button key={x} className={`tab ${type===x?'active':''}`} onClick={()=>setType(x)}>{t(x)}</button>)}</div></div>
-      <div className="table-wrap"><table className="tbl"><thead><tr><th>{t('date')}</th><th>{t('type')}</th><th>{t('name')}</th><th>{t('institution')}</th><th>{t('confidenceLabel')}</th><th>{t('status')}</th></tr></thead><tbody>
-        {filtered.map(r=><tr key={r.id}><td>{new Date(r.date).toLocaleDateString()}</td><td><Badge tone={RECORD_COLORS[r.type] as any}>{t(r.type)}</Badge></td><td><strong>{r.title}</strong><div style={{fontSize:12,color:'var(--muted)'}}>{r.summary}</div>{r.values?.map(v=><div key={v.name} style={{fontSize:12}}>{v.name}: <strong style={{color:v.flag==='high'?'var(--red)':v.flag==='low'?'var(--amber)':'inherit'}}>{v.value} {v.unit}</strong> <span style={{color:'var(--muted)'}}>({v.referenceLow}-{v.referenceHigh})</span></div>)}</td><td>{r.institution}</td><td>{r.confidence?`${r.confidence}%`:'-'}</td><td><StatusBadge status={r.status||'accessible'}/></td></tr>)}
+      <div className="table-wrap"><table className="tbl"><thead><tr><th>{t('date')}</th><th>{t('type')}</th><th>{t('name')}</th><th>{t('institution')}</th><th>{t('confidenceLabel')}</th><th>{t('status')}</th><th>{t('action')}</th></tr></thead><tbody>
+        {filtered.map(r=><tr key={r.id}><td>{new Date(r.date).toLocaleDateString()}</td><td><Badge tone={RECORD_COLORS[r.type] as any}>{t(r.type)}</Badge></td><td><strong>{r.title}</strong><div style={{fontSize:12,color:'var(--muted)'}}>{r.summary}</div></td><td>{institutions.find(i=>i.id===r.institution)?.name||r.institution||'-'}</td><td>{r.confidence?`${r.confidence}%`:'-'}</td><td><StatusBadge status={r.status||'accessible'}/></td>
+          <td><button className="btn sm outline" onClick={()=>setParams({record:r.id})}>{t('view')}</button></td></tr>)}
       </tbody></table>{!filtered.length&&<Empty/>}</div>
     </Card>
+    {selected && <Modal title={selected.title} onClose={()=>setParams({})} footer={<button className="btn outline" onClick={()=>setParams({})}>{t('close')}</button>}>
+      <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}><Badge tone={RECORD_COLORS[selected.type] as any}>{t(selected.type)}</Badge><StatusBadge status={selected.status||'accessible'}/>
+        {selected.confidence!=null&&<Badge tone="blue">{selected.confidence}%</Badge>}</div>
+      <p style={{color:'var(--muted)'}}>{new Date(selected.date).toLocaleString()} · {institutions.find(i=>i.id===selected.institution)?.name||selected.institution||'-'}</p>
+      {selected.summary&&<p>{selected.summary}</p>}
+      {selected.values?.length ? <div className="table-wrap"><table className="tbl"><thead><tr><th>{t('name')}</th><th>{t('value')}</th><th>{t('referenceRange')}</th><th>{t('status')}</th></tr></thead><tbody>
+        {selected.values.map(v=><tr key={v.name}><td>{v.name}</td><td><strong>{v.value} {v.unit}</strong></td><td>{v.referenceLow!=null?`${v.referenceLow} - ${v.referenceHigh}`:'-'}</td><td><Badge tone={v.flag==='high'?'red':v.flag==='low'?'amber':'green'}>{t(v.flag||'normal')}</Badge></td></tr>)}</tbody></table></div> : <Empty message={t('noRecords')}/>}
+    </Modal>}
   </>;
 }
 
@@ -161,19 +174,25 @@ export function PatientConsents() {
 export function PatientEmergencyConfig() {
   const { session } = useAuth(); const { t } = useTranslation(); const {toast}=useToast();
   const [profile,setProfile] = useState<EmergencyProfile|null>(null); const [qr,setQr] = useState(''); const [tab,setTab]=useState('settings');
+  const defaults = {showBloodType:true,showAllergies:true,showConditions:true,showMedications:false,showContacts:true,aiChatbotEnabled:true};
+  const cacheKey = `onemed.emergency.${session!.user.uid}`;
   useEffect(()=>{ void (async()=>{
     let p:any=null;
-    if(api.API_MODE==='api'){ const q=await api.createEmergencyQr(); p={ token:q.token, patientId:session!.user.uid, activatedAt:q.createdAt, settings:{showBloodType:true,showAllergies:true,showConditions:true,showMedications:false,showContacts:true,aiChatbotEnabled:true} }; }
-    else { const a=await api.list<EmergencyProfile>('emergencyProfiles',x=>x.patientId===session!.user.uid); p=a[0]||null; }
+    if(api.API_MODE==='api'){
+      // The API's /mine endpoint issues a new token each call: keep one stable
+      // wearable link per browser instead of minting a new QR on every visit.
+      const cached=JSON.parse(localStorage.getItem(cacheKey)||'null');
+      const token=cached?.token || (await api.createEmergencyQr()).token;
+      localStorage.setItem(cacheKey,JSON.stringify({token,settings:cached?.settings||defaults}));
+      p={ token, patientId:session!.user.uid, activatedAt:cached?.activatedAt||new Date().toISOString(), settings:cached?.settings||defaults };
+    } else { const a=await api.list<EmergencyProfile>('emergencyProfiles',x=>x.patientId===session!.user.uid); p=a[0]||null; }
     const n=await api.myNfc();
-    if(n.issued) p={ ...(p as any), token:p?.token||'', patientId:session!.user.uid, nfcIssued:true,
-      nfcUid:n.nfcUid, scanCount:n.scanCount||0, activatedAt:p?.activatedAt||new Date().toISOString(),
-      settings:p?.settings||{showBloodType:true,showAllergies:true,showConditions:true,showMedications:false,showContacts:true,aiChatbotEnabled:true} };
-    if(!p?.token && api.API_MODE==='api'){ const r=await api.createEmergencyQr(); p={ ...(p as any), token:r.token }; }
+    if(n.issued) p={ ...(p as any), nfcIssued:true, nfcUid:n.nfcUid, scanCount:n.scanCount||0 };
     setProfile(p); if(p?.token) void QRCode.toDataURL(`${location.origin}/emergency/${p.token}`).then(setQr).catch(()=>{});
   })().catch((e:any)=>toast(e.message||'Unable to load emergency settings',true)); },[]);
   const toggle = async (k:keyof EmergencyProfile['settings'])=>{
     if(!profile) return; const next={...profile,settings:{...profile.settings,[k]:!profile.settings[k]}}; setProfile(next);
+    localStorage.setItem(cacheKey,JSON.stringify({token:next.token,settings:next.settings,activatedAt:next.activatedAt}));
     try{ await api.updateEmergencyPrivacy(next.settings); }catch(e:any){ toast(e.message,true); }
   };
   const fields:[keyof EmergencyProfile['settings'],string][] = [['showBloodType',t('bloodGroup')],['showAllergies',t('allergies')],['showConditions',t('chronicConditions')],['showMedications',t('currentMedications')],['showContacts',t('emergencyContact')],['aiChatbotEnabled',t('askAi')]];

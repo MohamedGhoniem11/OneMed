@@ -26,6 +26,9 @@ npm-debug.log*
 frontend/playwright-report/
 frontend/test-results/
 
+# Impeccable local screenshots
+.impeccable/
+
 # Internal reports (kept outside the public repo)
 FINAL-REPORT.md
 docs/

@@ -35,7 +35,7 @@ export interface Pharmacy {
   lat: number; lng: number; hours: string; rating: number; active: boolean; status: 'pending' | 'approved' | 'suspended';
   monthlyFee: number;
 }
-export interface Institution { id: string; name: string; type: 'hospital' | 'laboratory' | 'clinic'; licenseNumber: string; city: string; address: string; verified: boolean; active: boolean }
+export interface Institution { id: string; name: string; type: 'hospital' | 'laboratory' | 'clinic'; licenseNumber: string; city: string; address: string; verified: boolean; active: boolean; contactEmail?: string; contactPhone?: string }
 export interface Consent { id: string; patientId: string; granteeType: 'doctor' | 'institution'; granteeId: string; granteeName: string; scope: string; purpose: string; active: boolean; grantedAt: string; expiresAt?: string }
 export interface EmergencySettings {
   showBloodType: boolean; showAllergies: boolean; showConditions: boolean;
