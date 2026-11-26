@@ -32,7 +32,7 @@ export function PatientDashboard() {
     api.listRecords(session!.user.uid).then(a=>setRecords(a.sort((x,y)=>String(y.date).localeCompare(String(x.date))))),
     api.list<Prescription>('prescriptions',r=>r.patientId===session!.user.uid).then(setRx),
     api.patientAnalytics(session!.user.uid).then(a=>setScore(a.healthScore)).catch(()=>{}),
-  ]).finally(()=>setLoading(false)); },[]);
+  ]).catch(()=>{}).finally(()=>setLoading(false)); },[]);
   return <>
     <PageHead title={`${t('welcomeBack')}, ${patient?.name.split(' ')[0]||session?.user.name.split(' ')[0]}`} subtitle={`${t('dashboard')} - ${new Date().toLocaleDateString()}`} actions={<Link className="btn primary" to="/app/patient/analytics"><BarChart3 size={16}/> {t('analytics')}</Link>}/>
     {loading ? <SkeletonCards/> : <><div className="grid cols-4">

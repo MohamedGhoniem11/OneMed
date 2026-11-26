@@ -112,7 +112,7 @@ export function AppShell({children}:{children:React.ReactNode}) {
       <NavLink to={roleHome[role]} className="rail-brand" aria-label={t('appName')} title={t('appName')}>
         <span className="brand-mark" aria-hidden="true">+</span>
       </NavLink>
-      <nav className="rail-nav">
+      <nav className="rail-nav" aria-label={t('primaryNavigation')}>
         {groups.map((group,idx)=><div className="rail-group" key={`${group.key}-${idx}`}
           role="group" aria-label={group.key ? t(group.key) : undefined}>
           {idx > 0 && <span className="rail-divider" aria-hidden="true"/>}
