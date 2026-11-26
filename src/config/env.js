@@ -192,7 +192,7 @@ if (nodeEnv === "production") {
   if (missing.length) throw new ConfigError(`Production configuration is incomplete: ${missing.join(", ")}`);
   if (storageDriver !== "firebase") throw new ConfigError("STORAGE_DRIVER=firebase is required in production");
   if (llmDriver !== "cloud") throw new ConfigError("LLM_DRIVER=cloud is required in production");
-  if (rateLimitDisabled) throw new ConfigError("RATE_LIMIT_DISABLED must be false in production");
+  if (readBool("RATE_LIMIT_DISABLED", false)) throw new ConfigError("RATE_LIMIT_DISABLED must be false in production");
 }
 
 export const env = Object.freeze({

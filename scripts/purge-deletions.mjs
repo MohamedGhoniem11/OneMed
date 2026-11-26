@@ -6,8 +6,8 @@
  * Run daily from a scheduler (cron / Cloud Scheduler in production).
  */
 import "dotenv/config";
-import fs from "node:fs";
 import { getStore } from "../src/store/index.js";
+import { deleteEncryptedFile } from "../src/services/file-storage.service.js";
 import { env } from "../src/config/env.js";
 import { getIdp } from "../src/auth/index.js";
 import { appendAudit } from "../src/services/audit.service.js";
@@ -25,9 +25,7 @@ async function deleteWhere(collection, field, value) {
 async function purgePatient(patientId) {
   // Encrypted originals must be removed from disk, not just their metadata.
   const uploads = await deleteWhere("uploads", "patientId", patientId);
-  for (const upload of uploads) {
-    if (upload.storagePath) await fs.promises.unlink(upload.storagePath).catch(() => {});
-  }
+  for (const upload of uploads) await deleteEncryptedFile(upload);
   for (const collection of COLLECTIONS.filter((c) => c !== "uploads")) {
     const field = ["deviceTokens", "authSessions", "userMfa", "users", "aiIssues"].includes(collection) ? "userId" : "patientId";
     await deleteWhere(collection, field, patientId);

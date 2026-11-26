@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { ConfigError, env } from "../config/env.js";
+import { getStorageBucket } from "../config/firebase.js";
 import { getStore } from "../store/index.js";
 import { httpError } from "../utils/http-error.js";
 
@@ -74,9 +75,20 @@ export async function saveEncrypted({ buffer, patientId, filename, mimeType, upl
   const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
   const ciphertext = Buffer.concat([cipher.update(buffer), cipher.final()]);
   const tag = cipher.getAuthTag();
-  const storedPath = path.join(env.uploadDir, safeSegment(patientId), `${id}.enc`);
-  await fs.promises.mkdir(path.dirname(storedPath), { recursive: true });
-  await fs.promises.writeFile(storedPath, Buffer.concat([iv, tag, ciphertext]), { mode: 0o600 });
+  const payload = Buffer.concat([iv, tag, ciphertext]);
+  const storageDriver = env.storageDriver;
+  let storedPath;
+  if (storageDriver === "firebase") {
+    const objectKey = `uploads/${safeSegment(patientId)}/${id}.enc`;
+    await getStorageBucket().file(objectKey).save(payload, {
+      metadata: { contentType: "application/octet-stream", metadata: { encryption: "AES-256-GCM" } },
+    });
+    storedPath = objectKey;
+  } else {
+    storedPath = path.join(env.uploadDir, safeSegment(patientId), `${id}.enc`);
+    await fs.promises.mkdir(path.dirname(storedPath), { recursive: true });
+    await fs.promises.writeFile(storedPath, payload, { mode: 0o600 });
+  }
 
   const metadata = await getStore().add(UPLOADS, {
     id,
@@ -90,6 +102,7 @@ export async function saveEncrypted({ buffer, patientId, filename, mimeType, upl
     sha256: checksum ?? sha256(buffer),
     encryption: "AES-256-GCM",
     storagePath: storedPath,
+    storageDriver,
     createdAt: new Date(),
   });
   return metadata;
@@ -99,9 +112,17 @@ export async function saveEncrypted({ buffer, patientId, filename, mimeType, upl
 export async function readEncrypted(uploadId) {
   const meta = await getStore().get(UPLOADS, uploadId);
   if (!meta) throw httpError(404, "Upload not found");
-  const raw = await fs.promises.readFile(meta.storagePath).catch(() => {
-    throw httpError(404, "Original file is missing");
-  });
+  let raw;
+  if (meta.storageDriver === "firebase") {
+    const file = getStorageBucket().file(meta.storagePath);
+    const [exists] = await file.exists();
+    if (!exists) throw httpError(404, "Original file is missing");
+    [raw] = await file.download();
+  } else {
+    raw = await fs.promises.readFile(meta.storagePath).catch(() => {
+      throw httpError(404, "Original file is missing");
+    });
+  }
   const iv = raw.subarray(0, IV_BYTES);
   const tag = raw.subarray(IV_BYTES, IV_BYTES + TAG_BYTES);
   const ciphertext = raw.subarray(IV_BYTES + TAG_BYTES);
@@ -110,6 +131,16 @@ export async function readEncrypted(uploadId) {
   const buffer = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
   if (sha256(buffer) !== meta.sha256) throw httpError(500, "Checksum verification failed");
   return { metadata: meta, buffer };
+}
+
+/** Remove the stored ciphertext for an upload (used by EDP erasure). */
+export async function deleteEncryptedFile(meta) {
+  if (!meta?.storagePath) return;
+  if (meta.storageDriver === "firebase") {
+    await getStorageBucket().file(meta.storagePath).delete({ ignoreNotFound: true }).catch(() => {});
+  } else {
+    await fs.promises.unlink(meta.storagePath).catch(() => {});
+  }
 }
 
 export async function listUploads(patientId) {

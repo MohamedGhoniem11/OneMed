@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { cert, getApp, getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getAuth as getAdminAuth } from "firebase-admin/auth";
+import { getStorage as getAdminStorage } from "firebase-admin/storage";
 import { ConfigError, env } from "./env.js";
 
 /**
@@ -63,4 +64,11 @@ export function getDb() {
 
 export function getAuth() {
   return getAdminAuth(getFirebaseApp());
+}
+
+export function getStorageBucket() {
+  if (!env.firebaseStorageBucket) {
+    throw new ConfigError("FIREBASE_STORAGE_BUCKET is required for Firebase Storage.");
+  }
+  return getAdminStorage(getFirebaseApp()).bucket(env.firebaseStorageBucket);
 }
