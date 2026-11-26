@@ -1,7 +1,7 @@
 import { getStore } from "../store/index.js";
 import { parseLimit } from "../utils/query.js";
 import { httpError } from "../utils/http-error.js";
-import { canReadPatient } from "../middleware/consent.js";
+import { allowedPatientsFor, isSelfOrAdminUser } from "./consent.service.js";
 import { auditRequest } from "./audit.service.js";
 
 const COLLECTION = "patients";
@@ -33,15 +33,10 @@ export async function searchPatients(req, query, limit = 20) {
     return [p.id, p.name, nameFor.get(p.id), p.nationalId, p.phone]
       .some((value) => String(value || "").toLowerCase().includes(needle));
   });
-  const visible = [];
-  for (const patient of matches) {
-    try {
-      await canReadPatient(req, patient.id, { scope: "records" });
-      visible.push({ ...patient, name: patient.name || nameFor.get(patient.id) || null });
-    } catch {
-      // Unauthorized matches are omitted, never returned as "not found".
-    }
-  }
+  const allowed = await allowedPatientsFor(req, "records");
+  const visible = matches
+    .filter((p) => isSelfOrAdminUser(req, p.id) || allowed === null || allowed.has(p.id))
+    .map((p) => ({ ...p, name: p.name || nameFor.get(p.id) || null }));
   return visible.slice(0, parseLimit(limit));
 }
 

@@ -96,10 +96,30 @@ export async function findActiveForGrantee(granteeType, granteeId, now = new Dat
       { field: "granteeId", op: "==", value: granteeId },
       { field: "status", op: "==", value: "active" },
     ],
-    orderBy: [{ field: "createdAt", direction: "desc" }],
     limit: 500,
   });
   return items.filter((consent) => isActive(consent, now));
+}
+
+/** One query for all patients this requester may read, instead of one query
+ * per candidate patient. `null` means unrestricted (admin). */
+export async function allowedPatientsFor(req, scope = "records", now = new Date()) {
+  const role = req?.user?.role;
+  if (role === "admin") return null;
+  let granteeType;
+  let granteeId;
+  if (role === "doctor") {
+    granteeType = "doctor"; granteeId = req.user.uid;
+  } else if (role === "lab_staff" || role === "hospital_admin") {
+    granteeType = "institution"; granteeId = req.affiliation?.institutionId;
+  }
+  if (!granteeType || !granteeId) return new Set();
+  const grants = await findActiveForGrantee(granteeType, granteeId, now);
+  return new Set(grants.filter((c) => c.scope.includes(scope)).map((c) => c.patientId));
+}
+
+export function isSelfOrAdminUser(req, patientId) {
+  return req?.user?.uid === patientId || req?.user?.role === "admin";
 }
 
 export const consentInternals = { CONSENTS, isActive };

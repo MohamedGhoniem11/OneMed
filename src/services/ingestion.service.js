@@ -9,6 +9,7 @@ import { extractPdfText, rasterizePdf } from "./pdf.service.js";
 import { normalizeCsv, normalizeDicom, normalizeJson, normalizeOcrText, normalizeType, toNumber, flagFor } from "./normalization.service.js";
 import { saveEncrypted, sha256 } from "./file-storage.service.js";
 import { canReadPatient } from "../middleware/consent.js";
+import { allowedPatientsFor, isSelfOrAdminUser } from "./consent.service.js";
 import { can } from "../constants/permissions.js";
 import { awardForUpload } from "./credit.service.js";
 import { notify } from "./notification.service.js";
@@ -250,20 +251,14 @@ export async function listVisibleRecords(req, { type, patientId, limit, lifecycl
     orderBy: [{ field: "observedAt", direction: "desc" }],
     limit,
   });
-  const allowed = new Map();
-  const items = [];
-  for (const record of page.items) {
-    if (record.lifecycle === "deleted") continue;
+  const permitted = await allowedPatientsFor(req, "records");
+  const items = page.items.filter((record) => {
+    if (record.lifecycle === "deleted") return false;
     const archived = record.lifecycle === "archived";
-    if (lifecycle === "archived" ? !archived : archived) continue;
-    if (req.user.role === "patient" && (record.status === "needs_review" || record.lifecycle === "manual_review")) continue;
-    if (!allowed.has(record.patientId)) {
-      let ok;
-      try { await canReadPatient(req, record.patientId, { scope: "records" }); ok = true; } catch { ok = false; }
-      allowed.set(record.patientId, ok);
-    }
-    if (allowed.get(record.patientId)) items.push(record);
-  }
+    if (lifecycle === "archived" ? !archived : archived) return false;
+    if (req.user.role === "patient" && (record.status === "needs_review" || record.lifecycle === "manual_review")) return false;
+    return isSelfOrAdminUser(req, record.patientId) || permitted === null || permitted.has(record.patientId);
+  });
   return { items, nextCursor: page.nextCursor };
 }
 
