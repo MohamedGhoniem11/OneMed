@@ -27,7 +27,10 @@ export default async function auditMiddleware(req, res, next) {
       action,
       resourceType: req.baseUrl.replace(/^\/api\//, "") || "api",
       resourceId: req.params?.id ?? req.params?.patientId ?? null,
-      patientId: req.body?.patientId ?? req.query?.patientId ?? req.params?.patientId ?? null,
+      patientId: req.body?.patientId ?? req.query?.patientId ?? req.params?.patientId
+        ?? req.path?.match(/^\/api\/patients\/([^/?]+)/)?.[1]
+        ?? req.path?.match(/^\/patients\/([^/?]+)/)?.[1]
+        ?? null,
       ip: req.ip ?? "",
       userAgent: req.get("user-agent") ?? "",
       metadata: {

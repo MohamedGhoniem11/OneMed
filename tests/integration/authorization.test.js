@@ -88,6 +88,9 @@ describe("Authorization matrix and security regressions", () => {
   });
 
   it("audits record reads with user, patient and IP metadata", async () => {
+    await getStore().set("consents", "authz_audit_consent", {
+      patientId: P, granteeType: "doctor", granteeId: D, scope: ["records"], status: "active", grantedAt: new Date(),
+    });
     await api.get(`/api/patients/${P}/records`).set(bearer(doctor)).expect(200);
     const { items } = await getStore().query("accessLog", {
       where: [{ field: "patientId", op: "==", value: P }], limit: 50,
