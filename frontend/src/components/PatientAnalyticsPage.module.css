@@ -1,11 +1,10 @@
 /* ── Page shell ─────────────────────────────────────────── */
 .page {
   display: flex;
-  height: 100vh;
+  height: calc(100vh - var(--tab-bar-h));
   overflow: hidden;
   background: #f8f9fa;
-  padding-bottom: 72px;
-  box-sizing: border-box;
+  
 }
 
 /* ── Side Nav ───────────────────────────────────────────── */

@@ -8,17 +8,19 @@
   background: #ffffff;
   border-top: 1px solid #e5e7eb;
   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.08);
-  padding: 0 16px;
+  padding: 0 8px;
+  height: var(--tab-bar-h);
 }
 
 .track {
   display: flex;
   align-items: stretch;
   justify-content: center;
-  gap: 4px;
-  max-width: 600px;
+  gap: 2px;
+  width: 100%;
+  max-width: 900px;
   margin: 0 auto;
-  height: 60px;
+  height: 100%;
 }
 
 .tab {
@@ -27,32 +29,36 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 3px;
   text-decoration: none;
-  border-radius: 12px;
-  margin: 6px 2px;
-  padding: 6px 8px;
+  border-radius: 10px;
+  margin: 5px 1px;
+  padding: 4px 4px;
   color: #9ca3af;
-  transition: background 0.15s, color 0.15s, transform 0.1s;
+  transition: background 0.15s, color 0.15s;
+  min-width: 0;
 }
 
 .tab:hover {
   background: #f3f4f6;
   color: #374151;
-  transform: translateY(-1px);
 }
 
 .emoji {
-  font-size: 20px;
+  font-size: 18px;
   line-height: 1;
+  flex-shrink: 0;
 }
 
 .label {
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 600;
   font-family: 'Inter', sans-serif;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.2px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 /* active tab */
@@ -63,10 +69,4 @@
 
 .active:hover {
   background: #ccfbf1;
-  transform: none;
-}
-
-.active .emoji {
-  transform: translateY(-2px);
-  transition: transform 0.15s;
 }
