@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
-  Bell, ChevronDown, HeartPulse, Languages, LogOut, MoreHorizontal, RotateCcw, Search,
+  Bell, ChevronDown, HeartPulse, Languages, LogOut, MoreHorizontal, Plus, RotateCcw, Search,
   Settings, X,
 } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
@@ -88,7 +88,8 @@ export function AppShell({children}:{children:React.ReactNode}) {
   const allNav = navItemsFor(role);
   const groups = groupedNavItems(items);
   const { titleKey, backTo } = sectionForPath(role, location.pathname);
-  const emergencyHref = emergencyLink || (role === 'patient' ? '/app/patient/emergency' : null);
+  // The emergency action belongs to the patient's own QR/NFC configuration only.
+  const emergencyHref = role === 'patient' ? (emergencyLink || '/app/patient/emergency') : null;
   const initials = session.user.name.slice(0,2).toUpperCase();
   const bellLabel = `${t('notifications')}${unread ? ` · ${unread} ${t('unread')}` : ''}`;
 
@@ -110,7 +111,7 @@ export function AppShell({children}:{children:React.ReactNode}) {
 
     <aside className="rail" aria-label={t('primaryNavigation')}>
       <NavLink to={roleHome[role]} className="rail-brand" aria-label={t('appName')} title={t('appName')}>
-        <span className="brand-mark" aria-hidden="true">+</span>
+        <span className="brand-mark" aria-hidden="true"><Plus size={20} strokeWidth={3}/></span>
       </NavLink>
       <nav className="rail-nav" aria-label={t('primaryNavigation')}>
         {groups.map((group,idx)=><div className="rail-group" key={`${group.key}-${idx}`}

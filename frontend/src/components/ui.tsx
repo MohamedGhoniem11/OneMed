@@ -1,7 +1,7 @@
 import React, {
   createContext, isValidElement, cloneElement, useContext, useEffect, useId, useRef, useState,
 } from 'react';
-import { X, CheckCircle2, AlertCircle, ArrowLeft, Copy } from 'lucide-react';
+import { X, CheckCircle2, AlertCircle, ArrowLeft, Copy, Droplet, AlertTriangle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 
@@ -29,21 +29,24 @@ export function Card({title, action, children, className='', pad=true, style}:{t
 }
 export function Badge({children,tone='blue'}:{children:React.ReactNode;tone?:'blue'|'green'|'red'|'amber'|'gray'}) { return <span className={`badge ${tone}`}>{children}</span>; }
 
-type InjectableFieldProps = { id?: string; 'aria-describedby'?: string };
-export function Field({label,hint,children,id:idProp}:{label:string;hint?:string;children:React.ReactNode;id?:string}) {
+type InjectableFieldProps = { id?: string; 'aria-describedby'?: string; 'aria-invalid'?: boolean };
+export function Field({label,hint,error,children,id:idProp}:{label:string;hint?:string;error?:string;children:React.ReactNode;id?:string}) {
   const generated = useId();
   const inputId = idProp || `field-${generated}`;
   const hintId = `${inputId}-hint`;
+  const errorId = `${inputId}-error`;
   let controlled: React.ReactNode = children;
   if (isValidElement(children)) {
     const props = children.props as InjectableFieldProps;
-    const injected: InjectableFieldProps = { id: props.id || inputId };
-    if (hint) injected['aria-describedby'] = [props['aria-describedby'], hintId].filter(Boolean).join(' ');
+    const injected: InjectableFieldProps = { id: props.id || inputId, 'aria-invalid': !!error || undefined };
+    const describedBy = [props['aria-describedby'], error ? errorId : null, hint ? hintId : null].filter(Boolean);
+    if (describedBy.length) injected['aria-describedby'] = describedBy.join(' ');
     controlled = cloneElement(children as React.ReactElement<InjectableFieldProps>, injected);
   }
   return <div className="field">
     <label htmlFor={inputId}>{label}</label>
     {controlled}
+    {error && <span className="error" id={errorId} role="alert">{error}</span>}
     {hint && <span className="hint" id={hintId}>{hint}</span>}
   </div>;
 }
@@ -76,13 +79,13 @@ function useDialogA11y(onClose:()=>void) {
   return ref;
 }
 
-export function Modal({title,children,onClose,footer}:{title:string;children:React.ReactNode;onClose:()=>void;footer?:React.ReactNode}) {
+export function Modal({title,children,onClose,footer,className=''}:{title:string;children:React.ReactNode;onClose:()=>void;footer?:React.ReactNode;className?:string}) {
   const {t}=useTranslation();
   const titleId = `modal-${useId()}`;
   const ref = useDialogA11y(onClose);
   return <div className="modal-layer">
     <button type="button" className="modal-backdrop" aria-label={t('close')} tabIndex={-1} onClick={onClose}/>
-    <div className="modal" role="dialog" aria-modal="true" aria-labelledby={titleId} ref={ref} tabIndex={-1}>
+    <div className={`modal ${className}`} role="dialog" aria-modal="true" aria-labelledby={titleId} ref={ref} tabIndex={-1}>
       <div className="modal-head"><h3 id={titleId}>{title}</h3><button className="btn sm" onClick={onClose} aria-label={t('close')}><X size={16}/></button></div>
       <div className="modal-body">{children}</div>{footer && <div className="modal-foot">{footer}</div>}
     </div>
@@ -103,11 +106,12 @@ export function MenuDialog({label,onClose,children,className=''}:{label:string;o
   </div>;
 }
 
-/** Back navigation. `to` is an explicit parent path; without it, a safe fallback route is used. */
-export function BackButton({fallback,label,floating=false,to}:{fallback:string;label?:string;floating?:boolean;to?:string}) {
+/** Back navigation. `to` is an explicit parent path; `onClick` handles in-flow steps. */
+export function BackButton({fallback,label,floating=false,to,onClick}:{fallback:string;label?:string;floating?:boolean;to?:string;onClick?:()=>void}) {
   const navigate = useNavigate(); const location = useLocation(); const {t}=useTranslation();
   const cls = `btn sm outline back-btn ${floating?'floating':''}`;
   const content = <><ArrowLeft size={15} aria-hidden="true"/><span>{label || t('back')}</span></>;
+  if (onClick) return <button type="button" className={cls} onClick={onClick} title={t('back')}>{content}</button>;
   if (to) return <Link className={cls} to={to} title={t('back')}>{content}</Link>;
   const back = () => {
     // React Router sets location.key to "default" only for the first entry in a session.
@@ -197,6 +201,8 @@ const STATUS: Record<string,{tone:'green'|'amber'|'red'|'gray'|'blue';labelKey?:
   critical:{tone:'red',labelKey:'critical'}, high:{tone:'red',labelKey:'high'}, cancelled:{tone:'red',labelKey:'cancelled'},
   suspended:{tone:'red',labelKey:'suspended'}, revoked:{tone:'red',labelKey:'revoked'}, inactive:{tone:'gray',labelKey:'inactive'},
   archived:{tone:'gray',labelKey:'archived'}, stable:{tone:'green',labelKey:'stable'},
+  abnormal:{tone:'red',labelKey:'abnormal'}, monitor:{tone:'amber',labelKey:'monitor'},
+  unknown:{tone:'gray',labelKey:'unknown'}, low:{tone:'amber',labelKey:'low'},
 };
 export function StatusBadge({status}:{status:string|null|undefined}) {
   const {t}=useTranslation();
@@ -213,7 +219,7 @@ export function IdentityStrip({name,initials,id,meta,blood,allergies,extra}:{nam
   return <div className="identity-strip">
     <span className="avatar identity-avatar">{initials || name.slice(0,2).toUpperCase()}</span>
     <div className="identity-main"><h2>{name}</h2><div className="identity-meta">{meta}{id && <span className="identity-id">{t('idLabel')} {id}</span>}</div></div>
-    <div className="identity-flags">{blood && <span className="identity-blood">🩸 <bdi dir="ltr">{blood}</bdi></span>}{allergies?.length ? <span className="identity-allergy">⚠ {allergies.join(', ')}</span> : null}{extra}</div>
+    <div className="identity-flags">{blood && <span className="identity-blood"><Droplet size={14} aria-hidden="true"/><bdi dir="ltr">{blood}</bdi></span>}{allergies?.length ? <span className="identity-allergy"><AlertTriangle size={14} aria-hidden="true"/>{allergies.join(', ')}</span> : null}{extra}</div>
   </div>;
 }
 /** Compact metric card with optional trend and a threshold micro-bar (G4). */

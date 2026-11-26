@@ -1,10 +1,12 @@
 import { loadDB, saveDB, findUserByEmail, DEMO_PASSWORDS, roleHome } from '../data/demo';
 import type { Role, User, Session, Patient, MedicalRecord, Prescription, Pharmacy, Institution, Consent, EmergencyProfile, Conversation, Message, Notification, AuditEntry, ChatTurn, EmergencySettings } from '../types';
 
-// Production never uses browser demo data or demo credentials.
-export const API_MODE = import.meta.env.PROD
-  ? 'api'
-  : ((import.meta.env.VITE_API_MODE as string) || 'demo');
+// Production never uses browser demo data or demo credentials. Development
+// defaults to the API too; the browser fixture is opt-in via VITE_API_MODE=demo.
+// Unit tests exercise the seeded fixture so the data layer stays covered.
+const requestedMode = (import.meta.env.VITE_API_MODE as string | undefined)
+  ?? (import.meta.env.MODE === 'test' ? 'demo' : 'api');
+export const API_MODE: 'api' | 'demo' = import.meta.env.PROD || requestedMode !== 'demo' ? 'api' : 'demo';
 const BASE = (import.meta.env.VITE_API_URL as string) || '/api';
 
 export class ApiError extends Error { constructor(public status: number, msg: string) { super(msg); } }
@@ -154,11 +156,11 @@ export async function logout(): Promise<void> {
 // ---------------- Generic data access ----------------
 export async function list<T>(collection: keyof ReturnType<typeof loadDB>, filter?: (x:any)=>boolean): Promise<T[]> {
   if (API_MODE === 'api') {
-    const map: Record<string,string> = { patients:'/patients', prescriptions:'/prescriptions', pharmacies:'/admin/pharmacies', institutions:'/institutions', consents:'/consents', users:'/users' };
+    const map: Record<string,string> = { patients:'/patients', prescriptions:'/prescriptions', pharmacies:'/admin/pharmacies', institutions:'/institutions', consents:'/consents', users:'/users', records:'/records' };
     const path = map[collection as string];
     if (!path) return [] as T[];
     const r = await http<any>(path, {}, getSession()?.token);
-    const arr = Array.isArray(r) ? r : (r.patients || r.prescriptions || r.consents || r.users || r.institutions || r.pharmacies || r.auditLog || []);
+    const arr = Array.isArray(r) ? r : (r.items || r.patients || r.prescriptions || r.consents || r.users || r.institutions || r.pharmacies || r.auditLog || []);
     let items = arr as any[];
     if (collection === 'prescriptions') items = items.map(normMeds);
     if (collection === 'patients') items = items.map(normalizePatient);
@@ -541,6 +543,16 @@ export async function updateMyProfile(patch: any) {
 export async function updateEmergencyContact(contact: any) {
   if (API_MODE === 'api') return http<any>('/patients/me', { method:'PATCH', body:JSON.stringify({ emergencyContacts:[contact] }) }, token());
   return mutate(db => { const p:any=db.patients.find(x=>x.id===getSession()?.user.uid); if(p) p.emergencyContact=contact; return p; });
+}
+/** Admin edit of an existing user account (REST PATCH / demo fixture). */
+export async function updateUserAdmin(id: string, patch: any) {
+  if (API_MODE === 'api') return http<any>(`/users/${id}`, { method:'PATCH', body:JSON.stringify(patch) }, token());
+  return mutate(db => { const u:any = db.users.find(x=>x.uid===id||(x as any).id===id); if(u) Object.assign(u,patch); return u; });
+}
+/** Admin role change for an existing user account. */
+export async function setUserRoleAdmin(id: string, role: string) {
+  if (API_MODE === 'api') return http<any>(`/users/${id}/role`, { method:'PATCH', body:JSON.stringify({ role }) }, token());
+  return mutate(db => { const u:any = db.users.find(x=>x.uid===id||(x as any).id===id); if(u) u.role=role; return u; });
 }
 
 export async function createStaffAccount(data: any) {

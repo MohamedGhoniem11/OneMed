@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   LayoutDashboard, Users, FileText, FlaskConical, Pill, MessageSquare, Bell, Settings,
-  BarChart3, ShieldCheck, Building2, Store, ClipboardList, Plug, Activity, QrCode, PlayCircle,
+  BarChart3, ShieldCheck, Building2, Store, ClipboardList, Plug, Activity, QrCode,
 } from 'lucide-react';
 import type { Role } from '../types';
 
@@ -77,8 +77,7 @@ export function roleLabelKey(role: Role) {
 
 export function navItemsFor(role: Role) {
   return [...(navByRole[role] || []),
-    {to:'/app/notifications',label:'notifications',icon:<Bell className="ico"/>} as NavItem,
-    {to:'/app/demos',label:'demos',group:'navGroupSystem',icon:<PlayCircle className="ico"/>} as NavItem];
+    {to:'/app/notifications',label:'notifications',icon:<Bell className="ico"/>} as NavItem];
 }
 
 /** Destinations shown in the compact bottom tab bar (the rest live in "More"). */

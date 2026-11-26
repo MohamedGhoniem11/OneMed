@@ -1,6 +1,6 @@
 # OneMed — Unified Medical Data Platform
 
-Bilingual (Arabic/English) healthcare connectivity demo: patient timelines, consent-gated clinical access, lab ingestion, prescription extraction and pharmacy fulfillment, emergency QR/NFC pages with grounded first-aid guidance, analytics, reports and role-based portals for six roles.
+Bilingual (Arabic/English) healthcare connectivity platform (academic build): patient timelines, consent-gated clinical access, lab ingestion, prescription extraction and pharmacy fulfillment, emergency QR/NFC pages with grounded first-aid guidance, analytics, reports and role-based portals for six roles. Local runs use a fully synthetic cohort — no real patient data is included.
 
 > Academic graduation project. Production deployment requires Firebase Blaze credentials supplied through environment variables; no secrets are included in this repository.
 
@@ -19,15 +19,15 @@ Bilingual (Arabic/English) healthcare connectivity demo: patient timelines, cons
 ```bash
 npm install
 cd frontend && npm install && cd ..
-npm run seed          # create demo accounts and data BEFORE starting the API
+npm run seed          # populate the API with the synthetic cohort BEFORE starting it
 npm run dev:all       # API :3000 + UI :5173 in API mode
 ```
 
 Open <http://localhost:5173>. Health check: <http://localhost:3000/>.
 
-Without `VITE_API_MODE=api` the UI runs in browser demo mode with localStorage data. Production builds always use API mode.
+The UI talks to the real API by default. The browser-local dataset remains available only when `VITE_API_MODE=demo` is set explicitly (used by unit tests and offline development); production builds are always API-only.
 
-### Demo accounts (from `npm run seed`)
+### Synthetic accounts (from `npm run seed`)
 
 | Role | Email | Password |
 |---|---|---|
@@ -68,7 +68,7 @@ Production startup fails closed if any required variable is missing or demo deli
 |---|---|
 | `npm start` | Start API only |
 | `npm run dev:all` | Start API + frontend in API mode |
-| `npm run seed` / `seed:guidelines` | Idempotent demo data / first-aid KB |
+| `npm run seed` / `seed:guidelines` | Idempotent synthetic cohort / first-aid KB |
 | `npm run test:ocr`, `test:ocr:accuracy` | OCR smoke/accuracy |
 | `npm run demo` | 12-flow end-to-end API walkthrough |
 | `npm run perf:smoke` | Measured NFR subset → `docs/PERFORMANCE.md` (local only) |
@@ -93,7 +93,7 @@ Production startup fails closed if any required variable is missing or demo deli
 4. Deploy functions: `npm --prefix functions ci && npm --prefix functions run deploy`.
 5. Deploy rules/indexes: `firebase deploy --only firestore:rules,firestore:indexes`.
 6. Build the frontend (`npm --prefix frontend run build`) and deploy `frontend/dist` with Firebase Hosting or another static host; configure rewrites to `index.html`.
-7. Run `npm run seed` only for a demo environment; never seed test accounts in production.
+7. Run `npm run seed` only for a local or demo environment; never seed synthetic accounts in production.
 
 ## Known limitations
 
