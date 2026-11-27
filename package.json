@@ -18,6 +18,7 @@
     "test:ocr": "node scripts/ocr-smoke.mjs",
     "test:ocr:accuracy": "node scripts/ocr-accuracy.mjs",
     "seed": "node scripts/seed.mjs",
+    "mfa": "node scripts/mfa-code.mjs",
     "seed:guidelines": "node scripts/seed-guidelines.mjs",
     "dev:all": "node scripts/dev-all.mjs",
     "demo": "node scripts/demo-walkthrough.mjs",

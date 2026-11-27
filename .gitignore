@@ -6,9 +6,16 @@ node_modules
 .env.*
 !.env.example
 
-# Firebase service account keys
+# Firebase service account keys (never commit any credential file)
 serviceAccountKey.json
 *serviceAccountKey*.json
+*firebase-adminsdk*.json
+*service-account*.json
+*.pem
+*.key
+
+# Temporary browser test fixtures
+frontend/public/__*.json
 
 # runtime data (local persistence adapter + generated dev secrets)
 /data/
@@ -33,6 +40,10 @@ frontend/test-results/
 .agents/
 skills-lock.json
 
-# Internal reports (kept outside the public repo)
+# Internal reports / team guides (kept outside the public repo)
 FINAL-REPORT.md
+PERFORMANCE.md
+AI-ASSISTANT.md
+AI-TEST-RESULTS.md
+TEAM-SETUP.md
 docs/

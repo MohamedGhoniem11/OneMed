@@ -39,7 +39,7 @@ The UI talks to the real API by default. The browser-local dataset remains avail
 | hospital admin | hany.admin@example.com | Demo!onemedH1 |
 | admin | admin.onemed@example.com | Demo!onemedA1 |
 
-Staff roles require TOTP MFA; seeded secrets are written to `userMfa/{uid}`.
+Staff roles require TOTP MFA; seeded secrets are written to `userMfa/{uid}`. For local testing, print a current code with `npm run mfa -- user_doctor_1` (replace the UID as needed).
 
 ## Environment
 
