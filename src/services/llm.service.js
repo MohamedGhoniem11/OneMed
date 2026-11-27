@@ -75,8 +75,15 @@ export async function embed(texts) {
 }
 
 const STOP = new Set(["what","is","the","a","an","of","to","and","or","i","my","for","in","on","with","does","do","can","you","your","patient","patients","person","situation","emergency","help","need","should","please","tell","me","about","this","that","has","have","may","might","could","who","when","where","why","how","someone","there","their"]);
+// Arabic definite article and common prepositions are attached to the word.
+// Strip them so "التشنج" and "تشنج" match in the offline retrieval path.
+function normalizeWord(word) {
+  if (!/[\u0600-\u06FF]/.test(word)) return word;
+  return word.replace(/^(وال|بال|فال|كال|لل|ال)/, "");
+}
 function tokens(text) {
-  return String(text || "").toLowerCase().split(/[^a-z0-9\u0600-\u06FF]+/).filter((w) => w && !STOP.has(w));
+  return String(text || "").toLowerCase().split(/[^a-z0-9\u0600-\u06FF]+/)
+    .map(normalizeWord).filter((w) => w && !STOP.has(w));
 }
 
 /** Deterministic lexical ranking used when no LLM API key is configured. */
