@@ -70,9 +70,15 @@ export function createFirestoreStore() {
     async set(name, id, data, { merge = false } = {}) {
       if (!id) throw new Error("set requires a document id");
       const clean = stripId(data);
-      await db.collection(name).doc(id).set(clean, { merge });
-      // The caller supplied the complete stored shape; re-reading it costs a
-      // second network round trip (~550 ms) for no new information.
+      const ref = db.collection(name).doc(id);
+      if (merge) {
+        // Preserve the local adapter's merged-document return contract for the
+        // rare partial update; full writes skip the extra network read.
+        const before = await ref.get();
+        await ref.set(clean, { merge });
+        return { id, ...toIso({ ...(before.exists ? before.data() : {}), ...clean }) };
+      }
+      await ref.set(clean);
       return { id, ...toIso(clean) };
     },
 

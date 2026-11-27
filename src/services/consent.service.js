@@ -96,6 +96,9 @@ export async function findActiveForGrantee(granteeType, granteeId, now = new Dat
       { field: "granteeId", op: "==", value: granteeId },
       { field: "status", op: "==", value: "active" },
     ],
+    // Keep server-side limiting in Firestore (the adapter only pushes `limit`
+    // down when an order is present) so this hot-path query stays bounded.
+    orderBy: [{ field: "createdAt", direction: "desc" }],
     limit: 500,
   });
   return items.filter((consent) => isActive(consent, now));

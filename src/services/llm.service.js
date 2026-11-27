@@ -114,5 +114,7 @@ export async function generate({ system, prompt, maxOutputTokens = 1600 }) {
     .map((c) => c.content?.parts?.map((p) => p.text || "").join("") || "")
     .join("\n")
     .trim();
-  return { text: text || "I cannot provide guidance for this situation. Please wait for emergency services.", mode: "gemini" };
+  // An empty response is a degraded generation, not a clinical answer. Let
+  // each assistant apply its own safe reply and mark the failure visibly.
+  return { text, mode: "gemini" };
 }

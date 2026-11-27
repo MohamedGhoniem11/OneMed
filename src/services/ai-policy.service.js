@@ -15,14 +15,14 @@
 // patterns. Keeping the two sets separate avoids silent misses in Arabic.
 const ASCII = {
   emergency: /\b(123|999|112|emergency|ambulance|cardiac|heart attack|arrest|unconscious|unresponsive|not breathing|stroke|overdose|poison|collapse|faint|self.?harm|suicide|kill myself|hang myself|cut myself|hurt myself|harm myself)\b/i,
-  medication: /\b(dose|dosage|milligram|\bmg\b|tablet|prescri|medication|medicine|drug|aspirin|paracetamol|insulin|warfarin|antibiotic)\b/i,
-  diagnosis: /\b(diagnose|diagnosis|what disease|what condition|is it cancer|could it be)\b/i,
+  medication: /\b(doses?|dosage|milligram|\bmg\b|tablets?|prescri\w*|medication|medicines?|drug|aspirin|paracetamol|insulin|warfarin|antibiotic)\b/i,
+  diagnosis: /\b(diagnos\w*|what disease|what condition|is it cancer|could it be)\b/i,
   unrelated: /\b(weather|football|stock|movie|recipe|computer virus|write code|income|insurance policy|salary)\b/i,
   firstAid: /\b(cpr|seizure|bleeding|burn|choking|allergy|faint|recovery position|rescue|first aid)\b/i,
 };
 const ARABIC = {
-  emergency: /(الإسعاف|طوارئ|غيبوبة|انتحار|إيذاء نفسي|أؤذي نفسي|أؤذي|أغمي عليه|فاقد للوعي|لا يتنفس|لا تتنفس)/,
-  medication: /(جرعة|دواء|عقار|مسكن|اسبرين|باراسيتامول|مضاد حيوي)/,
+  emergency: /(الإسعاف|طوارئ|غيبوبة|انتحار|انتحر|سأقتل نفسي|أقتل نفسي|إيذاء نفسي|أؤذي نفسي|أؤذي|أغمي عليه|فاقد للوعي|لا يتنفس|لا تتنفس)/,
+  medication: /(جرعات|جرعة|دواء|أقراص|حبوب|عقار|مسكن|اسبرين|باراسيتامول|مضاد حيوي)/,
   diagnosis: /(تشخيص|شخّص|ما المرض|هل هو سرطان)/,
   unrelated: /(الطقس|كرة القدم|فيلم|راتب|دخل|بوليصة تأمين)/,
   firstAid: /(إسعاف|تشنج|نزيف|حرق|اختناق|إنعاش|وضع التعافي)/,
@@ -47,8 +47,8 @@ const REPLIES = {
     ar: "لا أقدّم تشخيصاً أو وصفة دوائية. أستطيع تلخيص ومقارنة البيانات المسجّلة للمريض، مثل الأدوية أو الحساسية أو اتجاهات التحاليل.",
   },
   unclear: {
-    en: "Can you tell me what happened or which first-aid step you need?",
-    ar: "هل يمكنك أن تخبرني بما حدث أو بخطوة الإسعاف التي تحتاجها؟",
+    en: "Call emergency services (123) if anyone needs urgent help. Can you tell me what happened or which first-aid step you need?",
+    ar: "اتصل بالإسعاف (١٢٣) إذا كان أحدهم يحتاج مساعدة عاجلة. هل يمكنك أن تخبرني بما حدث أو بخطوة الإسعاف التي تحتاجها؟",
   },
   knowledgeGap: {
     en: "I could not find a matching first-aid step for that question. Call emergency services (123) if someone needs help.",

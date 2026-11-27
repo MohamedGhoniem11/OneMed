@@ -93,6 +93,17 @@ describe("M4 emergency public page and first-aid chatbot", () => {
     expect(selfHarm.body.text).toContain("١٢٣");
   });
 
+  it("always includes the emergency number for short unclear messages", async () => {
+    const unclear = await api.post(`/api/emergency/${emergencyToken}/chat`)
+      .send({ message: "chest pain", language: "en" }).expect(200);
+    expect(unclear.body.scope).toBe("unclear");
+    expect(unclear.body.text).toContain("123");
+    const arabic = await api.post(`/api/emergency/${emergencyToken}/chat`)
+      .send({ message: "انتحر", language: "ar" }).expect(200);
+    expect(arabic.body.scope).toBe("emergency");
+    expect(arabic.body.text).toContain("١٢٣");
+  });
+
   it("answers Arabic first-aid questions in Arabic with the 123 lead", async () => {
     const res = await api.post(`/api/emergency/${emergencyToken}/chat`)
       .send({ message: "شخص عنده تشنج، ماذا أفعل؟", language: "ar" }).expect(200);
