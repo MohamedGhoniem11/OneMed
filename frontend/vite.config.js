@@ -15,6 +15,12 @@ export default defineConfig({
   },
   preview: { port: 4173, strictPort: true },
   build: {
+    // Rolldown was hoisting the 616 kB chart chunk into index.html as a
+    // modulepreload. Keep preloads for small shared chunks, but let the entry
+    // skip charts; route chunks still preload them when analytics opens.
+    modulePreload: {
+      resolveDependencies: (filename, deps) => deps.filter((dep) => !dep.includes('charts-')),
+    },
     rollupOptions: {
       output: {
         manualChunks(id) {
