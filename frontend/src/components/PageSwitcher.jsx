@@ -3,14 +3,15 @@ import { NavLink } from 'react-router-dom'
 import styles from './PageSwitcher.module.css'
 
 const pages = [
-  { to: '/prescription',      emoji: '📄', label: 'Prescription' },
-  { to: '/admin',             emoji: '⚙️',  label: 'Admin'        },
-  { to: '/system',            emoji: '🏥', label: 'System'       },
-  { to: '/lab',               emoji: '🧪', label: 'Lab'          },
-  { to: '/patient-analytics', emoji: '📊', label: 'Analytics'    },
-  { to: '/medical-record',    emoji: '📋', label: 'Records'      },
-  { to: '/pharmacy-order',    emoji: '💊', label: 'Pharmacy'     },
-  { to: '/emergency',         emoji: '🚨', label: 'Emergency'    },
+  { to: '/prescription',      emoji: '📄', label: 'Rx'        },
+  { to: '/admin',             emoji: '⚙️',  label: 'Admin'     },
+  { to: '/system',            emoji: '🏥', label: 'System'    },
+  { to: '/lab',               emoji: '🧪', label: 'Lab'       },
+  { to: '/patient-analytics', emoji: '📊', label: 'Analytics' },
+  { to: '/medical-record',    emoji: '📋', label: 'Records'   },
+  { to: '/pharmacy-order',    emoji: '💊', label: 'Pharmacy'  },
+  { to: '/emergency',         emoji: '🚨', label: 'Emergency' },
+  { to: '/nfc',               emoji: '📡', label: 'NFC'       },
 ]
 
 export default function PageSwitcher() {

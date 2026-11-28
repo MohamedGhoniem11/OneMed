@@ -9,6 +9,7 @@ import SystemOverviewPage   from './components/SystemOverviewPage.jsx'
 import LabIngestionPage     from './components/LabIngestionPage.jsx'
 import PatientAnalyticsPage from './components/PatientAnalyticsPage.jsx'
 import MedicalRecordPage    from './components/MedicalRecordPage.jsx'
+import NfcScanPage          from './components/NfcScanPage.jsx'
 import PageSwitcher         from './components/PageSwitcher.jsx'
 import './index.css'
 
@@ -25,6 +26,7 @@ function Root() {
         <Route path="/lab"               element={<LabIngestionPage />} />
         <Route path="/patient-analytics" element={<PatientAnalyticsPage />} />
         <Route path="/medical-record"    element={<MedicalRecordPage />} />
+        <Route path="/nfc"               element={<NfcScanPage />} />
       </Routes>
       <PageSwitcher />
     </>
