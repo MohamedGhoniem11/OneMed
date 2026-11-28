@@ -1,0 +1,342 @@
+/* ══════════════════════════════════════════════════════════════
+   NfcScanPage — Figma nodes 59:3, 1:1960, 1:1906
+   390 × 884px — full responsive
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── Page wrapper — bg #f9f9ff ── */
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  height: calc(100vh - var(--tab-bar-h));
+  background: linear-gradient(90deg, #f9f9ff 0%, #f9f9ff 100%);
+  position: relative;
+  overflow-y: auto;
+  font-family: var(--font-main);
+}
+
+/* ── Header (node 1:1960) ── */
+/* backdrop-blur-[6px] bg-[rgba(249,249,255,0.8)] p-[16px] flex items-center justify-center */
+.header {
+  position: sticky;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(249, 249, 255, 0.80);
+  backdrop-filter: blur(6px);
+  z-index: 10;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.headerInner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* Heading 1 (node 1:1961) — Inter Black 24px #002657 tracking-[-0.6px] */
+.brandName {
+  font-size: 24px;
+  font-weight: 900;
+  color: #002657;
+  letter-spacing: -0.6px;
+  line-height: 32px;
+  margin: 0;
+  font-family: var(--font-main);
+}
+
+/* ── Main Content Canvas (node 1:1906) ── */
+/* absolute left-0 right-0 top-[64px] px-[16px] py-[138px] flex flex-col items-center justify-center max-w-[448px] */
+.canvas {
+  flex: 1 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 448px;
+  padding: 138px 16px;
+  box-sizing: border-box;
+  gap: 0;
+}
+
+/* ── NFC Scanning Area (node 1:1908) ── */
+/* h-[208px] w-full pb-[32px] relative */
+.nfcArea {
+  position: relative;
+  width: 100%;
+  height: 208px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 32px;
+  flex-shrink: 0;
+  margin-bottom: 32px;
+}
+
+/* NFC container (node 1:1915) — 128×128 centered */
+.nfcContainer {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 128px;
+  height: 128px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Outer ring (node 1:1916) — border-4 rgba(0,38,87,0.2) inset-0 rounded-[12px] */
+.nfcRingOuter {
+  position: absolute;
+  inset: 0;
+  border: 4px solid rgba(0, 38, 87, 0.2);
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+/* Inner ring (node 1:1917) — border-2 rgba(0,38,87,0.4) inset-[8px] rounded-[12px] */
+.nfcRingInner {
+  position: absolute;
+  inset: 8px;
+  border: 2px solid rgba(0, 38, 87, 0.4);
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+/* Main icon box (node 1:1918) — bg-[#0b3b7c] 96×96 rounded-[12px] shadow */
+.nfcBox {
+  width: 96px;
+  height: 96px;
+  background: #0b3b7c;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0px 10px 15px -3px rgba(0,0,0,0.1), 0px 4px 6px -4px rgba(0,0,0,0.1);
+  position: relative;
+  z-index: 1;
+}
+
+.nfcBoxIcon {
+  width: 40px;
+  height: 40px;
+  display: block;
+}
+
+/* Title (node 1:1909) — absolute centered, 62px below center */
+/* Inter SemiBold 20px #002657 text-center */
+.title {
+  position: absolute;
+  top: calc(50% + 62px);
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 20px;
+  font-weight: 600;
+  color: #002657;
+  text-align: center;
+  line-height: 28px;
+  margin: 0;
+  white-space: nowrap;
+  font-family: var(--font-main);
+}
+
+/* Subtitle wrapper (node 1:1911) — absolute left-[44px] top-[180px] pt-[8px] */
+.subtitleWrap {
+  position: absolute;
+  top: 180px;
+  left: 44.47px;
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Inter Regular 14px #434750 text-center */
+.subtitle {
+  font-size: 14px;
+  font-weight: 400;
+  color: #434750;
+  text-align: center;
+  line-height: 20px;
+  margin: 0;
+  white-space: nowrap;
+  font-family: var(--font-main);
+}
+
+/* ── Navigation Options (node 1:1922) gap-[8px] ── */
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+/* ── Option button — base (node 1:1923) ── */
+/* bg-white border border-[#c3c6d2] p-[17px] rounded-[8px] gap-[16px] */
+.optionBtn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 17px;
+  background: white;
+  border: 1px solid #c3c6d2;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  overflow: hidden;
+  transition: background 0.15s, box-shadow 0.15s;
+  box-sizing: border-box;
+  font-family: var(--font-main);
+}
+
+.optionBtn:hover {
+  background: #f9f9ff;
+  box-shadow: 0px 2px 8px rgba(0,0,0,0.06);
+}
+
+.optionBtn:active { transform: scale(0.99); }
+
+/* Emergency variant (node 1:1945) */
+/* bg-[#f0f3ff] border-2 border-[#006a61] p-[18px] shadow */
+.optionBtnEmergency {
+  background: #f0f3ff;
+  border: 2px solid #006a61;
+  padding: 18px;
+  box-shadow: 0px 1px 2px rgba(0,0,0,0.05);
+}
+
+.optionBtnEmergency:hover {
+  background: #e8f5f3;
+}
+
+/* Glow (node 1:1946) — bg rgba(134,242,228,0.3) blur-[20px] right-[-48px] top-[-48px] 96×96 rounded-[12px] */
+.emergencyGlow {
+  position: absolute;
+  top: -48px;
+  right: -48px;
+  width: 96px;
+  height: 96px;
+  background: rgba(134, 242, 228, 0.3);
+  border-radius: 12px;
+  filter: blur(20px);
+  pointer-events: none;
+}
+
+/* Icon wrap — base (node 1:1924) bg-[#d8e3fb] 40×40 rounded-[12px] */
+.optionIconWrap {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 12px;
+  background: #d8e3fb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Emergency icon wrap (node 1:1947) bg-[#86f2e4] */
+.optionIconWrapEmergency {
+  background: #86f2e4;
+}
+
+.optionIcon {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* Text block */
+.optionText {
+  flex: 1 0 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3.5px;
+}
+
+/* Inter SemiBold 14px #111c2d tracking-[0.14px] */
+.optionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111c2d;
+  letter-spacing: 0.14px;
+  line-height: 20px;
+  display: block;
+}
+
+/* Emergency title — Inter Bold 14px #002657 */
+.optionTitleEmergency {
+  font-weight: 700;
+  color: #002657;
+}
+
+/* Inter Medium 12px #434750 */
+.optionSub {
+  font-size: 12px;
+  font-weight: 500;
+  color: #434750;
+  line-height: 16px;
+  display: block;
+}
+
+/* Emergency sub — Inter SemiBold 12px #006a61 */
+.optionSubEmergency {
+  font-weight: 600;
+  color: #006a61;
+}
+
+/* Chevron 7.4×12px */
+.optionChevron {
+  display: block;
+  flex-shrink: 0;
+}
+
+/* ── Footer (node 1:1957) ── */
+/* absolute bottom-0 p-[24px] flex items-center justify-center */
+.footer {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+/* Inter Medium 12px rgba(67,71,80,0.7) tracking-[1.2px] uppercase text-center */
+.footerText {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(67, 71, 80, 0.7);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 16px;
+  font-family: var(--font-main);
+}
+
+/* ── Responsive ── */
+@media (max-width: 440px) {
+  .canvas { padding: 80px 16px 32px; }
+  .title { font-size: 18px; white-space: normal; text-align: center; width: 90%; }
+  .subtitle { white-space: normal; text-align: center; }
+  .subtitleWrap { left: 50%; transform: translateX(-50%); width: 100%; }
+}
+
+@media (max-height: 700px) {
+  .canvas { padding: 60px 16px 24px; }
+  .nfcArea { height: 180px; }
+  .title { font-size: 17px; }
+}
